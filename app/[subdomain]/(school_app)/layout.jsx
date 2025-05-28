@@ -8,8 +8,9 @@ import { Toaster, toast } from 'sonner';
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Sun, Moon, LayoutDashboard, Users, BookOpen, LogOut, Menu, X as CloseIcon } from 'lucide-react'; // Added Menu, CloseIcon
+import { Sun, Moon, LayoutDashboard, Users, BookOpen, LogOut, Menu, X as CloseIcon, AlertTriangle } from 'lucide-react'; // Added Menu, CloseIcon
 import { useTheme } from 'next-themes';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const SchoolContext = createContext(null);
 export const useSchool = () => useContext(SchoolContext);
