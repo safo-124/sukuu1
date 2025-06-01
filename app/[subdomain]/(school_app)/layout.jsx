@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/button';
 import {
   Sun, Moon, LayoutDashboard, Users, UserCog, BookOpen, LogOut, Menu, X as CloseIcon, Settings, GraduationCap, PresentationChart, CalendarDays, Building, Library, Bus, ClipboardList, Briefcase, CheckSquare, DollarSign, FileText, Percent, BookCopy, Newspaper, FileArchive, Home, // Comprehensive icon list
   AlertTriangle,
-  Store
+  Store,
+  Layers
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -101,6 +102,7 @@ function SchoolSidebar({ schoolSubdomain, schoolName, schoolLogoUrl, isOpen, onC
     {
       title: 'Academics',
       items: [
+        { href: `/${schoolSubdomain}/academics/school-levels`, label: 'School Levels', icon: Layers },
         { href: `/${schoolSubdomain}/academics/classes`, label: 'Classes & Sections', icon: Building },
         { href: `/${schoolSubdomain}/academics/subjects`, label: 'Subjects', icon: BookOpen },
         { href: `/${schoolSubdomain}/academics/timetable`, label: 'Timetable', icon: CalendarDays },
@@ -150,6 +152,7 @@ function SchoolSidebar({ schoolSubdomain, schoolName, schoolLogoUrl, isOpen, onC
     {
       title: 'School Setup',
       items: [
+        { href: `/${schoolSubdomain}/settings/academic-years`, label: 'Academic Years', icon: CalendarDays /* or other suitable icon */ },
         { href: `/${schoolSubdomain}/settings/profile`, label: 'School Profile', icon: Settings },
         // { href: `/${schoolSubdomain}/settings/academic`, label: 'Academic Settings', icon: BookCopy },
       ]
