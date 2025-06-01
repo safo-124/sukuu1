@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useSchool } from '../../../layout'; // Adjust path if your layout export is different
+import { useSchool } from '../../layout'; // Adjust path if your layout export is different
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 import { Button } from "@/components/ui/button";
