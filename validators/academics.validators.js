@@ -41,8 +41,7 @@ export const classSchema = z.object({
     .cuid({ message: "Invalid Academic Year ID format." }),
 });
 
-// If you intend to have an update route (e.g., .../classes/[classId]/route.js)
-export const updateClassSchema = classSchema.partial();
+export const updateClassSchema = classSchema.partial(); 
 
 export const schoolLevelSchema = z.object({
   name: z.string()
@@ -63,20 +62,16 @@ export const sectionSchema = z.object({
     .min(1, { message: "Section name must be at least 1 character." })
     .max(50, { message: "Section name cannot exceed 50 characters." })
     .trim(),
-  // classId will typically come from the route parameters if sections are nested under classes,
-  // or be required in the body if it's a general endpoint.
-  // For now, let's assume classId is handled by the route context when creating.
-  // If you make POST requests to a general /sections endpoint, add classId here:
-  // classId: z.string().cuid({ message: "Invalid Class ID format." }), 
   classTeacherId: z.string()
-    .cuid({ message: "Invalid Class Teacher ID format." })
+    .cuid({ message: "Invalid Class Teacher (Staff) ID format." })
     .optional()
-    .nullable(), // Staff ID for the class teacher
-  maxCapacity: z.number()
-    .int({ message: "Max capacity must be an integer." })
+    .nullable(), // Allows explicitly unassigning or not assigning a teacher
+  maxCapacity: z.coerce // Use z.coerce for numbers from form inputs
+    .number({ invalid_type_error: "Max capacity must be a number." })
+    .int({ message: "Max capacity must be a whole number." })
     .positive({ message: "Max capacity must be a positive number." })
     .optional()
-    .nullable(),
+    .nullable(), // Allows empty or no capacity set
 });
 
-export const updateSectionSchema = sectionSchema.partial(); 
+export const updateSectionSchema = sectionSchema.partial();
