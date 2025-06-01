@@ -11,20 +11,29 @@ import {
   CardTitle,
   CardContent,
   CardDescription
-} from "@/components/ui/card";
+} from "@/components/ui/card"; // Using parts of Shadcn Card for structure
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { Users, UserCog, Building, CalendarPlus, BellPlus, DollarSign, PieChart as PieChartIcon, CalendarDays, PresentationChart } from 'lucide-react';
+import { Users, UserCog, Building, CalendarDays, BellPlus, DollarSign, PresentationChart, PieChart } from 'lucide-react';
 
-// --- Helper: StatCard Component (remains the same) ---
+// --- Helper: StatCard Component (Ensure it's robust for undefined values during loading) ---
 const StatCard = ({ title, value, icon, description, isLoading, linkTo }) => {
   const titleTextClasses = "text-zinc-900 dark:text-zinc-50";
   const descriptionTextClasses = "text-zinc-600 dark:text-zinc-400";
+  // Using Tailwind classes for glassmorphism directly on this component's root
+  const glassCardClasses = `
+    p-1 min-h-[130px] flex flex-col justify-between rounded-xl 
+    backdrop-blur-xl backdrop-saturate-150 shadow-xl dark:shadow-2xl 
+    bg-white/70 border border-zinc-200/80 
+    dark:bg-zinc-900/70 dark:border-zinc-700/80
+    ${linkTo ? 'hover:shadow-lg dark:hover:shadow-sky-500/20 transition-shadow' : ''}
+  `;
   const StatCardWrapper = linkTo ? Link : 'div';
+
 
   if (isLoading) {
     return (
-      <div className="bw-glass-card p-5 min-h-[130px] flex flex-col justify-between">
+      <div className={`${glassCardClasses} p-5`}> {/* Add padding for skeleton */}
         <div>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
             <Skeleton className="h-5 w-3/4 bg-zinc-300 dark:bg-zinc-700 rounded" />
@@ -40,13 +49,13 @@ const StatCard = ({ title, value, icon, description, isLoading, linkTo }) => {
   }
 
   return (
-    <StatCardWrapper href={linkTo || undefined} className={`bw-glass-card block p-1 min-h-[130px] flex flex-col justify-between ${linkTo ? 'hover:shadow-lg dark:hover:shadow-sky-500/20 transition-shadow' : ''}`}>
+    <StatCardWrapper href={linkTo || undefined} className={glassCardClasses}>
       <div>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-5 pt-5">
           <CardTitle className={`text-sm font-medium ${titleTextClasses}`}>{title}</CardTitle>
           {icon}
         </CardHeader>
-        <CardContent className="pb-2">
+        <CardContent className="pb-2 px-5">
           <div className={`text-3xl font-bold ${titleTextClasses}`}>{value !== undefined && value !== null ? value : '-'}</div>
         </CardContent>
       </div>
@@ -58,21 +67,22 @@ const StatCard = ({ title, value, icon, description, isLoading, linkTo }) => {
 
 export default function SchoolAdminDashboardPage() {
   const { data: session } = useSession();
-  const schoolData = useSchool();
+  const schoolData = useSchool(); // from SchoolAppLayout context
 
   const [dashboardStats, setDashboardStats] = useState({
-    totalStudents: 0, totalTeachers: 0, totalActiveClassesOrSections: 0,
+    totalStudents: 0, 
+    totalTeachers: 0, 
+    totalClasses: 0, // Added totalClasses
   });
   const [isLoadingStats, setIsLoadingStats] = useState(true);
 
-  // --- ✨ Tailwind Class Constants - Added outlineButtonClasses ✨ ---
-  const titleTextClasses = "text-black dark:text-white"; // Maintained from previous error, changed pageTitleClasses to use this
-  const pageTitleClasses = `text-3xl font-bold ${titleTextClasses}`;
+  // Tailwind class constants
+  const pageTitleClasses = "text-zinc-900 dark:text-zinc-50";
   const descriptionTextClasses = "text-zinc-600 dark:text-zinc-400";
   const glassCardClasses = `p-6 md:p-8 rounded-xl backdrop-blur-xl backdrop-saturate-150 shadow-xl dark:shadow-2xl bg-white/70 border border-zinc-200/80 dark:bg-zinc-900/70 dark:border-zinc-700/80`;
-  const sectionTitleClasses = `text-xl font-semibold ${titleTextClasses}`;
+  const sectionTitleClasses = `text-xl font-semibold ${pageTitleClasses}`;
   const primaryButtonClasses = "bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200";
-  const outlineButtonClasses = "border-zinc-300 text-black hover:bg-zinc-100 dark:border-zinc-700 dark:text-white dark:hover:bg-zinc-800"; // Correctly defined here
+  const outlineButtonClasses = "border-zinc-300 text-black hover:bg-zinc-100 dark:border-zinc-700 dark:text-white dark:hover:bg-zinc-800";
 
 
   const fetchDashboardStats = useCallback(async () => {
@@ -85,10 +95,15 @@ export default function SchoolAdminDashboardPage() {
         throw new Error(errData.error || `Failed to fetch dashboard stats (${response.status})`);
       }
       const data = await response.json();
-      setDashboardStats(data);
+      setDashboardStats({ // Ensure all expected fields are set, defaulting if not present
+          totalStudents: data.totalStudents || 0,
+          totalTeachers: data.totalTeachers || 0,
+          totalClasses: data.totalClasses || 0, // Use new field
+      });
     } catch (error) {
       console.error("Failed to fetch dashboard stats:", error);
       toast.error("Could not load dashboard statistics", { description: error.message });
+      setDashboardStats({ totalStudents: 0, totalTeachers: 0, totalClasses: 0 }); // Reset on error
     } finally {
       setIsLoadingStats(false);
     }
@@ -100,7 +115,7 @@ export default function SchoolAdminDashboardPage() {
     }
   }, [schoolData, fetchDashboardStats]);
 
-  // Skeleton/Loading for the entire page if schoolData from context is not yet available
+  // Skeleton for the entire page if schoolData isn't available from context yet
   if (!schoolData && isLoadingStats) { 
     return (
       <div className="space-y-6 p-4 md:p-6 lg:p-8">
@@ -115,13 +130,14 @@ export default function SchoolAdminDashboardPage() {
   }
   
   if (!schoolData) {
-      return <div className={`text-xl p-4 md:p-6 lg:p-8 ${titleTextClasses}`}>Loading school information or school not found...</div>;
+      return <div className={`text-xl p-4 md:p-6 lg:p-8 ${pageTitleClasses}`}>Loading school information or school not found...</div>;
   }
 
+
   return (
-    <div className="space-y-8"> {/* Removed container and mx-auto, page gets padding from layout */}
+    <div className="space-y-8">
       <div>
-        <h1 className={pageTitleClasses}>
+        <h1 className={`text-3xl font-bold ${pageTitleClasses}`}>
           {schoolData?.name} Dashboard
         </h1>
         <p className={descriptionTextClasses}>
@@ -148,12 +164,12 @@ export default function SchoolAdminDashboardPage() {
           description="Manage teaching staff"
         />
         <StatCard 
-          title="Classes / Sections" 
-          value={dashboardStats.totalActiveClassesOrSections} 
+          title="Total Classes" // Updated title
+          value={dashboardStats.totalClasses} // Use new stat
           icon={<Building className={`h-5 w-5 ${descriptionTextClasses}`} />} 
           isLoading={isLoadingStats}
           linkTo={`/${schoolData.subdomain}/academics/classes`}
-          description="Active learning groups"
+          description="View all classes"
         />
       </section>
 
@@ -190,7 +206,7 @@ export default function SchoolAdminDashboardPage() {
           <div className={`text-center py-8 ${descriptionTextClasses}`}>
             <CalendarDays className="mx-auto h-12 w-12 opacity-50" />
             <p className="mt-2 text-sm">No upcoming events scheduled yet.</p>
-            <p className="text-xs">Events module coming soon!</p>
+            {/* <p className="text-xs">Events module coming soon!</p> */}
           </div>
         </div>
       </section>
@@ -201,9 +217,9 @@ export default function SchoolAdminDashboardPage() {
             Financial Snapshot
         </h2>
         <div className={`text-center py-8 ${descriptionTextClasses}`}>
-            <PieChartIcon className="mx-auto h-12 w-12 opacity-50" />
+            <PieChart className="mx-auto h-12 w-12 opacity-50" />
             <p className="mt-2 text-sm">Financial overview will be displayed here.</p>
-            <p className="text-xs">Finance module integration coming soon!</p>
+            {/* <p className="text-xs">Finance module integration coming soon!</p> */}
         </div>
       </section>
     </div>

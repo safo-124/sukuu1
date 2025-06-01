@@ -3,13 +3,24 @@ import { z } from 'zod';
 
 export const subjectSchema = z.object({
   name: z.string().min(2, { message: "Subject name must be at least 2 characters." }).max(100),
-  subjectCode: z.string().max(20).optional().nullable(), // e.g., "PHY101"
+  subjectCode: z.string().max(20).optional().nullable(),
   description: z.string().max(500).optional().nullable(),
-  departmentId: z.string().cuid({ message: "Invalid Department ID."}).optional().nullable(), // Optional link to a department
+  departmentId: z.string().cuid({ message: "Invalid Department ID."}).optional().nullable(),
+  teacherId: z.string().cuid({ message: "A teacher must be selected." }), // ✨ New required field
 });
 
-// For updates, usually all fields become optional
-export const updateSubjectSchema = subjectSchema.partial();
+// For updates, teacherId might be handled differently (e.g., managing assignments separately)
+// For now, making it optional on update, assuming initial assignment is key.
+export const updateSubjectSchema = z.object({
+  name: z.string().min(2, { message: "Subject name must be at least 2 characters." }).max(100).optional(),
+  subjectCode: z.string().max(20).optional().nullable(),
+  description: z.string().max(500).optional().nullable(),
+  departmentId: z.string().cuid({ message: "Invalid Department ID."}).optional().nullable(),
+  // teacherId: z.string().cuid().optional(), // How to handle teacher updates needs thought.
+                                           // Is it changing the "primary" teacher or adding/removing from a list?
+                                           // For now, we'll omit it from simple subject update. Managing teacher assignments
+                                           // to subjects might be a separate interface or part of teacher's profile.
+});
 
 export const academicYearSchema = z.object({ // Make sure 'export' is here
   name: z.string()
@@ -75,3 +86,11 @@ export const sectionSchema = z.object({
 });
 
 export const updateSectionSchema = sectionSchema.partial();
+
+export const departmentSchema = z.object({
+  name: z.string().min(2, { message: "Department name must be at least 2 characters." }).max(100),
+  description: z.string().max(500).optional().nullable(),
+  // headOfDepartmentId: z.string().cuid({ message: "Invalid Head of Department ID."}).optional().nullable(), // For later if you add HOD selection
+});
+
+export const updateDepartmentSchema = departmentSchema.partial();

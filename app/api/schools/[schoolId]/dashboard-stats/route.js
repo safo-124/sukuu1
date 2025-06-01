@@ -8,50 +8,47 @@ export async function GET(request, { params }) {
   const session = await getServerSession(authOptions);
   const { schoolId } = params;
 
-  // Authorization: Ensure user is logged in, belongs to this school, and has an appropriate role
   if (!session || session.user?.schoolId !== schoolId || 
-      (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'ACCOUNTANT' /* Add other relevant roles */)) {
+      (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'ACCOUNTANT' /* && other relevant roles */)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    // Fetch total students for the school
     const totalStudents = await prisma.student.count({
       where: { schoolId: schoolId },
     });
 
-    // Fetch total teachers (staff with role 'TEACHER') for the school
-    const totalTeachers = await prisma.user.count({ // Or prisma.staff.count if you have a separate Staff model linked to User
+    const totalTeachers = await prisma.staff.count({ // Assuming teachers are in Staff model
       where: {
         schoolId: schoolId,
-        role: 'TEACHER', // Assuming 'TEACHER' role is used for teachers
-        // If using a Staff model: where: { schoolId: schoolId, jobTitle: 'Teacher' /* or a role field */ }
-      },
-    });
-
-    // Fetch total active classes/sections
-    // This might depend on having a concept of a "current" academic year.
-    // For simplicity, let's count all sections. You can refine this later.
-    const totalActiveClassesOrSections = await prisma.section.count({
-      where: {
-        schoolId: schoolId,
-        // class: {
-        //   academicYear: { isCurrent: true } // Example if you have isCurrent on AcademicYear
-        // }
-        // isActive: true, // If sections/classes have an isActive flag
+        user: {
+          role: 'TEACHER', // Or a specific job title if you don't use roles on User for this
+        }
       },
     });
     
-    // Placeholder for other stats you might want:
-    // const upcomingEventsCount = await prisma.event.count({ where: { schoolId, startDate: { gte: new Date() } }});
-    // const feeCollectionSummary = ... (more complex query)
+    // Count distinct classes for the current school
+    // This assumes classes are directly linked to schoolId.
+    // If classes are only linked via AcademicYear or SchoolLevel, adjust the query.
+    const totalClasses = await prisma.class.count({
+        where: {
+            schoolId: schoolId,
+            // Optionally, filter by current academic year if relevant for "active" classes
+            // academicYear: { isCurrent: true }
+        }
+    });
+
+
+    // This was counting sections, let's rename if we are counting classes above
+    // const totalActiveClassesOrSections = await prisma.section.count({
+    //   where: { schoolId: schoolId },
+    // });
 
     const stats = {
       totalStudents,
       totalTeachers,
-      totalActiveClassesOrSections,
-      // upcomingEventsCount: 0, // Placeholder
-      // recentEnrollments: 0,   // Placeholder
+      totalClasses, // New specific count for classes
+      // totalActiveClassesOrSections, // You can keep this if you want a section count too
     };
 
     return NextResponse.json(stats, { status: 200 });

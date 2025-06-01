@@ -104,6 +104,7 @@ function SchoolSidebar({ schoolSubdomain, schoolName, schoolLogoUrl, isOpen, onC
       title: 'Academics',
       items: [
         { href: `/${schoolSubdomain}/academics/school-levels`, label: 'School Levels', icon: Layers },
+        { href: `/${schoolSubdomain}/academics/departments`, label: 'Departments', icon: Briefcase },
         { href: `/${schoolSubdomain}/academics/classes`, label: 'Classes & Sections', icon: Building },
         { href: `/${schoolSubdomain}/academics/subjects`, label: 'Subjects', icon: BookOpen },
         { href: `/${schoolSubdomain}/academics/timetable`, label: 'Timetable', icon: CalendarDays },
