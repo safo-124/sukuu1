@@ -57,3 +57,26 @@ export const schoolLevelSchema = z.object({
 
 // If you intend to have an update route (e.g., .../school-levels/[levelId]/route.js)
 export const updateSchoolLevelSchema = schoolLevelSchema.partial();
+
+export const sectionSchema = z.object({
+  name: z.string()
+    .min(1, { message: "Section name must be at least 1 character." })
+    .max(50, { message: "Section name cannot exceed 50 characters." })
+    .trim(),
+  // classId will typically come from the route parameters if sections are nested under classes,
+  // or be required in the body if it's a general endpoint.
+  // For now, let's assume classId is handled by the route context when creating.
+  // If you make POST requests to a general /sections endpoint, add classId here:
+  // classId: z.string().cuid({ message: "Invalid Class ID format." }), 
+  classTeacherId: z.string()
+    .cuid({ message: "Invalid Class Teacher ID format." })
+    .optional()
+    .nullable(), // Staff ID for the class teacher
+  maxCapacity: z.number()
+    .int({ message: "Max capacity must be an integer." })
+    .positive({ message: "Max capacity must be a positive number." })
+    .optional()
+    .nullable(),
+});
+
+export const updateSectionSchema = sectionSchema.partial(); 
