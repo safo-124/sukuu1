@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -175,6 +175,7 @@ model AcademicYear {
   enrollments   StudentEnrollment[]
   grades        Grade[]
   feeStructures FeeStructure[]      @relation("YearFeeStructures")
+  classes       Class[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -210,20 +211,33 @@ model Department {
 }
 
 model Class {
-  id                 String              @id @default(cuid())
-  name               String
-  schoolLevelId      String
-  schoolLevel        SchoolLevel         @relation(fields: [schoolLevelId], references: [id], onDelete: Cascade)
-  schoolId           String
-  school             School              @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  id   String @id @default(cuid())
+  name String
+
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+
+  schoolLevelId String
+  schoolLevel   SchoolLevel @relation(fields: [schoolLevelId], references: [id], onDelete: Cascade)
+
+  academicYearId String // <<< ADD THIS FIELD
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade) // <<< ADD THIS RELATION
+
   sections           Section[]
   subjects           Subject[]           @relation("ClassSubjects")
   staffSubjectLevels StaffSubjectLevel[]
   assignments        Assignment[]        @relation("ClassAssignments")
   feeStructures      FeeStructure[]      @relation("ClassFeeStructures")
+  // If it was just schoolLevelId and name per academic year, adjust accordingly.
+  // The original was @@unique([schoolLevelId, name]) - decide which uniqueness rule you need.
+  // Based on your API P2002 handling, the one above is more likely what you intend.
 
-  @@unique([schoolLevelId, name])
+  // Update unique constraint based on your application logic
+  // If a class name should be unique within a school, for a specific level and academic year:
+  @@unique([schoolId, name, academicYearId, schoolLevelId])
   @@index([schoolId])
+  @@index([schoolLevelId])
+  @@index([academicYearId]) // Add index for the new foreign key
 }
 
 model Section {
