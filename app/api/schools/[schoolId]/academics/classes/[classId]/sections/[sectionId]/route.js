@@ -1,192 +1,138 @@
 // app/api/schools/[schoolId]/academics/sections/[sectionId]/route.js
 import prisma from '@/lib/prisma';
-import { updateSectionSchema } from '@/validators/academics.validators'; // Ensure this is correctly defined and exported
+import { updateSectionSchema } from '@/validators/academics.validators'; // Adjust path
 import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { authOptions } from "@/lib/auth"; // Adjust path
 
-const ALLOWED_ROLES = ['SCHOOL_ADMIN']; // Define roles that can manage sections
-
-/**
- * GET /api/schools/{schoolId}/academics/sections/{sectionId}
- * Retrieves a specific section by its ID.
- */
+// GET handler to fetch a single section (for pre-filling edit form)
 export async function GET(request, { params }) {
   const session = await getServerSession(authOptions);
-  const { schoolId, sectionId } = params;
+  const { schoolId, sectionId } = params; // classId is not needed here as sectionId is unique
 
-  if (!session || !session.user || session.user.schoolId !== schoolId || !ALLOWED_ROLES.includes(session.user.role)) {
-    return NextResponse.json({ error: 'Unauthorized to access this section.' }, { status: 401 });
+  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
     const section = await prisma.section.findUnique({
-      where: {
-        id: sectionId,
-        schoolId: schoolId, // Crucial: Ensure the section belongs to the specified school
-      },
-      include: {
-        class: { // Include parent class details
-          select: { id: true, name: true }
-        },
-        classTeacher: { // Include class teacher details
-          select: {
-            id: true,
-            user: {
-              select: { id: true, firstName: true, lastName: true, email: true }
-            }
-          }
-        },
-        _count: { // Count of enrolled students
-          select: { studentEnrollments: true }
-        }
+      where: { id: sectionId, schoolId: schoolId }, // Ensure section belongs to the school
+      include: { 
+        classTeacher: { select: { id: true, user: { select: { firstName: true, lastName: true }}}}
       }
     });
 
     if (!section) {
-      return NextResponse.json({ error: 'Section not found or access denied.' }, { status: 404 });
+      return NextResponse.json({ error: 'Section not found.' }, { status: 404 });
     }
-
     return NextResponse.json({ section }, { status: 200 });
   } catch (error) {
-    console.error(`API_ERROR (GET /sections/${sectionId}): Failed for school ${schoolId}. User: ${session.user.email}. Error:`, error);
-    return NextResponse.json({ error: 'Failed to fetch section. Please try again later.' }, { status: 500 });
+    console.error(`Failed to fetch section ${sectionId} for school ${schoolId}:`, error);
+    return NextResponse.json({ error: 'Failed to fetch section details.' }, { status: 500 });
   }
 }
 
-/**
- * PATCH /api/schools/{schoolId}/academics/sections/{sectionId}
- * Updates a specific section.
- */
-export async function PATCH(request, { params }) {
+// PUT handler to update a section
+export async function PUT(request, { params }) {
   const session = await getServerSession(authOptions);
   const { schoolId, sectionId } = params;
 
-  if (!session || !session.user || session.user.schoolId !== schoolId || !ALLOWED_ROLES.includes(session.user.role)) {
-    return NextResponse.json({ error: 'Unauthorized to update this section.' }, { status: 401 });
+  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    // First, verify the section exists and belongs to the school
-    const existingSection = await prisma.section.findUnique({
-      where: { id: sectionId, schoolId: schoolId }
-    });
-
-    if (!existingSection) {
-      return NextResponse.json({ error: 'Section not found or access denied.' }, { status: 404 });
-    }
-
     const body = await request.json();
-    const validation = updateSectionSchema.safeParse(body); // Use the partial schema for updates
+    const validation = updateSectionSchema.safeParse(body);
 
     if (!validation.success) {
-      console.warn(`API_VALIDATION_ERROR (PATCH /sections/${sectionId}): Invalid input for school ${schoolId}. User: ${session.user.email}. Issues:`, validation.error.issues);
       return NextResponse.json({ error: 'Invalid input.', issues: validation.error.issues }, { status: 400 });
     }
 
-    const updateData = validation.data;
+    const { name, classTeacherId, maxCapacity } = validation.data;
+    const dataToUpdate = {};
 
-    // If classTeacherId is being updated, validate the teacher
-    if (updateData.classTeacherId !== undefined) { // Check if classTeacherId is explicitly in the payload
-      if (updateData.classTeacherId === null) { // Allowing to unassign teacher
-        // No further validation needed for null
-      } else {
-        const teacher = await prisma.staff.findFirst({
-          where: { id: updateData.classTeacherId, schoolId: schoolId }
-        });
-        if (!teacher) {
-          return NextResponse.json({ error: 'Selected Class Teacher is invalid or does not belong to this school.' }, { status: 400 });
+    if (name !== undefined) dataToUpdate.name = name;
+    if (maxCapacity !== undefined) dataToUpdate.maxCapacity = maxCapacity === '' ? null : Number(maxCapacity); // Allow clearing or ensure number
+    
+    if (classTeacherId !== undefined) { // Handle classTeacherId change, including unsetting
+        if (classTeacherId === null || classTeacherId === '') {
+            dataToUpdate.classTeacherId = null;
+        } else {
+            const teacher = await prisma.staff.findFirst({
+                where: { id: classTeacherId, schoolId: schoolId, user: { role: 'TEACHER' } }
+            });
+            if (!teacher) {
+                return NextResponse.json({ error: 'Selected Class Teacher is invalid.' }, { status: 400 });
+            }
+            // Check if teacher is already a class teacher for another section (if unique constraint exists)
+            const existingAssignment = await prisma.section.findFirst({
+                where: { classTeacherId: classTeacherId, schoolId: schoolId, NOT: { id: sectionId } }
+            });
+            if (existingAssignment) {
+                return NextResponse.json({ error: 'This teacher is already assigned as a class teacher to another section.'}, { status: 409 });
+            }
+            dataToUpdate.classTeacherId = classTeacherId;
         }
-      }
     }
     
-    // If name is being updated, it's unique per classId.
-    // The P2002 handler below will catch this.
-    // The classId for the section is `existingSection.classId`.
+    if (Object.keys(dataToUpdate).length === 0) {
+        return NextResponse.json({ error: 'No fields to update provided.' }, { status: 400 });
+    }
 
     const updatedSection = await prisma.section.update({
-      where: {
-        id: sectionId,
-        // schoolId: schoolId, // Already confirmed by existingSection fetch
-      },
-      data: updateData, // Pass only validated & potentially modified data
-      include: {
-        class: { select: { id: true, name: true } },
-        classTeacher: {
-          select: {
-            id: true,
-            user: { select: { id:true, firstName: true, lastName: true, email: true } }
-          }
-        }
-      }
+      where: { id: sectionId, schoolId: schoolId },
+      data: dataToUpdate,
     });
 
-    console.log(`API_SUCCESS (PATCH /sections/${sectionId}): Section updated for school ${schoolId} by ${session.user.email}.`);
     return NextResponse.json({ success: true, section: updatedSection }, { status: 200 });
-
   } catch (error) {
-    console.error(`API_ERROR (PATCH /sections/${sectionId}): Failed for school ${schoolId}. User: ${session.user.email}. Error:`, error);
-    
+    console.error(`Failed to update section ${sectionId} for school ${schoolId}:`, error);
     if (error.code === 'P2002') {
-      const target = error.meta?.target;
-      if (target?.includes('classId') && target?.includes('name')) {
+      if (error.meta?.target?.includes('name') && error.meta?.target?.includes('classId')) {
         return NextResponse.json({ error: 'A section with this name already exists for this class.' }, { status: 409 });
       }
-      if (target?.includes('classTeacherId')) {
+      if (error.meta?.target?.includes('classTeacherId')) {
         return NextResponse.json({ error: 'This teacher is already assigned as a class teacher to another section.' }, { status: 409 });
       }
-      return NextResponse.json({ error: 'A conflict occurred. The data might already exist or violate a unique constraint.' }, { status: 409 });
+      return NextResponse.json({ error: 'This section configuration conflicts with an existing one.' }, { status: 409 });
     }
-    return NextResponse.json({ error: 'Failed to update section. Please try again later.' }, { status: 500 });
+    if (error.code === 'P2025') {
+        return NextResponse.json({ error: 'Section not found for update.' }, { status: 404 });
+    }
+    return NextResponse.json({ error: 'Failed to update section.' }, { status: 500 });
   }
 }
 
-/**
- * DELETE /api/schools/{schoolId}/academics/sections/{sectionId}
- * Deletes a specific section.
- */
+// DELETE handler to delete a section
 export async function DELETE(request, { params }) {
   const session = await getServerSession(authOptions);
   const { schoolId, sectionId } = params;
 
-  if (!session || !session.user || session.user.schoolId !== schoolId || !ALLOWED_ROLES.includes(session.user.role)) {
-    return NextResponse.json({ error: 'Unauthorized to delete this section.' }, { status: 401 });
+  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    // First, verify the section exists and belongs to the school
-    const sectionToDelete = await prisma.section.findUnique({
-      where: { id: sectionId, schoolId: schoolId },
-      include: { _count: { select: { studentEnrollments: true }}} // Check for enrollments
-    });
-
-    if (!sectionToDelete) {
-      return NextResponse.json({ error: 'Section not found or access denied.' }, { status: 404 });
+    // Check for linked records (e.g., student enrollments, timetable entries)
+    const studentEnrollmentsCount = await prisma.studentEnrollment.count({ where: { sectionId: sectionId } });
+    if (studentEnrollmentsCount > 0) {
+      return NextResponse.json({ error: `Cannot delete section. It has ${studentEnrollmentsCount} student(s) enrolled. Please move or unenroll them first.` }, { status: 409 });
     }
-    
-    // Optional: Prevent deletion if students are enrolled
-    // if (sectionToDelete._count.studentEnrollments > 0) {
-    //   return NextResponse.json({ error: `Cannot delete section. ${sectionToDelete._count.studentEnrollments} student(s) are currently enrolled.` }, { status: 400 });
-    // }
-    // For now, we'll proceed with delete. Prisma's onDelete behavior for StudentEnrollment will apply.
-    // StudentEnrollment.section -> Section has no onDelete specified, so it would be Restrict by default if not specified.
-    // Check StudentEnrollment model: Section @relation(fields: [sectionId], references: [id]) -- default is Restrict unless studentEnrollment relation on Section specifies Cascade.
-    // Your Section model has `studentEnrollments StudentEnrollment[]`, if the StudentEnrollment model's relation field `section` does not specify `onDelete: Cascade`, this will fail if there are enrollments.
+    // Add similar checks for timetable entries, assignments, etc.
 
     await prisma.section.delete({
-      where: {
-        id: sectionId,
-        // schoolId: schoolId // Already confirmed by sectionToDelete fetch
-      },
+      where: { id: sectionId, schoolId: schoolId },
     });
-
-    console.log(`API_SUCCESS (DELETE /sections/${sectionId}): Section deleted for school ${schoolId} by ${session.user.email}.`);
-    return NextResponse.json({ success: true, message: 'Section deleted successfully.' }, { status: 200 }); // Or 204 No Content
+    return NextResponse.json({ success: true, message: 'Section deleted successfully.' }, { status: 200 });
   } catch (error) {
-    console.error(`API_ERROR (DELETE /sections/${sectionId}): Failed for school ${schoolId}. User: ${session.user.email}. Error:`, error);
-    if (error.code === 'P2003') { // Foreign key constraint failed on delete (e.g. student enrollments exist and onDelete is Restrict)
-        return NextResponse.json({ error: 'Cannot delete section. It is still referenced by other records (e.g., student enrollments).' }, { status: 409 });
+    console.error(`Failed to delete section ${sectionId} for school ${schoolId}:`, error);
+    if (error.code === 'P2025') {
+        return NextResponse.json({ error: 'Section not found for deletion.' }, { status: 404 });
     }
-    return NextResponse.json({ error: 'Failed to delete section. Please try again later.' }, { status: 500 });
+    if (error.code === 'P2003'){
+        return NextResponse.json({ error: 'Cannot delete this section. It is still referenced by other records.' }, { status: 409 });
+    }
+    return NextResponse.json({ error: 'Failed to delete section.' }, { status: 500 });
   }
 }

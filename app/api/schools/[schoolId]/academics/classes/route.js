@@ -1,37 +1,38 @@
 // app/api/schools/[schoolId]/academics/classes/route.js
 import prisma from '@/lib/prisma';
-import { classSchema } from '@/validators/academics.validators'; // Ensure this path is correct
+import { classSchema } from '@/validators/academics.validators'; // Adjust path if needed
 import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth"; // Ensure this path is correct
+import { authOptions } from "@/lib/auth"; // Adjust path
 
-// Define roles allowed for these operations
-const ALLOWED_ROLES_CREATE = ['SCHOOL_ADMIN'];
-const ALLOWED_ROLES_VIEW = ['SCHOOL_ADMIN', 'TEACHER']; // Teachers might need to view classes
-
-/**
- * GET /api/schools/{schoolId}/academics/classes
- * Retrieves all classes for a specific school, with optional filtering.
- */
+// GET handler to list all classes for a specific school
 export async function GET(request, { params }) {
+  const session = await getServerSession(authOptions);
+  const { schoolId } = params;
+
+  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const academicYearIdFilter = searchParams.get('academicYearId');
+  const schoolLevelIdFilter = searchParams.get('schoolLevelId');
+  const page = parseInt(searchParams.get('page') || '1', 10);
+  const limit = parseInt(searchParams.get('limit') || '10', 10);
+  const searchTerm = searchParams.get('search') || '';
+
+  const skip = (page - 1) * limit;
+
   try {
-    const session = await getServerSession(authOptions);
-    const { schoolId } = params;
-
-    if (!session || !session.user) {
-      return NextResponse.json({ error: 'Unauthorized: No session found.' }, { status: 401 });
-    }
-
-    if (session.user.schoolId !== schoolId || !ALLOWED_ROLES_VIEW.includes(session.user.role)) {
-      console.warn(`Forbidden access attempt to GET classes for school ${schoolId} by user ${session.user.email} (Role: ${session.user.role})`);
-      return NextResponse.json({ error: 'Forbidden: You do not have permission to view these classes.' }, { status: 403 });
-    }
-
-    const { searchParams } = new URL(request.url);
-    const academicYearIdFilter = searchParams.get('academicYearId');
-    const schoolLevelIdFilter = searchParams.get('schoolLevelId');
-
-    const whereClause = { schoolId: schoolId };
+    const whereClause = { 
+      schoolId: schoolId,
+      ...(searchTerm && {
+        name: {
+          contains: searchTerm,
+          mode: 'insensitive',
+        }
+      }),
+    };
     if (academicYearIdFilter) {
       whereClause.academicYearId = academicYearIdFilter;
     }
@@ -39,51 +40,56 @@ export async function GET(request, { params }) {
       whereClause.schoolLevelId = schoolLevelIdFilter;
     }
 
-    const classes = await prisma.class.findMany({
-      where: whereClause,
-      orderBy: [
-        { academicYear: { startDate: 'desc' } }, 
-        { schoolLevel: { name: 'asc' } },       
-        { name: 'asc' }                          
-      ],
-      include: {
-        schoolLevel: { select: { id: true, name: true } },
-        academicYear: { select: { id: true, name: true, startDate: true, endDate: true } },
-        _count: { select: { sections: true } } 
-      }
-    });
+    const [classes, totalClasses] = await prisma.$transaction([
+        prisma.class.findMany({
+          where: whereClause,
+          orderBy: [
+            { academicYear: { startDate: 'desc' } },
+            { schoolLevel: { name: 'asc' } },
+            { name: 'asc' }
+          ],
+          include: {
+            schoolLevel: { select: { id: true, name: true } },
+            academicYear: { select: { id: true, name: true } },
+            _count: { select: { sections: true } } 
+          },
+          skip: skip,
+          take: limit,
+        }),
+        prisma.class.count({ where: whereClause })
+    ]);
+    
+    const totalPages = Math.ceil(totalClasses / limit);
 
-    return NextResponse.json({ classes }, { status: 200 });
-
+    return NextResponse.json({ 
+        classes,
+        pagination: {
+            currentPage: page,
+            totalPages,
+            totalClasses,
+            limit
+        }
+    }, { status: 200 });
   } catch (error) {
-    console.error(`[API GET /classes] Error fetching classes for school ${params.schoolId}:`, error);
-    return NextResponse.json({ error: 'Failed to fetch classes. Please try again later.' }, { status: 500 });
+    console.error(`Failed to fetch classes for school ${schoolId}:`, error);
+    return NextResponse.json({ error: 'Failed to fetch classes.' }, { status: 500 });
   }
 }
 
-/**
- * POST /api/schools/{schoolId}/academics/classes
- * Creates a new class for a specific school.
- */
+// POST handler to create a new class for a specific school
 export async function POST(request, { params }) {
+  const session = await getServerSession(authOptions);
+  const { schoolId } = params;
+
+  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
-    const session = await getServerSession(authOptions);
-    const { schoolId } = params;
-
-    if (!session || !session.user) {
-      return NextResponse.json({ error: 'Unauthorized: No session found.' }, { status: 401 });
-    }
-    
-    if (session.user.schoolId !== schoolId || !ALLOWED_ROLES_CREATE.includes(session.user.role)) {
-      console.warn(`Forbidden access attempt to POST class for school ${schoolId} by user ${session.user.email} (Role: ${session.user.role})`);
-      return NextResponse.json({ error: 'Forbidden: You do not have permission to create a class.' }, { status: 403 });
-    }
-
     const body = await request.json();
     const validation = classSchema.safeParse(body);
 
     if (!validation.success) {
-      console.warn(`[API POST /classes] Validation Error for school ${schoolId}, User: ${session.user.email}, Issues:`, validation.error.format());
       return NextResponse.json({ error: 'Invalid input.', issues: validation.error.issues }, { status: 400 });
     }
 
@@ -104,35 +110,25 @@ export async function POST(request, { params }) {
 
     const newClass = await prisma.class.create({
       data: {
-        schoolId: schoolId, 
+        schoolId: schoolId,
         name,
         schoolLevelId,
         academicYearId,
       },
-      include: { 
+      include: {
         schoolLevel: { select: { id: true, name: true } },
         academicYear: { select: { id: true, name: true } },
-        _count: { select: { sections: true } }
       }
     });
 
     return NextResponse.json({ success: true, class: newClass }, { status: 201 });
 
   } catch (error) {
-    console.error(`[API POST /classes] Error creating class for school ${params.schoolId}:`, error);
-    
-    if (error.code === 'P2002' && error.meta?.target) {
-        const targetFields = error.meta.target;
-        // Check against your unique constraint: @@unique([schoolId, name, academicYearId, schoolLevelId])
-        if (
-            targetFields.includes('schoolId') &&
-            targetFields.includes('name') &&
-            targetFields.includes('academicYearId') &&
-            targetFields.includes('schoolLevelId')
-        ) {
-             return NextResponse.json({ error: 'A class with this name already exists for the selected school level and academic year.' }, { status: 409 });
-        }
+    console.error(`Failed to create class for school ${schoolId}:`, error);
+    if (error.code === 'P2002') { 
+      // Based on @@unique([schoolId, name, academicYearId, schoolLevelId])
+      return NextResponse.json({ error: 'A class with this name already exists for the selected school level and academic year.' }, { status: 409 });
     }
-    return NextResponse.json({ error: 'Failed to create class. Please try again later.' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to create class.' }, { status: 500 });
   }
 }
