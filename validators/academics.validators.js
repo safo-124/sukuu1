@@ -6,20 +6,20 @@ export const subjectSchema = z.object({
   subjectCode: z.string().max(20).optional().nullable(),
   description: z.string().max(500).optional().nullable(),
   departmentId: z.string().cuid({ message: "Invalid Department ID."}).optional().nullable(),
-  teacherId: z.string().cuid({ message: "A teacher must be selected." }), // ✨ New required field
+  teacherId: z.string().cuid({ message: "A teacher must be assigned to this subject." }), // Required teacher
+  schoolLevelIds: z.array(z.string().cuid({ message: "Invalid School Level ID in selection."}))
+                   .min(1, { message: "At least one school level must be selected for this subject." }), // Must select at least one level
 });
 
-// For updates, teacherId might be handled differently (e.g., managing assignments separately)
-// For now, making it optional on update, assuming initial assignment is key.
-export const updateSubjectSchema = z.object({
+export const updateSubjectSchema = z.object({ // For editing a subject's core details
   name: z.string().min(2, { message: "Subject name must be at least 2 characters." }).max(100).optional(),
   subjectCode: z.string().max(20).optional().nullable(),
   description: z.string().max(500).optional().nullable(),
   departmentId: z.string().cuid({ message: "Invalid Department ID."}).optional().nullable(),
-  // teacherId: z.string().cuid().optional(), // How to handle teacher updates needs thought.
-                                           // Is it changing the "primary" teacher or adding/removing from a list?
-                                           // For now, we'll omit it from simple subject update. Managing teacher assignments
-                                           // to subjects might be a separate interface or part of teacher's profile.
+  // Note: Updating teacher assignments or school level links for an existing subject
+  // would typically be a more complex operation, possibly via a separate interface
+  // or by managing the linking tables (StaffSubjectLevel, SubjectSchoolLevel) directly.
+  // This schema is for updating the Subject model's direct fields.
 });
 
 export const academicYearSchema = z.object({ // Make sure 'export' is here

@@ -1,16 +1,17 @@
-// app/api/schools/[schoolId]/academics/departments/route.js
+// app/api/schools/[schoolId]/departments/route.js
 import prisma from '@/lib/prisma';
-import { departmentSchema } from '@/validators/academics.validators'; // Adjust path
 import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth"; // Adjust path
+import { authOptions } from "@/lib/auth";
+// Assuming departmentSchema is in academics.validators.js
+import { departmentSchema } from '@/validators/academics.validators';
 
-// GET handler to list all departments for a specific school
+
 export async function GET(request, { params }) {
+  const { schoolId } = params; // Destructure params early
   const session = await getServerSession(authOptions);
-  const { schoolId } = params;
 
-  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' /* && other authorized roles */)) {
+  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -18,12 +19,10 @@ export async function GET(request, { params }) {
     const departments = await prisma.department.findMany({
       where: { schoolId: schoolId },
       orderBy: { name: 'asc' },
-      include: {
-        _count: { // Count related subjects and staff
-          select: { subjects: true, staff: true }
-        }
-        // If you add HOD:
-        // headOfDepartment: { include: { user: { select: { firstName: true, lastName: true }}}}
+      select: {
+        id: true,
+        name: true,
+        // _count: { select: { subjects: true, staff: true } } // Keep if needed, or remove if not used by client
       }
     });
     return NextResponse.json({ departments }, { status: 200 });
@@ -33,12 +32,11 @@ export async function GET(request, { params }) {
   }
 }
 
-// POST handler to create a new department for a specific school
 export async function POST(request, { params }) {
+  const { schoolId } = params; // Destructure params early
   const session = await getServerSession(authOptions);
-  const { schoolId } = params;
 
-  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' /* && other authorized roles */)) {
+  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -49,27 +47,15 @@ export async function POST(request, { params }) {
     if (!validation.success) {
       return NextResponse.json({ error: 'Invalid input.', issues: validation.error.issues }, { status: 400 });
     }
-
-    const { name, description /*, headOfDepartmentId */ } = validation.data;
-
-    // Optional: Validate headOfDepartmentId if provided (ensure staff exists, is a teacher/HOD role, belongs to school)
-    // if (headOfDepartmentId) { ... validation logic ... }
-
+    const { name, description } = validation.data;
     const newDepartment = await prisma.department.create({
-      data: {
-        schoolId: schoolId,
-        name,
-        description: description || null,
-        // headOfDepartmentId: headOfDepartmentId || null,
-      },
+      data: { schoolId, name, description: description || null },
     });
-
     return NextResponse.json({ success: true, department: newDepartment }, { status: 201 });
-
   } catch (error) {
     console.error(`Failed to create department for school ${schoolId}:`, error);
-    if (error.code === 'P2002' && error.meta?.target?.includes('name') && error.meta?.target?.includes('schoolId')) {
-      return NextResponse.json({ error: 'A department with this name already exists for this school.' }, { status: 409 });
+    if (error.code === 'P2002') {
+      return NextResponse.json({ error: 'A department with this name already exists.' }, { status: 409 });
     }
     return NextResponse.json({ error: 'Failed to create department.' }, { status: 500 });
   }
