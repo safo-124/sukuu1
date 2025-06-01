@@ -29,3 +29,31 @@ export const academicYearSchema = z.object({ // Make sure 'export' is here
   message: "End date must be after start date.",
   path: ["endDate"],
 });
+
+export const classSchema = z.object({
+  name: z.string()
+    .min(1, { message: "Class name must be at least 1 character." })
+    .max(100, { message: "Class name cannot exceed 100 characters." })
+    .trim(),
+  schoolLevelId: z.string()
+    .cuid({ message: "Invalid School Level ID format." }),
+  academicYearId: z.string()
+    .cuid({ message: "Invalid Academic Year ID format." }),
+});
+
+// If you intend to have an update route (e.g., .../classes/[classId]/route.js)
+export const updateClassSchema = classSchema.partial();
+
+export const schoolLevelSchema = z.object({
+  name: z.string()
+    .min(2, { message: "School level name must be at least 2 characters." })
+    .max(100, { message: "School level name cannot exceed 100 characters." })
+    .trim(),
+  description: z.string()
+    .max(500, { message: "Description cannot exceed 500 characters." })
+    .optional()
+    .nullable(),
+});
+
+// If you intend to have an update route (e.g., .../school-levels/[levelId]/route.js)
+export const updateSchoolLevelSchema = schoolLevelSchema.partial();

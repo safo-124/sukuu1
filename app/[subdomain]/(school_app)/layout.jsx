@@ -9,10 +9,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
-  Sun, Moon, LayoutDashboard, Users, UserCog, BookOpen, LogOut, Menu, X as CloseIcon, Settings, GraduationCap, PresentationChart, CalendarDays, Building, Library, Bus, ClipboardList, Briefcase, CheckSquare, DollarSign, FileText, Percent, BookCopy, Newspaper, FileArchive, Home, // Comprehensive icon list
+  Sun, Moon, LayoutDashboard, Users, UserCog, BookOpen, LogOut, Menu, X as CloseIcon, Settings, GraduationCap, CalendarDays, Building, Library, Bus, ClipboardList, Briefcase, CheckSquare, DollarSign, FileText, Percent, BookCopy, Newspaper, FileArchive, Home, // Comprehensive icon list
   AlertTriangle,
   Store,
-  Layers
+  Layers,
+  PieChart
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -126,7 +127,7 @@ function SchoolSidebar({ schoolSubdomain, schoolName, schoolLogoUrl, isOpen, onC
     {
       title: 'Finance',
       items: [
-        { href: `/${schoolSubdomain}/finance/overview`, label: 'Financial Overview', icon: PresentationChart },
+        { href: `/${schoolSubdomain}/finance/overview`, label: 'Financial Overview', icon: PieChart },
         { href: `/${schoolSubdomain}/finance/fee-structures`, label: 'Fee Structures', icon: FileText },
         { href: `/${schoolSubdomain}/finance/invoices`, label: 'Invoices', icon: DollarSign },
         { href: `/${schoolSubdomain}/finance/payments`, label: 'Payments', icon: CheckSquare },
