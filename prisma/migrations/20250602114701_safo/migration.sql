@@ -2,7 +2,13 @@
 CREATE TYPE "UserRole" AS ENUM ('SUPER_ADMIN', 'SCHOOL_ADMIN', 'SECRETARY', 'PROCUREMENT_OFFICER', 'TEACHER', 'STUDENT', 'HR_MANAGER', 'ACCOUNTANT', 'LIBRARIAN', 'TRANSPORT_MANAGER', 'HOSTEL_WARDEN', 'PARENT');
 
 -- CreateEnum
+CREATE TYPE "Gender" AS ENUM ('MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY');
+
+-- CreateEnum
 CREATE TYPE "AttendanceStatus" AS ENUM ('PRESENT', 'ABSENT', 'LATE', 'EXCUSED');
+
+-- CreateEnum
+CREATE TYPE "FeeFrequency" AS ENUM ('ONE_TIME', 'MONTHLY', 'TERMLY', 'ANNUALLY');
 
 -- CreateEnum
 CREATE TYPE "InvoiceStatus" AS ENUM ('DRAFT', 'SENT', 'PAID', 'PARTIALLY_PAID', 'OVERDUE', 'VOID', 'CANCELLED');
@@ -76,6 +82,9 @@ CREATE TABLE "ParentStudent" (
     "parentId" TEXT NOT NULL,
     "studentId" TEXT NOT NULL,
     "relationToStudent" TEXT,
+    "isPrimaryContact" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "ParentStudent_pkey" PRIMARY KEY ("parentId","studentId")
 );
@@ -86,6 +95,8 @@ CREATE TABLE "SchoolLevel" (
     "name" TEXT NOT NULL,
     "description" TEXT,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "SchoolLevel_pkey" PRIMARY KEY ("id")
 );
@@ -98,6 +109,8 @@ CREATE TABLE "AcademicYear" (
     "endDate" TIMESTAMP(3) NOT NULL,
     "isCurrent" BOOLEAN NOT NULL DEFAULT false,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "AcademicYear_pkey" PRIMARY KEY ("id")
 );
@@ -110,6 +123,8 @@ CREATE TABLE "Term" (
     "endDate" TIMESTAMP(3) NOT NULL,
     "academicYearId" TEXT NOT NULL,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Term_pkey" PRIMARY KEY ("id")
 );
@@ -120,6 +135,8 @@ CREATE TABLE "Department" (
     "name" TEXT NOT NULL,
     "description" TEXT,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Department_pkey" PRIMARY KEY ("id")
 );
@@ -131,6 +148,8 @@ CREATE TABLE "Class" (
     "schoolId" TEXT NOT NULL,
     "schoolLevelId" TEXT NOT NULL,
     "academicYearId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Class_pkey" PRIMARY KEY ("id")
 );
@@ -139,10 +158,12 @@ CREATE TABLE "Class" (
 CREATE TABLE "Section" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
+    "maxCapacity" INTEGER,
     "classId" TEXT NOT NULL,
     "classTeacherId" TEXT,
-    "maxCapacity" INTEGER,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Section_pkey" PRIMARY KEY ("id")
 );
@@ -155,20 +176,47 @@ CREATE TABLE "Subject" (
     "description" TEXT,
     "departmentId" TEXT,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Subject_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
+CREATE TABLE "SubjectSchoolLevel" (
+    "id" TEXT NOT NULL,
+    "subjectId" TEXT NOT NULL,
+    "schoolLevelId" TEXT NOT NULL,
+    "schoolId" TEXT NOT NULL,
+    "assignedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "SubjectSchoolLevel_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "Student" (
     "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
+    "firstName" TEXT NOT NULL,
+    "lastName" TEXT NOT NULL,
+    "middleName" TEXT,
     "studentIdNumber" TEXT NOT NULL,
-    "dateOfBirth" TIMESTAMP(3),
-    "gender" TEXT,
-    "address" TEXT,
     "admissionDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "dateOfBirth" TIMESTAMP(3),
+    "gender" "Gender",
+    "email" TEXT,
+    "phone" TEXT,
+    "address" TEXT,
+    "city" TEXT,
+    "state" TEXT,
+    "country" TEXT,
+    "guardianName" TEXT,
+    "guardianRelation" TEXT,
+    "guardianPhone" TEXT,
+    "guardianEmail" TEXT,
+    "userId" TEXT,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Student_pkey" PRIMARY KEY ("id")
 );
@@ -179,9 +227,13 @@ CREATE TABLE "StudentEnrollment" (
     "studentId" TEXT NOT NULL,
     "sectionId" TEXT NOT NULL,
     "academicYearId" TEXT NOT NULL,
+    "schoolId" TEXT NOT NULL,
     "enrollmentDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "isCurrent" BOOLEAN NOT NULL DEFAULT true,
-    "schoolId" TEXT NOT NULL,
+    "status" TEXT,
+    "rollNumber" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "StudentEnrollment_pkey" PRIMARY KEY ("id")
 );
@@ -196,6 +248,8 @@ CREATE TABLE "Staff" (
     "dateOfJoining" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "departmentId" TEXT,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Staff_pkey" PRIMARY KEY ("id")
 );
@@ -215,9 +269,11 @@ CREATE TABLE "StaffSubjectLevel" (
     "id" TEXT NOT NULL,
     "staffId" TEXT NOT NULL,
     "subjectId" TEXT NOT NULL,
-    "schoolLevelId" TEXT,
+    "schoolLevelId" TEXT NOT NULL,
     "classId" TEXT,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "StaffSubjectLevel_pkey" PRIMARY KEY ("id")
 );
@@ -232,6 +288,8 @@ CREATE TABLE "Attendance" (
     "remarks" TEXT,
     "takenById" TEXT NOT NULL,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Attendance_pkey" PRIMARY KEY ("id")
 );
@@ -244,6 +302,8 @@ CREATE TABLE "StaffAttendance" (
     "status" "AttendanceStatus" NOT NULL,
     "remarks" TEXT,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "StaffAttendance_pkey" PRIMARY KEY ("id")
 );
@@ -280,6 +340,8 @@ CREATE TABLE "SubmittedAssignment" (
     "gradedById" TEXT,
     "gradedAt" TIMESTAMP(3),
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "SubmittedAssignment_pkey" PRIMARY KEY ("id")
 );
@@ -290,6 +352,8 @@ CREATE TABLE "GradingScale" (
     "name" TEXT NOT NULL,
     "description" TEXT,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "GradingScale_pkey" PRIMARY KEY ("id")
 );
@@ -302,6 +366,8 @@ CREATE TABLE "GradeDetail" (
     "minPercentage" DOUBLE PRECISION NOT NULL,
     "maxPercentage" DOUBLE PRECISION NOT NULL,
     "gpaValue" DOUBLE PRECISION,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "GradeDetail_pkey" PRIMARY KEY ("id")
 );
@@ -319,6 +385,8 @@ CREATE TABLE "Grade" (
     "gpa" DOUBLE PRECISION,
     "comments" TEXT,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Grade_pkey" PRIMARY KEY ("id")
 );
@@ -329,6 +397,8 @@ CREATE TABLE "Exam" (
     "name" TEXT NOT NULL,
     "termId" TEXT NOT NULL,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Exam_pkey" PRIMARY KEY ("id")
 );
@@ -344,6 +414,8 @@ CREATE TABLE "ExamSchedule" (
     "maxMarks" DOUBLE PRECISION NOT NULL,
     "room" TEXT,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "ExamSchedule_pkey" PRIMARY KEY ("id")
 );
@@ -355,6 +427,8 @@ CREATE TABLE "ExamSubject" (
     "maxMarks" DOUBLE PRECISION,
     "passingMarks" DOUBLE PRECISION,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "ExamSubject_pkey" PRIMARY KEY ("examId","subjectId")
 );
@@ -370,6 +444,8 @@ CREATE TABLE "TimetableEntry" (
     "endTime" TEXT NOT NULL,
     "roomNo" TEXT,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "TimetableEntry_pkey" PRIMARY KEY ("id")
 );
@@ -397,8 +473,11 @@ CREATE TABLE "Event" (
     "description" TEXT,
     "startDate" TIMESTAMP(3) NOT NULL,
     "endDate" TIMESTAMP(3),
+    "location" TEXT,
+    "isGlobal" BOOLEAN NOT NULL DEFAULT false,
     "schoolId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Event_pkey" PRIMARY KEY ("id")
 );
@@ -409,10 +488,12 @@ CREATE TABLE "FeeStructure" (
     "name" TEXT NOT NULL,
     "description" TEXT,
     "amount" DOUBLE PRECISION NOT NULL,
-    "frequency" TEXT NOT NULL,
+    "frequency" "FeeFrequency" NOT NULL,
     "academicYearId" TEXT NOT NULL,
     "classId" TEXT,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "FeeStructure_pkey" PRIMARY KEY ("id")
 );
@@ -429,6 +510,8 @@ CREATE TABLE "Invoice" (
     "status" "InvoiceStatus" NOT NULL DEFAULT 'DRAFT',
     "notes" TEXT,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Invoice_pkey" PRIMARY KEY ("id")
 );
@@ -443,6 +526,8 @@ CREATE TABLE "InvoiceItem" (
     "unitPrice" DOUBLE PRECISION NOT NULL,
     "totalPrice" DOUBLE PRECISION NOT NULL,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "InvoiceItem_pkey" PRIMARY KEY ("id")
 );
@@ -458,6 +543,8 @@ CREATE TABLE "Payment" (
     "notes" TEXT,
     "processedById" TEXT,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Payment_pkey" PRIMARY KEY ("id")
 );
@@ -468,6 +555,8 @@ CREATE TABLE "ExpenseCategory" (
     "name" TEXT NOT NULL,
     "description" TEXT,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "ExpenseCategory_pkey" PRIMARY KEY ("id")
 );
@@ -483,6 +572,8 @@ CREATE TABLE "Expense" (
     "receiptUrl" TEXT,
     "paidById" TEXT NOT NULL,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Expense_pkey" PRIMARY KEY ("id")
 );
@@ -493,6 +584,8 @@ CREATE TABLE "LeaveType" (
     "name" TEXT NOT NULL,
     "defaultDays" INTEGER,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "LeaveType_pkey" PRIMARY KEY ("id")
 );
@@ -510,6 +603,8 @@ CREATE TABLE "LeaveApplication" (
     "comments" TEXT,
     "appliedOn" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "LeaveApplication_pkey" PRIMARY KEY ("id")
 );
@@ -527,6 +622,8 @@ CREATE TABLE "PayrollRecord" (
     "paymentDate" TIMESTAMP(3),
     "isPaid" BOOLEAN NOT NULL DEFAULT false,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "PayrollRecord_pkey" PRIMARY KEY ("id")
 );
@@ -540,6 +637,8 @@ CREATE TABLE "Vendor" (
     "phone" TEXT,
     "address" TEXT,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Vendor_pkey" PRIMARY KEY ("id")
 );
@@ -556,6 +655,8 @@ CREATE TABLE "PurchaseOrder" (
     "notes" TEXT,
     "approvedById" TEXT,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "PurchaseOrder_pkey" PRIMARY KEY ("id")
 );
@@ -571,6 +672,8 @@ CREATE TABLE "PurchaseOrderItem" (
     "totalPrice" DOUBLE PRECISION NOT NULL,
     "inventoryItemId" TEXT,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "PurchaseOrderItem_pkey" PRIMARY KEY ("id")
 );
@@ -580,6 +683,8 @@ CREATE TABLE "InventoryCategory" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "InventoryCategory_pkey" PRIMARY KEY ("id")
 );
@@ -594,6 +699,8 @@ CREATE TABLE "InventoryItem" (
     "reorderLevel" INTEGER,
     "supplierInfo" TEXT,
     "schoolId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "InventoryItem_pkey" PRIMARY KEY ("id")
 );
@@ -643,6 +750,9 @@ CREATE INDEX "Parent_schoolId_idx" ON "Parent"("schoolId");
 CREATE INDEX "ParentStudent_studentId_idx" ON "ParentStudent"("studentId");
 
 -- CreateIndex
+CREATE INDEX "ParentStudent_parentId_idx" ON "ParentStudent"("parentId");
+
+-- CreateIndex
 CREATE INDEX "SchoolLevel_schoolId_idx" ON "SchoolLevel"("schoolId");
 
 -- CreateIndex
@@ -676,7 +786,7 @@ CREATE INDEX "Class_schoolLevelId_idx" ON "Class"("schoolLevelId");
 CREATE INDEX "Class_academicYearId_idx" ON "Class"("academicYearId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Class_schoolId_name_academicYearId_schoolLevelId_key" ON "Class"("schoolId", "name", "academicYearId", "schoolLevelId");
+CREATE UNIQUE INDEX "UQ_Class_School_Name_Year_Level" ON "Class"("schoolId", "name", "academicYearId", "schoolLevelId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Section_classTeacherId_key" ON "Section"("classTeacherId");
@@ -685,7 +795,10 @@ CREATE UNIQUE INDEX "Section_classTeacherId_key" ON "Section"("classTeacherId");
 CREATE INDEX "Section_schoolId_idx" ON "Section"("schoolId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Section_classId_name_key" ON "Section"("classId", "name");
+CREATE INDEX "Section_classTeacherId_idx" ON "Section"("classTeacherId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "UQ_Section_Class_Name" ON "Section"("classId", "name");
 
 -- CreateIndex
 CREATE INDEX "Subject_schoolId_idx" ON "Subject"("schoolId");
@@ -695,6 +808,15 @@ CREATE UNIQUE INDEX "Subject_schoolId_name_key" ON "Subject"("schoolId", "name")
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Subject_schoolId_subjectCode_key" ON "Subject"("schoolId", "subjectCode");
+
+-- CreateIndex
+CREATE INDEX "SubjectSchoolLevel_schoolId_idx" ON "SubjectSchoolLevel"("schoolId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "SubjectSchoolLevel_subjectId_schoolLevelId_schoolId_key" ON "SubjectSchoolLevel"("subjectId", "schoolLevelId", "schoolId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Student_email_key" ON "Student"("email");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Student_userId_key" ON "Student"("userId");
@@ -715,10 +837,13 @@ CREATE INDEX "StudentEnrollment_schoolId_idx" ON "StudentEnrollment"("schoolId")
 CREATE INDEX "StudentEnrollment_sectionId_idx" ON "StudentEnrollment"("sectionId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "StudentEnrollment_studentId_academicYearId_key" ON "StudentEnrollment"("studentId", "academicYearId");
+CREATE INDEX "StudentEnrollment_academicYearId_idx" ON "StudentEnrollment"("academicYearId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "StudentEnrollment_studentId_sectionId_academicYearId_key" ON "StudentEnrollment"("studentId", "sectionId", "academicYearId");
+CREATE INDEX "StudentEnrollment_studentId_idx" ON "StudentEnrollment"("studentId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "UQ_Student_AcademicYear_Enrollment" ON "StudentEnrollment"("studentId", "academicYearId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Staff_userId_key" ON "Staff"("userId");
@@ -745,7 +870,13 @@ CREATE INDEX "StaffSubjectLevel_staffId_idx" ON "StaffSubjectLevel"("staffId");
 CREATE INDEX "StaffSubjectLevel_subjectId_idx" ON "StaffSubjectLevel"("subjectId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "StaffSubjectLevel_staffId_subjectId_schoolLevelId_classId_key" ON "StaffSubjectLevel"("staffId", "subjectId", "schoolLevelId", "classId");
+CREATE INDEX "StaffSubjectLevel_schoolLevelId_idx" ON "StaffSubjectLevel"("schoolLevelId");
+
+-- CreateIndex
+CREATE INDEX "StaffSubjectLevel_classId_idx" ON "StaffSubjectLevel"("classId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "UQ_Staff_Subject_Level_Class_School" ON "StaffSubjectLevel"("staffId", "subjectId", "schoolLevelId", "classId", "schoolId");
 
 -- CreateIndex
 CREATE INDEX "Attendance_schoolId_date_idx" ON "Attendance"("schoolId", "date");
@@ -764,6 +895,12 @@ CREATE UNIQUE INDEX "StaffAttendance_staffId_date_key" ON "StaffAttendance"("sta
 
 -- CreateIndex
 CREATE INDEX "Assignment_schoolId_subjectId_idx" ON "Assignment"("schoolId", "subjectId");
+
+-- CreateIndex
+CREATE INDEX "Assignment_sectionId_idx" ON "Assignment"("sectionId");
+
+-- CreateIndex
+CREATE INDEX "Assignment_classId_idx" ON "Assignment"("classId");
 
 -- CreateIndex
 CREATE INDEX "SubmittedAssignment_schoolId_idx" ON "SubmittedAssignment"("schoolId");
@@ -805,7 +942,7 @@ CREATE INDEX "Announcement_schoolId_publishedAt_idx" ON "Announcement"("schoolId
 CREATE INDEX "Event_schoolId_startDate_idx" ON "Event"("schoolId", "startDate");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "FeeStructure_schoolId_name_academicYearId_key" ON "FeeStructure"("schoolId", "name", "academicYearId");
+CREATE UNIQUE INDEX "FeeStructure_schoolId_name_academicYearId_classId_key" ON "FeeStructure"("schoolId", "name", "academicYearId", "classId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Invoice_invoiceNumber_key" ON "Invoice"("invoiceNumber");
@@ -919,7 +1056,16 @@ ALTER TABLE "Subject" ADD CONSTRAINT "Subject_departmentId_fkey" FOREIGN KEY ("d
 ALTER TABLE "Subject" ADD CONSTRAINT "Subject_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "School"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Student" ADD CONSTRAINT "Student_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "SubjectSchoolLevel" ADD CONSTRAINT "SubjectSchoolLevel_subjectId_fkey" FOREIGN KEY ("subjectId") REFERENCES "Subject"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "SubjectSchoolLevel" ADD CONSTRAINT "SubjectSchoolLevel_schoolLevelId_fkey" FOREIGN KEY ("schoolLevelId") REFERENCES "SchoolLevel"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "SubjectSchoolLevel" ADD CONSTRAINT "SubjectSchoolLevel_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "School"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Student" ADD CONSTRAINT "Student_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Student" ADD CONSTRAINT "Student_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "School"("id") ON DELETE CASCADE ON UPDATE CASCADE;

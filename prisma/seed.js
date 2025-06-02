@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 
 async function main() {
   const email = 'superadmin@example.com'; // Change as needed
-  const password = 'kantanka'; // Change to a strong password
+  const password = 'kantanka1'; // Change to a strong password
 
   console.log(`Checking for existing user: ${email}`);
   const existingUser = await prisma.user.findUnique({ where: { email } });
