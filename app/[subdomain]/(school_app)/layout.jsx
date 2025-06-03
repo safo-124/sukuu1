@@ -14,7 +14,8 @@ import {
   Store,
   Layers,
   PieChart,
-  Book
+  Book,
+  MoveRight
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -111,6 +112,7 @@ function SchoolSidebar({ schoolSubdomain, schoolName, schoolLogoUrl, isOpen, onC
         { href: `/${schoolSubdomain}/academics/timetable`, label: 'Timetable', icon: CalendarDays },
         { href: `/${schoolSubdomain}/academics/assignments`, label: 'Assignments', icon: Book },
         { href: `/${schoolSubdomain}/academics/examinations`, label: 'Examinations', icon: GraduationCap },
+        { href: `/${schoolSubdomain}/academics/grades`, label: 'Grades', icon: MoveRight },
       ]
     },
     {
