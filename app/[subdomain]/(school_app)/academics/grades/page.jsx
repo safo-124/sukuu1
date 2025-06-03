@@ -24,8 +24,7 @@ import {
   BookOpen, Layers, Users, CalendarDays, Percent
 } from 'lucide-react';
 
-// Charting Library (Install one if you don't have it, e.g., npm install recharts)
-// For simplicity, I'll use a placeholder for the graph and assume Recharts for concepts.
+// Charting Library (If you install recharts: npm install recharts)
 // import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 
@@ -59,7 +58,7 @@ const initialWeightConfigFormData = {
 const GradingWeightConfigFormFields = ({ formData, onFormChange, onSelectChange, academicYearsList, schoolLevelsList, classesList, subjectsList, isLoadingDeps }) => {
   const labelTextClasses = "text-black dark:text-white block text-sm font-medium mb-1 text-left";
   const inputTextClasses = "bg-white/50 dark:bg-zinc-800/50 text-black dark:text-white border-zinc-300 dark:border-zinc-700 focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-500 dark:focus:border-sky-500";
-  // const descriptionTextClasses = "text-zinc-600 dark:text-zinc-400"; // Already available in parent component
+  // descriptionTextClasses is available from parent component, so no need to define here
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 max-h-[70vh] overflow-y-auto p-1 custom-scrollbar">
@@ -208,7 +207,7 @@ export default function ManageGradesPage() {
         fetch(`/api/schools/${schoolData.id}/academics/school-levels`),
         fetch(`/api/schools/${schoolData.id}/academics/classes`),
         fetch(`/api/schools/${schoolData.id}/academics/subjects`),
-        fetch(`/api/schools/${schoolData.id}/students`), // CHANGED PATH HERE from /people/students
+        fetch(`/api/schools/${schoolData.id}/students`), // Corrected path to match backend
         fetch(`/api/schools/${schoolData.id}/academics/exams`),
       ]);
 
@@ -496,7 +495,7 @@ export default function ManageGradesPage() {
                                 <SelectTrigger className={`${inputTextClasses} mt-1`}><SelectValue placeholder="Select term" /></SelectTrigger>
                                 <SelectContent className="bg-white dark:bg-zinc-900">{
                                   academicYears.find(y => y.id === gradeFormData.academicYearId)?.terms?.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)
-                                  || <SelectItem value="" disabled>Select Year First</SelectItem>
+                                  || <SelectItem value="select-year-first" disabled>Select Year First</SelectItem>
                                 }</SelectContent>
                                 </Select>
                             </div>
