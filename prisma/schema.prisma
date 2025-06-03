@@ -350,6 +350,7 @@ model Subject {
   id                  String                 @id @default(cuid())
   name                String
   subjectCode         String?
+  weeklyHours         Float?
   description         String?
   departmentId        String?
   department          Department?            @relation(fields: [departmentId], references: [id], onDelete: SetNull)

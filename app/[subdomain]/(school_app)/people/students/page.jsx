@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useSchool } from '../../layout'; // Adjust path to your SchoolAppLayout's context
+import { useSchool } from '../../layout'; // Adjust path
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -23,6 +23,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area'; // Added ScrollArea
 
 // Lucide React Icons
 import { 
@@ -30,98 +31,95 @@ import {
     ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Loader2 
 } from 'lucide-react';
 
-// Define initial form data structure based on your Zod schema (createStudentSchema)
 const initialStudentFormData = {
   firstName: '', lastName: '', middleName: '', 
   studentIdNumber: '', admissionDate: new Date().toISOString().split('T')[0], 
-  dateOfBirth: '', gender: 'MALE', // Default gender
+  dateOfBirth: '', gender: 'MALE',
   email: '', phone: '', 
   address: '', city: '', state: '', country: '',
   guardianName: '', guardianRelation: '', guardianPhone: '', guardianEmail: '',
-  academicYearId: '', classId: '', sectionId: '', // These will be populated by dropdowns
+  academicYearId: '', classId: '', sectionId: '',
 };
 
-// Gender options for the dropdown
 const genderOptions = ["MALE", "FEMALE", "OTHER", "PREFER_NOT_TO_SAY"];
 
-
-// Reusable FormFields Component for Add/Edit Student
-const StudentFormFields = ({ formData, onFormChange, onSelectChange, academicYearsList, classesList, sectionsList, isLoadingDeps, isEdit = false }) => {
+const StudentFormFields = ({ formData, onFormChange, onSelectChange, academicYearsList, classesList, sectionsList, isLoadingDeps, isEdit = false, outlineButtonClasses }) => {
   const titleTextClasses = "text-black dark:text-white";
   const labelTextClasses = `${titleTextClasses} block text-sm font-medium mb-1 text-left`;
   const inputTextClasses = "bg-white/50 dark:bg-zinc-800/50 text-black dark:text-white border-zinc-300 dark:border-zinc-700 focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-500 dark:focus:border-sky-500";
-  const descriptionTextClasses = "text-zinc-600 dark:text-zinc-400";
+  // descriptionTextClasses is not used here, can be removed or defined if needed elsewhere in this component
 
   if (!formData) {
     return <div className="p-4 flex justify-center items-center h-full min-h-[400px]"><Loader2 className="h-8 w-8 animate-spin text-sky-600" /></div>;
   }
   
-  // Cascading dropdown logic: Filter classes based on selected academic year
-  const filteredClasses = formData.academicYearId 
-    ? classesList?.filter(c => c.academicYearId === formData.academicYearId) 
+  const filteredClasses = formData.academicYearId && Array.isArray(classesList)
+    ? classesList.filter(c => c.academicYearId === formData.academicYearId) 
     : [];
   
-  // Cascading dropdown logic: Filter sections based on selected class
-  const filteredSections = formData.classId
-    ? sectionsList?.filter(s => s.classId === formData.classId)
+  const filteredSections = formData.classId && Array.isArray(sectionsList)
+    ? sectionsList.filter(s => s.classId === formData.classId)
     : [];
+
+  // console.log("StudentFormFields - formData.academicYearId:", formData.academicYearId);
+  // console.log("StudentFormFields - classesList:", classesList);
+  // console.log("StudentFormFields - filteredClasses:", filteredClasses);
+  // console.log("StudentFormFields - formData.classId:", formData.classId);
+  // console.log("StudentFormFields - sectionsList:", sectionsList);
+  // console.log("StudentFormFields - filteredSections:", filteredSections);
+
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4 max-h-[65vh] overflow-y-auto p-1 custom-scrollbar">
-      {/* Section Title */}
-      <h3 className={`md:col-span-3 text-base font-semibold ${titleTextClasses} pb-2 border-b dark:border-zinc-700 mb-2`}>Personal Details</h3>
-      <div><Label htmlFor="firstName" className={labelTextClasses}>First Name <span className="text-red-500">*</span></Label><Input id="firstName" name="firstName" value={formData.firstName || ''} onChange={onFormChange} required className={`${inputTextClasses} mt-1`} /></div>
-      <div><Label htmlFor="lastName" className={labelTextClasses}>Last Name <span className="text-red-500">*</span></Label><Input id="lastName" name="lastName" value={formData.lastName || ''} onChange={onFormChange} required className={`${inputTextClasses} mt-1`} /></div>
-      <div><Label htmlFor="middleName" className={labelTextClasses}>Middle Name</Label><Input id="middleName" name="middleName" value={formData.middleName || ''} onChange={onFormChange} className={`${inputTextClasses} mt-1`} /></div>
-      
-      <div><Label htmlFor="dateOfBirth" className={labelTextClasses}>Date of Birth</Label><Input id="dateOfBirth" name="dateOfBirth" type="date" value={formData.dateOfBirth || ''} onChange={onFormChange} className={`${inputTextClasses} mt-1`} /></div>
-      <div>
-          <Label htmlFor="gender" className={labelTextClasses}>Gender</Label>
-          <Select name="gender" value={formData.gender || ''} onValueChange={(value) => onSelectChange('gender', value)}>
-              <SelectTrigger className={`${inputTextClasses} mt-1`}><SelectValue placeholder="Select gender" /></SelectTrigger>
-              <SelectContent className="bg-white dark:bg-zinc-900">{genderOptions.map(g => <SelectItem key={g} value={g} className="hover:bg-zinc-100 dark:hover:bg-zinc-800">{g.charAt(0) + g.slice(1).toLowerCase().replace('_', ' ')}</SelectItem>)}</SelectContent>
-          </Select>
-      </div>
-      <div><Label htmlFor="admissionNumber" className={labelTextClasses}>Admission No. <span className="text-red-500">*</span></Label><Input id="admissionNumber" name="studentIdNumber" value={formData.studentIdNumber || ''} onChange={onFormChange} required className={`${inputTextClasses} mt-1`} /></div>
-      <div><Label htmlFor="admissionDate" className={labelTextClasses}>Admission Date <span className="text-red-500">*</span></Label><Input id="admissionDate" name="admissionDate" type="date" value={formData.admissionDate || ''} onChange={onFormChange} required className={`${inputTextClasses} mt-1`} /></div>
-      
-      {/* Contact Details */}
-      <h3 className={`md:col-span-3 text-base font-semibold ${titleTextClasses} pb-2 border-b dark:border-zinc-700 mt-4 mb-2`}>Contact & Address</h3>
-      <div><Label htmlFor="email" className={labelTextClasses}>Student Email</Label><Input id="email" name="email" type="email" value={formData.email || ''} onChange={onFormChange} className={`${inputTextClasses} mt-1`} /></div>
-      <div><Label htmlFor="phone" className={labelTextClasses}>Student Phone</Label><Input id="phone" name="phone" value={formData.phone || ''} onChange={onFormChange} className={`${inputTextClasses} mt-1`} /></div>
-      <div className="sm:col-span-2 md:col-span-3"><Label htmlFor="address" className={labelTextClasses}>Address</Label><Textarea id="address" name="address" value={formData.address || ''} onChange={onFormChange} className={`${inputTextClasses} mt-1`} /></div>
-      {/* city, state, country inputs can be added here if needed */}
+        <h3 className={`md:col-span-3 text-base font-semibold ${titleTextClasses} pb-2 border-b dark:border-zinc-700 mb-2`}>Personal Details</h3>
+        <div><Label htmlFor="firstName" className={labelTextClasses}>First Name <span className="text-red-500">*</span></Label><Input id="firstName" name="firstName" value={formData.firstName || ''} onChange={onFormChange} required className={`${inputTextClasses} mt-1`} /></div>
+        <div><Label htmlFor="lastName" className={labelTextClasses}>Last Name <span className="text-red-500">*</span></Label><Input id="lastName" name="lastName" value={formData.lastName || ''} onChange={onFormChange} required className={`${inputTextClasses} mt-1`} /></div>
+        <div><Label htmlFor="middleName" className={labelTextClasses}>Middle Name</Label><Input id="middleName" name="middleName" value={formData.middleName || ''} onChange={onFormChange} className={`${inputTextClasses} mt-1`} /></div>
+        
+        <div><Label htmlFor="dateOfBirth" className={labelTextClasses}>Date of Birth</Label><Input id="dateOfBirth" name="dateOfBirth" type="date" value={formData.dateOfBirth || ''} onChange={onFormChange} className={`${inputTextClasses} mt-1`} /></div>
+        <div>
+            <Label htmlFor="gender" className={labelTextClasses}>Gender</Label>
+            <Select name="gender" value={formData.gender || ''} onValueChange={(value) => onSelectChange('gender', value)}>
+                <SelectTrigger className={`${inputTextClasses} mt-1`}><SelectValue placeholder="Select gender" /></SelectTrigger>
+                <SelectContent className="bg-white dark:bg-zinc-900">{genderOptions.map(g => <SelectItem key={g} value={g} className="hover:bg-zinc-100 dark:hover:bg-zinc-800">{g.charAt(0) + g.slice(1).toLowerCase().replace('_', ' ')}</SelectItem>)}</SelectContent>
+            </Select>
+        </div>
+        <div><Label htmlFor="admissionNumber" className={labelTextClasses}>Admission No. <span className="text-red-500">*</span></Label><Input id="admissionNumber" name="studentIdNumber" value={formData.studentIdNumber || ''} onChange={onFormChange} required className={`${inputTextClasses} mt-1`} /></div>
+        <div><Label htmlFor="admissionDate" className={labelTextClasses}>Admission Date <span className="text-red-500">*</span></Label><Input id="admissionDate" name="admissionDate" type="date" value={formData.admissionDate || ''} onChange={onFormChange} required className={`${inputTextClasses} mt-1`} /></div>
+        
+        <h3 className={`md:col-span-3 text-base font-semibold ${titleTextClasses} pb-2 border-b dark:border-zinc-700 mt-4 mb-2`}>Contact & Address</h3>
+        <div><Label htmlFor="email" className={labelTextClasses}>Student Email</Label><Input id="email" name="email" type="email" value={formData.email || ''} onChange={onFormChange} className={`${inputTextClasses} mt-1`} /></div>
+        <div><Label htmlFor="phone" className={labelTextClasses}>Student Phone</Label><Input id="phone" name="phone" value={formData.phone || ''} onChange={onFormChange} className={`${inputTextClasses} mt-1`} /></div>
+        <div className="sm:col-span-2 md:col-span-3"><Label htmlFor="address" className={labelTextClasses}>Address</Label><Textarea id="address" name="address" value={formData.address || ''} onChange={onFormChange} className={`${inputTextClasses} mt-1`} /></div>
 
-      {/* Guardian Details */}
-      <h3 className={`md:col-span-3 text-base font-semibold ${titleTextClasses} pb-2 border-b dark:border-zinc-700 mt-4 mb-2`}>Guardian Information</h3>
-      <div><Label htmlFor="guardianName" className={labelTextClasses}>Guardian Full Name <span className="text-red-500">*</span></Label><Input id="guardianName" name="guardianName" value={formData.guardianName || ''} onChange={onFormChange} required className={`${inputTextClasses} mt-1`} /></div>
-      <div><Label htmlFor="guardianRelation" className={labelTextClasses}>Relation to Student <span className="text-red-500">*</span></Label><Input id="guardianRelation" name="guardianRelation" value={formData.guardianRelation || ''} onChange={onFormChange} required className={`${inputTextClasses} mt-1`} /></div>
-      <div><Label htmlFor="guardianPhone" className={labelTextClasses}>Guardian Phone <span className="text-red-500">*</span></Label><Input id="guardianPhone" name="guardianPhone" value={formData.guardianPhone || ''} onChange={onFormChange} required className={`${inputTextClasses} mt-1`} /></div>
-      <div className="md:col-span-2"><Label htmlFor="guardianEmail" className={labelTextClasses}>Guardian Email</Label><Input id="guardianEmail" name="guardianEmail" type="email" value={formData.guardianEmail || ''} onChange={onFormChange} className={`${inputTextClasses} mt-1`} /></div>
-      
-      {/* Enrollment Details */}
-      <h3 className={`md:col-span-3 text-base font-semibold ${titleTextClasses} pb-2 border-b dark:border-zinc-700 mt-4 mb-2`}>Initial Enrollment</h3>
-      <div>
-          <Label htmlFor="academicYearId" className={labelTextClasses}>Academic Year <span className="text-red-500">*</span></Label>
-          <Select name="academicYearId" value={formData.academicYearId || ''} onValueChange={(value) => onSelectChange('academicYearId', value)} disabled={isLoadingDeps}>
-              <SelectTrigger className={`${inputTextClasses} mt-1`}><SelectValue placeholder="Select Academic Year" /></SelectTrigger>
-              <SelectContent className="bg-white dark:bg-zinc-900">{academicYearsList?.map(ay => <SelectItem key={ay.id} value={ay.id}>{ay.name}</SelectItem>)}</SelectContent>
-          </Select>
-      </div>
-      <div>
-          <Label htmlFor="classId" className={labelTextClasses}>Class <span className="text-red-500">*</span></Label>
-          <Select name="classId" value={formData.classId || ''} onValueChange={(value) => onSelectChange('classId', value)} disabled={!formData.academicYearId || isLoadingDeps || filteredClasses.length === 0}>
-              <SelectTrigger className={`${inputTextClasses} mt-1`}><SelectValue placeholder="Select Class" /></SelectTrigger>
-              <SelectContent className="bg-white dark:bg-zinc-900">{filteredClasses?.map(c => <SelectItem key={c.id} value={c.id}>{c.name} ({c.schoolLevel?.name})</SelectItem>)}</SelectContent>
-          </Select>
-      </div>
-      <div>
-          <Label htmlFor="sectionId" className={labelTextClasses}>Section <span className="text-red-500">*</span></Label>
-          <Select name="sectionId" value={formData.sectionId || ''} onValueChange={(value) => onSelectChange('sectionId', value)} disabled={!formData.classId || isLoadingDeps || filteredSections.length === 0}>
-              <SelectTrigger className={`${inputTextClasses} mt-1`}><SelectValue placeholder="Select Section" /></SelectTrigger>
-              <SelectContent className="bg-white dark:bg-zinc-900">{filteredSections?.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
-          </Select>
-      </div>
+        <h3 className={`md:col-span-3 text-base font-semibold ${titleTextClasses} pb-2 border-b dark:border-zinc-700 mt-4 mb-2`}>Guardian Information</h3>
+        <div><Label htmlFor="guardianName" className={labelTextClasses}>Guardian Full Name <span className="text-red-500">*</span></Label><Input id="guardianName" name="guardianName" value={formData.guardianName || ''} onChange={onFormChange} required className={`${inputTextClasses} mt-1`} /></div>
+        <div><Label htmlFor="guardianRelation" className={labelTextClasses}>Relation to Student <span className="text-red-500">*</span></Label><Input id="guardianRelation" name="guardianRelation" value={formData.guardianRelation || ''} onChange={onFormChange} required className={`${inputTextClasses} mt-1`} /></div>
+        <div><Label htmlFor="guardianPhone" className={labelTextClasses}>Guardian Phone <span className="text-red-500">*</span></Label><Input id="guardianPhone" name="guardianPhone" value={formData.guardianPhone || ''} onChange={onFormChange} required className={`${inputTextClasses} mt-1`} /></div>
+        <div className="md:col-span-2"><Label htmlFor="guardianEmail" className={labelTextClasses}>Guardian Email</Label><Input id="guardianEmail" name="guardianEmail" type="email" value={formData.guardianEmail || ''} onChange={onFormChange} className={`${inputTextClasses} mt-1`} /></div>
+        
+        <h3 className={`md:col-span-3 text-base font-semibold ${titleTextClasses} pb-2 border-b dark:border-zinc-700 mt-4 mb-2`}>Initial Enrollment</h3>
+        <div>
+            <Label htmlFor="academicYearId" className={labelTextClasses}>Academic Year <span className="text-red-500">*</span></Label>
+            <Select name="academicYearId" value={formData.academicYearId || ''} onValueChange={(value) => onSelectChange('academicYearId', value)} disabled={isLoadingDeps}>
+                <SelectTrigger className={`${inputTextClasses} mt-1`}><SelectValue placeholder="Select Academic Year" /></SelectTrigger>
+                <SelectContent className="bg-white dark:bg-zinc-900">{isLoadingDeps ? <SelectItem value="loading" disabled>Loading...</SelectItem> : academicYearsList?.map(ay => <SelectItem key={ay.id} value={ay.id}>{ay.name}</SelectItem>)}</SelectContent>
+            </Select>
+        </div>
+        <div>
+            <Label htmlFor="classId" className={labelTextClasses}>Class <span className="text-red-500">*</span></Label>
+            <Select name="classId" value={formData.classId || ''} onValueChange={(value) => onSelectChange('classId', value)} disabled={!formData.academicYearId || isLoadingDeps || filteredClasses.length === 0}>
+                <SelectTrigger className={`${inputTextClasses} mt-1`}><SelectValue placeholder="Select Class" /></SelectTrigger>
+                <SelectContent className="bg-white dark:bg-zinc-900">{isLoadingDeps ? <SelectItem value="loading" disabled>Loading...</SelectItem> : (filteredClasses.length === 0 && formData.academicYearId ? <SelectItem value="no-classes" disabled>No classes for selected year</SelectItem> : filteredClasses.map(c => <SelectItem key={c.id} value={c.id}>{c.name} ({c.schoolLevel?.name})</SelectItem>))}</SelectContent>
+            </Select>
+        </div>
+        <div>
+            <Label htmlFor="sectionId" className={labelTextClasses}>Section <span className="text-red-500">*</span></Label>
+            <Select name="sectionId" value={formData.sectionId || ''} onValueChange={(value) => onSelectChange('sectionId', value)} disabled={!formData.classId || isLoadingDeps || filteredSections.length === 0}>
+                <SelectTrigger className={`${inputTextClasses} mt-1`}><SelectValue placeholder="Select Section" /></SelectTrigger>
+                <SelectContent className="bg-white dark:bg-zinc-900">{isLoadingDeps ? <SelectItem value="loading" disabled>Loading...</SelectItem> : (filteredSections.length === 0 && formData.classId ? <SelectItem value="no-sections" disabled>No sections for selected class</SelectItem> : filteredSections.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>))}</SelectContent>
+            </Select>
+        </div>
     </div>
   );
 };
@@ -147,8 +145,8 @@ export default function ManageStudentsPage() {
   const [addFormError, setAddFormError] = useState('');
 
   const [academicYears, setAcademicYears] = useState([]);
-  const [classes, setClasses] = useState([]); // All classes for the school (or current AY)
-  const [sections, setSections] = useState([]); // All sections for the school (or current Class)
+  const [classes, setClasses] = useState([]);
+  const [sections, setSections] = useState([]);
   const [isLoadingDropdowns, setIsLoadingDropdowns] = useState(false);
 
   // Tailwind class constants
@@ -157,6 +155,8 @@ export default function ManageStudentsPage() {
   const primaryButtonClasses = "bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200";
   const outlineButtonClasses = "border-zinc-300 text-black hover:bg-zinc-100 dark:border-zinc-700 dark:text-white dark:hover:bg-zinc-800";
   const glassCardClasses = `p-6 md:p-8 rounded-xl backdrop-blur-xl backdrop-saturate-150 shadow-xl dark:shadow-2xl bg-white/60 border border-zinc-200/50 dark:bg-zinc-900/60 dark:border-zinc-700/50`;
+  const inputTextClasses = "bg-white/50 dark:bg-zinc-800/50 text-black dark:text-white border-zinc-300 dark:border-zinc-700 focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-500 dark:focus:border-sky-500";
+
 
   const fetchStudents = useCallback(async (page = 1, currentSearchTerm = debouncedSearchTerm) => {
     if (!schoolData?.id) return;
@@ -181,26 +181,31 @@ export default function ManageStudentsPage() {
   const fetchDropdownData = useCallback(async () => {
     if (!schoolData?.id) return;
     setIsLoadingDropdowns(true);
+    console.log("ManageStudentsPage: Fetching dropdown data...");
     try {
       const [ayRes, classRes, sectionRes] = await Promise.all([
         fetch(`/api/schools/${schoolData.id}/academic-years`),
-        fetch(`/api/schools/${schoolData.id}/academics/classes`), // Fetch all classes initially
-        fetch(`/api/schools/${schoolData.id}/academics/sections/all`) // ✨ New API: Fetch ALL sections for the school
+        fetch(`/api/schools/${schoolData.id}/academics/classes`),
+        fetch(`/api/schools/${schoolData.id}/academics/sections/all`)
       ]);
 
-      if (!ayRes.ok) throw new Error('Failed to load academic years.');
+      if (!ayRes.ok) { const d = await ayRes.json().catch(() => ({})); throw new Error(d.error || 'Failed to load academic years.'); }
       const ayData = await ayRes.json();
+      console.log("Fetched Academic Years:", ayData.academicYears);
       setAcademicYears(ayData.academicYears || []);
 
-      if (!classRes.ok) throw new Error('Failed to load classes.');
+      if (!classRes.ok) { const d = await classRes.json().catch(() => ({})); throw new Error(d.error || 'Failed to load classes.'); }
       const classData = await classRes.json();
+      console.log("Fetched Classes:", classData.classes);
       setClasses(classData.classes || []);
       
-      if (!sectionRes.ok) throw new Error('Failed to load sections.');
+      if (!sectionRes.ok) { const d = await sectionRes.json().catch(() => ({})); throw new Error(d.error || 'Failed to load sections.'); }
       const sectionData = await sectionRes.json();
+      console.log("Fetched Sections:", sectionData.sections);
       setSections(sectionData.sections || []);
 
     } catch (error) {
+      console.error("Error in fetchDropdownData:", error);
       toast.error("Failed to load form data", { description: error.message });
     } finally {
       setIsLoadingDropdowns(false);
@@ -235,10 +240,12 @@ export default function ManageStudentsPage() {
   const handleAddStudentSelectChange = (name, value) => {
     const newFormData = { ...addStudentFormData, [name]: value === 'none' ? '' : value };
     if (name === 'academicYearId') {
-        newFormData.classId = ''; // Reset class if AY changes
-        newFormData.sectionId = ''; // Reset section if AY changes
+        newFormData.classId = ''; 
+        newFormData.sectionId = ''; 
+        console.log("Academic Year changed, resetting class and section. New AY ID:", value);
     } else if (name === 'classId') {
-        newFormData.sectionId = ''; // Reset section if class changes
+        newFormData.sectionId = ''; 
+        console.log("Class changed, resetting section. New Class ID:", value);
     }
     setAddStudentFormData(newFormData);
   };
@@ -246,15 +253,22 @@ export default function ManageStudentsPage() {
   const handleAddStudentSubmit = async (e) => {
     e.preventDefault();
     if (!schoolData?.id) return;
-    if (!addStudentFormData.academicYearId || !addStudentFormData.sectionId) { // classId is implied by section
+    if (!addStudentFormData.academicYearId || !addStudentFormData.sectionId) {
         toast.error("Validation Error", { description: "Academic Year, Class, and Section are required for enrollment."});
         setAddFormError("Academic Year, Class, and Section are required.");
         return;
     }
     setIsSubmittingStudent(true); setAddFormError('');
     try {
+      // Ensure admissionDate and dateOfBirth are valid dates before sending
+      const payload = {
+        ...addStudentFormData,
+        admissionDate: addStudentFormData.admissionDate ? new Date(addStudentFormData.admissionDate).toISOString() : null,
+        dateOfBirth: addStudentFormData.dateOfBirth ? new Date(addStudentFormData.dateOfBirth).toISOString() : null,
+      };
+
       const response = await fetch(`/api/schools/${schoolData.id}/students`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(addStudentFormData),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
       });
       const result = await response.json();
       if (!response.ok) {
@@ -266,7 +280,7 @@ export default function ManageStudentsPage() {
         toast.success(`Student "${result.student?.firstName} ${result.student?.lastName}" added successfully!`);
         setAddStudentFormData({...initialStudentFormData}); 
         setIsAddStudentDialogOpen(false); 
-        fetchStudents(); // Refresh student list
+        fetchStudents();
       }
     } catch (err) { toast.error('An unexpected error occurred.'); setAddFormError('An unexpected error occurred.');
     } finally { setIsSubmittingStudent(false); }
@@ -278,9 +292,8 @@ export default function ManageStudentsPage() {
     router.push(`${pathname}?${params.toString()}`, { scroll: false });
   };
 
-  // Placeholders for Edit/Delete actions
   const openEditStudentDialog = (student) => toast.info(`Editing ${student.firstName} (WIP)`);
-  const viewStudentProfile = (studentId) => router.push(`/${schoolData.subdomain}/people/students/${studentId}`); // Navigate to detail page
+  const viewStudentProfile = (studentId) => router.push(`/${schoolData.subdomain}/people/students/${studentId}`);
 
   return (
     <div className="space-y-8">
@@ -311,6 +324,7 @@ export default function ManageStudentsPage() {
                     classesList={classes} 
                     sectionsList={sections}
                     isLoadingDeps={isLoadingDropdowns}
+                    outlineButtonClasses={outlineButtonClasses} // Pass this if StudentFormFields uses it
                 />
                 {addFormError && ( <p className="text-sm text-red-600 dark:text-red-400 md:col-span-full">{addFormError}</p> )}
                 <DialogFooter className="pt-6"> 
@@ -327,7 +341,7 @@ export default function ManageStudentsPage() {
       <div className="mb-6">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-400 dark:text-zinc-500" />
-          <Input type="search" placeholder="Search students by name, admission no..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`pl-10 w-full md:w-1/2 lg:w-1/3 `} />
+          <Input type="search" placeholder="Search students by name, admission no..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`pl-10 w-full md:w-1/2 lg:w-1/3 ${inputTextClasses}`} />
         </div>
       </div>
 

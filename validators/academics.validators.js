@@ -34,12 +34,9 @@ export const academicYearSchema = academicYearBaseSchema.refine(data => {
       data.endDate instanceof Date && !isNaN(data.endDate.getTime())) {
     return data.endDate.getTime() > data.startDate.getTime();
   }
-  // If dates are invalid, z.coerce.date should have already marked them.
-  // This refine focuses on their relationship if both are valid.
-  // If one date is invalid (getTime() is NaN), this refine should ideally not pass.
   if (isNaN(data.startDate?.getTime()) || isNaN(data.endDate?.getTime())) return false;
   
-  return true; // Fallback if dates are not present (should be caught by required_error)
+  return true; 
 }, {
   message: "End date must be after start date, and both dates must be valid.",
   path: ["endDate"],
@@ -70,7 +67,16 @@ export const schoolLevelSchema = z.object({
 });
 export const updateSchoolLevelSchema = schoolLevelSchema.partial();
 
-// Schema for Class
+// Schema for Class (Updated to include optional sections)
+const sectionDefinitionSchema = z.object({
+  name: z.string()
+    .min(1, { message: "Section name must be at least 1 character."})
+    .max(50, { message: "Section name cannot exceed 50 characters."})
+    .trim(),
+  // classTeacherId: z.string().cuid().optional().nullable(),
+  // maxCapacity: z.coerce.number().int().positive().optional().nullable(),
+});
+
 export const classSchema = z.object({
   name: z.string()
     .min(1, { message: "Class name must be at least 1 character." })
@@ -80,15 +86,29 @@ export const classSchema = z.object({
     .cuid({ message: "Invalid School Level ID format." }),
   academicYearId: z.string()
     .cuid({ message: "Invalid Academic Year ID format." }),
+  sections: z.array(sectionDefinitionSchema)
+    .optional() 
+    .default([]), 
 });
-export const updateClassSchema = classSchema.partial(); 
 
-// Schema for Section
+export const updateClassSchema = z.object({
+    name: z.string()
+        .min(1, { message: "Class name must be at least 1 character." })
+        .max(100, { message: "Class name cannot exceed 100 characters." })
+        .trim().optional(),
+    schoolLevelId: z.string()
+        .cuid({ message: "Invalid School Level ID format." }).optional(),
+    academicYearId: z.string()
+        .cuid({ message: "Invalid Academic Year ID format." }).optional(),
+}); 
+
+// Schema for Section (This is for managing sections independently later)
 export const sectionSchema = z.object({
   name: z.string()
     .min(1, { message: "Section name must be at least 1 character." })
     .max(50, { message: "Section name cannot exceed 50 characters." })
     .trim(),
+  classId: z.string().cuid({ message: "A valid Class ID is required."}).optional(), // Optional if creating with class
   classTeacherId: z.string()
     .cuid({ message: "Invalid Class Teacher (Staff) ID format." })
     .optional()
@@ -102,7 +122,7 @@ export const sectionSchema = z.object({
 });
 export const updateSectionSchema = sectionSchema.partial();
 
-// Schema for Subject
+// Schema for Subject ( ✨ Updated with weeklyHours ✨ )
 export const subjectSchema = z.object({
   name: z.string().min(2, { message: "Subject name must be at least 2 characters." }).max(100),
   subjectCode: z.string().max(20).optional().nullable(),
@@ -111,12 +131,20 @@ export const subjectSchema = z.object({
   teacherId: z.string().cuid({ message: "A teacher must be assigned to this subject." }),
   schoolLevelIds: z.array(z.string().cuid({ message: "Invalid School Level ID in selection."}))
                    .min(1, { message: "At least one school level must be selected for this subject." }),
+  weeklyHours: z.coerce // Use z.coerce for numbers from form inputs
+    .number({ invalid_type_error: "Weekly hours must be a number." })
+    .positive({ message: "Weekly hours must be a positive number." })
+    .optional()
+    .nullable(),
 });
-export const updateSubjectSchema = z.object({
+
+export const updateSubjectSchema = z.object({ // ✨ Updated with weeklyHours ✨
   name: z.string().min(2, { message: "Subject name must be at least 2 characters." }).max(100).optional(),
   subjectCode: z.string().max(20).optional().nullable(),
   description: z.string().max(500).optional().nullable(),
   departmentId: z.string().cuid({ message: "Invalid Department ID."}).optional().nullable(),
+  weeklyHours: z.coerce.number({ invalid_type_error: "Weekly hours must be a number." }).positive({ message: "Weekly hours must be positive."}).optional().nullable(),
+  // Note: Managing teacher/level links for an existing subject is typically a separate, more complex operation.
 });
 
 // Schema for Department
