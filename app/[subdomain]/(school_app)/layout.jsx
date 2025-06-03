@@ -13,7 +13,8 @@ import {
   AlertTriangle,
   Store,
   Layers,
-  PieChart
+  PieChart,
+  Book
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -108,6 +109,7 @@ function SchoolSidebar({ schoolSubdomain, schoolName, schoolLogoUrl, isOpen, onC
         { href: `/${schoolSubdomain}/academics/classes`, label: 'Classes & Sections', icon: Building },
         { href: `/${schoolSubdomain}/academics/subjects`, label: 'Subjects', icon: BookOpen },
         { href: `/${schoolSubdomain}/academics/timetable`, label: 'Timetable', icon: CalendarDays },
+        { href: `/${schoolSubdomain}/academics/assignments`, label: 'Assignments', icon: Book },
         { href: `/${schoolSubdomain}/academics/examinations`, label: 'Examinations', icon: GraduationCap },
       ]
     },
