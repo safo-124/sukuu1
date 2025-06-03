@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useSchool } from '../../layout'; 
+import { useSchool } from '../../layout';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -31,8 +31,8 @@ const initialFormData = {
   subjectCode: '',
   description: '',
   departmentId: '',
-  teacherId: '',       // For "Add" mode: initial teacher for all selected levels
-  schoolLevelIds: [],  // For "Add" mode: levels to link subject and teacher to
+  teacherId: '',        // For "Add" mode: initial teacher for all selected levels
+  schoolLevelIds: [],   // For "Add" mode: levels to link subject and teacher to
   weeklyHours: '',
 };
 
@@ -80,7 +80,7 @@ const SubjectFormFields = ({ formData, onFormChange, onSelectChange, onMultiSele
         <Label htmlFor="weeklyHours" className={labelTextClasses}>Weekly Hours/Periods (Optional)</Label>
         <Input id="weeklyHours" name="weeklyHours" type="number" step="0.5" min="0" value={formData.weeklyHours || ''} onChange={onFormChange} className={`${inputTextClasses} mt-1`} placeholder="e.g., 3 or 2.5" />
       </div>
-       <div className="sm:col-span-2">
+        <div className="sm:col-span-2">
         <Label htmlFor="description" className={labelTextClasses}>Description (Optional)</Label>
         <Textarea id="description" name="description" value={formData.description || ''} onChange={onFormChange} rows={2} className={`${inputTextClasses} mt-1`} />
       </div>
@@ -144,12 +144,12 @@ const SubjectFormFields = ({ formData, onFormChange, onSelectChange, onMultiSele
             <p className={`text-xs mt-1 ${descriptionTextClasses}`}>Managing level assignments for existing subjects is done via a dedicated interface (Not implemented in this form).</p>
           </div>
       )}
-       {isEdit && formData.teacherId && (
+        {isEdit && formData.teacherId && (
           <div className="sm:col-span-2">
             <Label className={labelTextClasses}>Initially Assigned Teacher (Read-only)</Label>
-             <Input 
-                value={teachersList?.find(t=>t.id === formData.teacherId)?.user?.firstName + ' ' + teachersList?.find(t=>t.id === formData.teacherId)?.user?.lastName || 'N/A'} 
-                disabled 
+              <Input
+                value={teachersList?.find(t=>t.id === formData.teacherId)?.user?.firstName + ' ' + teachersList?.find(t=>t.id === formData.teacherId)?.user?.lastName || 'N/A'}
+                disabled
                 className={`${inputTextClasses} mt-1`} />
             <p className={`text-xs mt-1 ${descriptionTextClasses}`}>Managing teacher assignments for existing subjects is done via a dedicated interface.</p>
           </div>
@@ -172,7 +172,8 @@ export default function ManageSubjectsPage() {
   const [isLoadingDeps, setIsLoadingDeps] = useState(true); // For dropdowns
   const [error, setError] = useState('');
 
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false); // This is the state for the add/edit dialog
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false); // State for the edit dialog specifically
   const [formData, setFormData] = useState({...initialFormData});
   const [editingSubject, setEditingSubject] = useState(null); // null for Add, object for Edit
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -224,11 +225,11 @@ export default function ManageSubjectsPage() {
   const handleSelectChange = (name, value) => setFormData(prev => ({ ...prev, [name]: value === 'none' ? '' : value }));
   const handleMultiSelectChange = (name, newArrayValue) => setFormData(prev => ({ ...prev, [name]: newArrayValue }));
 
-  const openAddDialog = () => { 
-    setEditingSubject(null); 
-    setFormData({...initialFormData}); 
-    setFormError(''); 
-    setIsDialogOpen(true); 
+  const openAddDialog = () => {
+    setEditingSubject(null);
+    setFormData({...initialFormData});
+    setFormError('');
+    setIsDialogOpen(true); // Use isDialogOpen here
   };
 
   const openEditDialog = (subject) => {
@@ -242,11 +243,11 @@ export default function ManageSubjectsPage() {
         weeklyHours: subject.weeklyHours?.toString() || '',
         // For Edit mode, teacher & levels are displayed as read-only for now.
         // If you want to edit them, the API and this form data setup would need to change.
-        teacherId: subject.staffSubjectLevels?.[0]?.staff?.id || '', 
+        teacherId: subject.staffSubjectLevels?.[0]?.staff?.id || '',
         schoolLevelIds: subject.schoolLevelLinks?.map(link => link.schoolLevel.id) || [],
     });
     setFormError('');
-    setIsDialogOpen(true);
+    setIsEditDialogOpen(true); // Use isEditDialogOpen here
   };
 
   const handleSubmit = async (e) => {
@@ -255,14 +256,14 @@ export default function ManageSubjectsPage() {
     setIsSubmitting(true); setFormError('');
 
     const isEditing = !!editingSubject;
-    
+
     // Client-side validation for add mode
     if (!isEditing) {
         if (!formData.teacherId) { toast.error("Validation Error", { description: "A teacher must be selected." }); setFormError("A teacher must be selected."); setIsSubmitting(false); return; }
         if (!formData.schoolLevelIds || formData.schoolLevelIds.length === 0) { toast.error("Validation Error", { description: "At least one school level must be selected." }); setFormError("At least one school level must be selected."); setIsSubmitting(false); return; }
     }
-    
-    let payload = { 
+
+    let payload = {
         name: formData.name,
         subjectCode: formData.subjectCode || null,
         description: formData.description || null,
@@ -294,13 +295,14 @@ export default function ManageSubjectsPage() {
         toast.error(`${actionText.charAt(0).toUpperCase() + actionText.slice(1)} Failed`, { description: err }); setFormError(err);
       } else {
         toast.success(`Subject "${result.subject?.name}" ${actionText}d successfully!`);
-        setIsDialogOpen(false); 
+        setIsDialogOpen(false); // Close add dialog
+        setIsEditDialogOpen(false); // Close edit dialog
         fetchSubjects();
       }
     } catch (err) { toast.error('An unexpected error occurred.'); setFormError('An unexpected error occurred.');
     } finally { setIsSubmitting(false); }
   };
-  
+
   const handleDelete = async (subjectId, subjectName) => {
     if (!schoolData?.id) return;
     if (!window.confirm(`Are you sure you want to DELETE subject "${subjectName}"? This may affect related records like teacher assignments and class links.`)) return;
@@ -310,7 +312,7 @@ export default function ManageSubjectsPage() {
         const response = await fetch(`/api/schools/${schoolData.id}/academics/subjects/${subjectId}`, { method: 'DELETE' });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "Deletion failed.");
-        toast.success(result.message || `Subject "${subjectName}" deleted.`, { id: toastId }); 
+        toast.success(result.message || `Subject "${subjectName}" deleted.`, { id: toastId });
         fetchSubjects();
     } catch (err) { toast.error(`Deletion Failed: ${err.message}`, { id: toastId }); }
   };
@@ -324,25 +326,25 @@ export default function ManageSubjectsPage() {
           </h1>
           <p className={descriptionTextClasses}>Define subjects, assign them to school levels, and link an initial teacher.</p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={(open) => { setIsAddDialogOpen(open); if (!open) setFormError(''); }}>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setFormError(''); }}> {/* Changed to isDialogOpen */}
           <DialogTrigger asChild>
             <Button className={primaryButtonClasses} onClick={openAddDialog}> <FilePlus2 className="mr-2 h-4 w-4" /> Add New Subject </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-lg md:max-w-2xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
             <DialogHeader> <DialogTitle className={titleTextClasses}>Add New Subject</DialogTitle> <DialogDescription className={descriptionTextClasses}>Enter details and assign to levels & a teacher.</DialogDescription> </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-6 py-1">
-              <SubjectFormFields 
-                formData={formData} 
-                onFormChange={handleFormChange} 
-                onSelectChange={handleSelectChange} 
+              <SubjectFormFields
+                formData={formData}
+                onFormChange={handleFormChange}
+                onSelectChange={handleSelectChange}
                 onMultiSelectChange={handleMultiSelectChange}
-                departmentsList={departments} 
-                teachersList={teachers} 
+                departmentsList={departments}
+                teachersList={teachers}
                 schoolLevelsList={schoolLevels}
-                isLoadingDeps={isLoadingDeps} 
+                isLoadingDeps={isLoadingDeps}
                 isEdit={false}
               />
-              {formError && isAddDialogOpen && ( <p className="text-sm text-red-600 dark:text-red-400 md:col-span-full">{formError}</p> )}
+              {formError && isDialogOpen && ( <p className="text-sm text-red-600 dark:text-red-400 md:col-span-full">{formError}</p> )} {/* Changed to isDialogOpen */}
               <DialogFooter className="pt-6">
                 <DialogClose asChild><Button type="button" variant="outline" className={outlineButtonClasses}>Cancel</Button></DialogClose>
                 <Button type="submit" className={primaryButtonClasses} disabled={isSubmitting || isLoadingDeps}> {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Creating...</> : 'Create Subject'} </Button>
@@ -352,7 +354,7 @@ export default function ManageSubjectsPage() {
         </Dialog>
       </div>
 
-      {error && !isAddDialogOpen && !isEditDialogOpen && ( <Alert variant="destructive" className="bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300 dark:border-red-700/50"> <AlertTriangle className="h-4 w-4" /> <AlertTitle>Error</AlertTitle> <AlertDescription>{error}</AlertDescription> </Alert> )}
+      {error && !isDialogOpen && !isEditDialogOpen && ( <Alert variant="destructive" className="bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300 dark:border-red-700/50"> <AlertTriangle className="h-4 w-4" /> <AlertTitle>Error</AlertTitle> <AlertDescription>{error}</AlertDescription> </Alert> )}
 
       <div className={`${glassCardClasses} overflow-x-auto`}>
         <Table>
@@ -406,7 +408,7 @@ export default function ManageSubjectsPage() {
           </TableBody>
         </Table>
       </div>
-      
+
       {/* Edit Subject Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={(open) => { setIsEditDialogOpen(open); if (!open) setFormError(''); }}>
           <DialogContent className="sm:max-w-lg md:max-w-2xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
@@ -416,7 +418,7 @@ export default function ManageSubjectsPage() {
                 Update subject details. Assigning to different levels or changing teachers is handled separately.
               </DialogDescription>
             </DialogHeader>
-            {isSubmitting && editingSubject && !formData.name ? ( 
+            {isSubmitting && editingSubject && !formData.name ? (
                 // This condition might be too aggressive for showing loader,
                 // better to rely on a specific 'isLoadingEditFormDetails' state if fetching for edit.
                 // For now, if isSubmitting is true while editingSubject exists, it implies the PUT request.
@@ -424,12 +426,12 @@ export default function ManageSubjectsPage() {
                 <div className="py-10 flex justify-center items-center"><Loader2 className="h-8 w-8 animate-spin text-sky-600" /></div>
             ) : (
                 <form onSubmit={handleSubmit} className="space-y-6 py-1">
-                    <SubjectFormFields 
-                        formData={formData} 
-                        onFormChange={handleFormChange} 
-                        onSelectChange={handleSelectChange} 
+                    <SubjectFormFields
+                        formData={formData}
+                        onFormChange={handleFormChange}
+                        onSelectChange={handleSelectChange}
                         onMultiSelectChange={handleMultiSelectChange} // This will be used for schoolLevelIds if made editable
-                        departmentsList={departments} 
+                        departmentsList={departments}
                         teachersList={teachers} // Used for display if editing teacher link
                         schoolLevelsList={schoolLevels} // Used for display if editing schoolLevel links
                         isLoadingDeps={isLoadingDeps}
@@ -438,8 +440,8 @@ export default function ManageSubjectsPage() {
                     {formError && isEditDialogOpen && ( <p className="text-sm text-red-600 dark:text-red-400 md:col-span-full">{formError}</p> )}
                     <DialogFooter className="pt-6">
                         <DialogClose asChild><Button type="button" variant="outline" className={outlineButtonClasses} onClick={() => setIsEditDialogOpen(false)}>Cancel</Button></DialogClose>
-                        <Button type="submit" className={primaryButtonClasses} disabled={isSubmitting || isLoadingDeps}> 
-                            {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Saving...</> : 'Save Changes'} 
+                        <Button type="submit" className={primaryButtonClasses} disabled={isSubmitting || isLoadingDeps}>
+                            {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Saving...</> : 'Save Changes'}
                         </Button>
                     </DialogFooter>
                 </form>
