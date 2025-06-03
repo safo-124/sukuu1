@@ -1,9 +1,17 @@
 // validators/academics.validators.js
-import { z } from 'zod'; // Step 1: Ensure Zod is imported correctly.
+import { z } from 'zod';
 
-// Schema for Academic Year
-// Step 2: Define academicYearSchema. Ensure no syntax errors within this block.
-export const academicYearSchema = z.object({
+console.log("VALIDATOR_FILE_LOADED: academics.validators.js - Zod type:", typeof z);
+
+if (typeof z === 'undefined' || typeof z.object !== 'function') {
+  console.error("CRITICAL VALIDATOR ERROR: Zod (z) is not imported or initialized correctly in academics.validators.js!");
+  throw new Error("Zod (z) is not properly imported or initialized in academics.validators.js");
+} else {
+  console.log("VALIDATOR_LOG: Zod (z) object seems to be available in academics.validators.js.");
+}
+
+// Step 1: Define the base object schema for Academic Year without the object-level refine
+const academicYearBaseSchema = z.object({
   name: z.string()
     .min(3, { message: "Academic year name must be at least 3 characters." })
     .max(100, { message: "Academic year name cannot exceed 100 characters." })
@@ -17,30 +25,37 @@ export const academicYearSchema = z.object({
     invalid_type_error: "End date must be a valid date (e.g., YYYY-MM-DD).",
   }),
   isCurrent: z.boolean().default(false).optional(),
-}).refine(data => {
-  // This refine operates on the transformed Date objects.
-  // z.coerce.date will produce a Date object. If the input string is invalid,
-  // it will be an "Invalid Date" object, and getTime() will return NaN.
-  if (data.startDate && data.endDate && 
-      !isNaN(data.startDate.getTime()) && 
-      !isNaN(data.endDate.getTime())) {
-    return data.endDate.getTime() > data.startDate.getTime();
-  }
-  // If either date is invalid (getTime() is NaN), this refine should ideally not determine schema validity by itself,
-  // as z.coerce.date should have already marked the field with an invalid_type_error.
-  // However, to prevent comparison errors, we can return true here and let field errors dominate.
-  // Or, if we want this refine to also catch invalid dates passed to it:
-  if (isNaN(data.startDate?.getTime()) || isNaN(data.endDate?.getTime())) return false; // Fail if dates are invalid for comparison
-  
-  return true; // Fallback if one of the dates isn't present (should be caught by required_error)
-}, {
-  message: "End date must be after start date and both dates must be valid.",
-  path: ["endDate"], // Report error on endDate field
 });
 
-// Step 3: This is where the error occurs. If academicYearSchema is a valid ZodObject, .partial() will exist.
-// If academicYearSchema is undefined or not a ZodObject, this line will throw.
-export const updateAcademicYearSchema = academicYearSchema.partial(); 
+// Step 2: Apply the object-level refine to the base schema to create the final academicYearSchema
+export const academicYearSchema = academicYearBaseSchema.refine(data => {
+  if (data.startDate && data.endDate && 
+      data.startDate instanceof Date && !isNaN(data.startDate.getTime()) &&
+      data.endDate instanceof Date && !isNaN(data.endDate.getTime())) {
+    return data.endDate.getTime() > data.startDate.getTime();
+  }
+  // If dates are invalid, z.coerce.date should have already marked them.
+  // This refine focuses on their relationship if both are valid.
+  // If one date is invalid (getTime() is NaN), this refine should ideally not pass.
+  if (isNaN(data.startDate?.getTime()) || isNaN(data.endDate?.getTime())) return false;
+  
+  return true; // Fallback if dates are not present (should be caught by required_error)
+}, {
+  message: "End date must be after start date, and both dates must be valid.",
+  path: ["endDate"],
+});
+
+// Step 3: Create the update schema by calling .partial() on the BASE schema
+export const updateAcademicYearSchema = academicYearBaseSchema.partial(); 
+
+console.log("VALIDATOR_LOG: academicYearSchema type:", typeof academicYearSchema, "Is ZodEffects:", academicYearSchema instanceof z.ZodEffects);
+console.log("VALIDATOR_LOG: updateAcademicYearSchema type:", typeof updateAcademicYearSchema, "Is ZodObject:", updateAcademicYearSchema instanceof z.ZodObject);
+if (updateAcademicYearSchema && typeof updateAcademicYearSchema.parse === 'function') {
+  console.log("VALIDATOR_LOG: updateAcademicYearSchema seems to be a valid Zod schema.");
+} else {
+   console.error("VALIDATOR_LOG: updateAcademicYearSchema IS NOT a valid Zod schema after .partial().");
+}
+
 
 // Schema for School Level
 export const schoolLevelSchema = z.object({
