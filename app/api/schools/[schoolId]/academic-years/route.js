@@ -1,118 +1,98 @@
 // app/api/schools/[schoolId]/academic-years/route.js
-import prisma from '@/lib/prisma';
-import { academicYearSchema } from '@/validators/academics.validators'; // Ensure this path is correct
 import { NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth"; // Ensure this path is correct
+import { authOptions } from "@/lib/auth";
+import { z } from 'zod';
+import { schoolIdSchema, createAcademicYearSchema } from '@/validators/academics.validators'; // Adjust path as needed
 
-// GET handler to list all academic years for a specific school
+// GET /api/schools/[schoolId]/academic-years
+// Fetches all academic years for a specific school
 export async function GET(request, { params }) {
   const { schoolId } = params;
   const session = await getServerSession(authOptions);
 
-  console.log(`API (GET AcademicYears) - SchoolId: ${schoolId}, User SchoolId: ${session?.user?.schoolId}, Role: ${session?.user?.role}`);
-
-  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {
-    console.error("API (GET AcademicYears) - Unauthorized access attempt.");
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'TEACHER')) {
+    console.warn(`Unauthorized access attempt to /api/schools/${schoolId}/academic-years by user: ${session?.user?.id}, role: ${session?.user?.role}, schoolId: ${session?.user?.schoolId}`);
+    return NextResponse.json({ error: 'Unauthorized access.' }, { status: 401 });
   }
-  console.log(`API (GET AcademicYears) - Authorized for user: ${session.user.email}`);
 
   try {
-    console.log(`API (GET AcademicYears) - Attempting to fetch academic years for schoolId: ${schoolId}`);
+    schoolIdSchema.parse(schoolId); // Validate schoolId from path
+
     const academicYears = await prisma.academicYear.findMany({
       where: { schoolId: schoolId },
-      orderBy: { startDate: 'desc' }, // Your schema has startDate
-      select: { 
-        id: true, 
-        name: true, 
-        startDate: true, 
-        endDate: true, 
-        isCurrent: true 
-        // Ensure your AcademicYear model in schema.prisma has these fields.
-      }
+      include: {
+        terms: { // Crucially include terms for frontend filtering
+          select: { id: true, name: true, startDate: true, endDate: true },
+          orderBy: { startDate: 'asc' }
+        }
+      },
+      orderBy: { startDate: 'desc' }, // Order by most recent first
     });
-    console.log(`API (GET AcademicYears) - Successfully fetched ${academicYears.length} academic years.`);
+
     return NextResponse.json({ academicYears }, { status: 200 });
   } catch (error) {
-    console.error(`API (GET AcademicYears) - ERROR fetching for school ${schoolId}:`, error);
-    // Log Prisma specific errors
-    if (error.name === 'PrismaClientValidationError') {
-        console.error("API (GET AcademicYears) - Prisma Validation Error Details:", error.message);
-    } else if (error.code) { 
-        console.error("API - Prisma Error Code:", error.code);
-        console.error("API - Prisma Error Meta:", error.meta);
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: 'Validation Error', issues: error.issues }, { status: 400 });
     }
-    return NextResponse.json({ error: 'Failed to fetch academic years. Check server logs.' }, { status: 500 });
+    console.error(`Error fetching academic years for school ${schoolId}:`, error);
+    return NextResponse.json({ error: 'Failed to retrieve academic years.' }, { status: 500 });
   }
 }
 
-// POST handler to create a new academic year
+// POST /api/schools/[schoolId]/academic-years
+// Creates a new academic year for a specific school
 export async function POST(request, { params }) {
   const { schoolId } = params;
   const session = await getServerSession(authOptions);
 
-  console.log(`API (POST AcademicYear) - SchoolId: ${schoolId}, User SchoolId: ${session?.user?.schoolId}, Role: ${session?.user?.role}`);
-
-  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {
-    console.error("API (POST AcademicYear) - Unauthorized.");
+  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) { // Only admin can create academic years
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
     const body = await request.json();
-    console.log("API (POST AcademicYear) - Request body:", body);
-    
-    // Ensure academicYearSchema is correctly imported and defined
-    if (typeof academicYearSchema === 'undefined' || typeof academicYearSchema.safeParse !== 'function') {
-        console.error("API (POST AcademicYear) - academicYearSchema is not a valid Zod schema or undefined.");
-        return NextResponse.json({ error: 'Server configuration error: Academic Year validator not loaded.'}, { status: 500 });
-    }
-    const validation = academicYearSchema.safeParse(body);
+    schoolIdSchema.parse(schoolId); // Validate schoolId from path
+    const parsedData = createAcademicYearSchema.parse(body); // Validate request body
 
-    if (!validation.success) {
-      console.error("API (POST AcademicYear) - Validation failed:", JSON.stringify(validation.error.issues, null, 2));
-      return NextResponse.json({ error: 'Invalid input.', issues: validation.error.issues }, { status: 400 });
-    }
-    console.log("API (POST AcademicYear) - Validation successful. Validated data:", validation.data);
+    // Check for overlapping academic years
+    const existingOverlappingYears = await prisma.academicYear.findMany({
+      where: {
+        schoolId: schoolId,
+        OR: [
+          {
+            startDate: { lte: new Date(parsedData.endDate) },
+            endDate: { gte: new Date(parsedData.startDate) },
+          },
+        ],
+      },
+    });
 
-    const { name, startDate, endDate, isCurrent } = validation.data; // startDate and endDate are Date objects
-
-    if (!(startDate instanceof Date && !isNaN(startDate.getTime())) || !(endDate instanceof Date && !isNaN(endDate.getTime()))) {
-        console.error("API (POST AcademicYear) - Dates are invalid after Zod processing.");
-        return NextResponse.json({ error: 'Invalid date format processed on server.' }, { status: 400 });
+    if (existingOverlappingYears.length > 0) {
+      return NextResponse.json({ error: 'Academic year dates overlap with an existing academic year.' }, { status: 409 });
     }
 
-    let newAcademicYear;
-    console.log("API (POST AcademicYear) - Attempting Prisma transaction. isCurrent flag:", isCurrent);
+    const newAcademicYear = await prisma.academicYear.create({
+      data: {
+        name: parsedData.name,
+        startDate: new Date(parsedData.startDate),
+        endDate: new Date(parsedData.endDate),
+        isCurrent: parsedData.isCurrent,
+        schoolId: schoolId,
+      },
+    });
 
-    if (Boolean(isCurrent)) {
-      console.log("API (POST AcademicYear) - Setting new year as current.");
-      const transactionResult = await prisma.$transaction([
-        prisma.academicYear.updateMany({
-          where: { schoolId: schoolId, isCurrent: true },
-          data: { isCurrent: false },
-        }),
-        prisma.academicYear.create({
-          data: { schoolId, name, startDate, endDate, isCurrent: true },
-        }),
-      ]);
-      newAcademicYear = transactionResult[1];
-    } else {
-      console.log("API (POST AcademicYear) - Creating new year, not as current.");
-      newAcademicYear = await prisma.academicYear.create({
-        data: { schoolId, name, startDate, endDate, isCurrent: Boolean(isCurrent) },
-      });
-    }
-    console.log("API (POST AcademicYear) - Prisma creation successful:", newAcademicYear);
-
-    return NextResponse.json({ success: true, academicYear: newAcademicYear }, { status: 201 });
-
+    return NextResponse.json({ academicYear: newAcademicYear, message: 'Academic year created successfully.' }, { status: 201 });
   } catch (error) {
-    console.error(`API (POST AcademicYear) - CRITICAL FAILURE for school ${schoolId}:`, error);
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: 'Validation Error', issues: error.issues }, { status: 400 });
+    }
+    // Handle unique constraint violation for @@unique([schoolId, name])
     if (error.code === 'P2002') {
       return NextResponse.json({ error: 'An academic year with this name already exists for this school.' }, { status: 409 });
     }
-    return NextResponse.json({ error: 'Failed to create academic year (Internal Server Error).' }, { status: 500 });
+    console.error(`Error creating academic year for school ${schoolId}:`, error);
+    return NextResponse.json({ error: 'Failed to create academic year.' }, { status: 500 });
   }
 }
