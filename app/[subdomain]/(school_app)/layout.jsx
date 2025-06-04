@@ -9,13 +9,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
-  Sun, Moon, LayoutDashboard, Users, UserCog, BookOpen, LogOut, Menu, X as CloseIcon, Settings, GraduationCap, CalendarDays, Building, Library, Bus, ClipboardList, Briefcase, CheckSquare, DollarSign, FileText, Percent, BookCopy, Newspaper, FileArchive, Home, // Comprehensive icon list
+  Sun, Moon, LayoutDashboard, Users, UserCog, BookOpen, LogOut, Menu, X as CloseIcon, Settings, GraduationCap, CalendarDays, Building, Library, Bus, ClipboardList, Briefcase, CheckSquare, DollarSign, FileText, Percent, BookCopy, Newspaper, Home, // Comprehensive icon list
   AlertTriangle,
   Store,
   Layers,
-  PieChart,
-  Book,
-  MoveRight
+  PieChart
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -32,7 +30,7 @@ function SchoolHeader({ schoolName, schoolLogoUrl, onToggleSidebar, userSession 
 
   const titleTextClasses = "text-zinc-900 dark:text-zinc-50";
   const outlineButtonClasses = "border-zinc-300 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800";
-  
+
   const getInitials = (name) => {
     if (!name || name.trim() === "") return schoolName ? schoolName.substring(0,1).toUpperCase() : 'S';
     const names = name.trim().split(' ');
@@ -81,7 +79,7 @@ function SchoolHeader({ schoolName, schoolLogoUrl, onToggleSidebar, userSession 
 }
 
 // --- SchoolSidebar Component ---
-function SchoolSidebar({ schoolSubdomain, schoolName, schoolLogoUrl, isOpen, onClose }) {
+function SchoolSidebar({ schoolSubdomain, schoolName, schoolLogoUrl, isOpen, onClose, userRole }) {
   const currentPathname = usePathname();
   const titleTextClasses = "text-zinc-900 dark:text-zinc-50";
   const linkLabelTextClasses = "text-zinc-700 dark:text-zinc-300";
@@ -96,89 +94,133 @@ function SchoolSidebar({ schoolSubdomain, schoolName, schoolLogoUrl, isOpen, onC
     return names[0][0].toUpperCase() + names[names.length - 1][0].toUpperCase();
   };
 
-  const navigationSections = [
-    {
-      items: [
-        { href: `/${schoolSubdomain}/dashboard`, label: 'Dashboard', icon: LayoutDashboard },
-      ]
-    },
-    {
-      title: 'Academics',
-      items: [
-        { href: `/${schoolSubdomain}/academics/school-levels`, label: 'School Levels', icon: Layers },
-        { href: `/${schoolSubdomain}/academics/departments`, label: 'Departments', icon: Briefcase },
-        { href: `/${schoolSubdomain}/academics/classes`, label: 'Classes & Sections', icon: Building },
-        { href: `/${schoolSubdomain}/academics/subjects`, label: 'Subjects', icon: BookOpen },
-        { href: `/${schoolSubdomain}/academics/timetable`, label: 'Timetable', icon: CalendarDays },
-        { href: `/${schoolSubdomain}/academics/assignments`, label: 'Assignments', icon: Book },
-        { href: `/${schoolSubdomain}/academics/examinations`, label: 'Examinations', icon: GraduationCap },
-        { href: `/${schoolSubdomain}/academics/grades`, label: 'Grades', icon: MoveRight },
-      ]
-    },
-    {
-      title: 'People',
-      items: [
-        { href: `/${schoolSubdomain}/people/students`, label: 'Manage Students', icon: Users },
-        { href: `/${schoolSubdomain}/people/teachers`, label: 'Manage Teachers', icon: UserCog },
-      ]
-    },
-    {
-      title: 'Attendance',
-      items: [
-        { href: `/${schoolSubdomain}/attendance/students`, label: 'Student Attendance', icon: CheckSquare },
-        { href: `/${schoolSubdomain}/attendance/staff`, label: 'Staff Attendance', icon: ClipboardList },
-      ]
-    },
-    {
-      title: 'Finance',
-      items: [
-        { href: `/${schoolSubdomain}/finance/overview`, label: 'Financial Overview', icon: PieChart },
-        { href: `/${schoolSubdomain}/finance/fee-structures`, label: 'Fee Structures', icon: FileText },
-        { href: `/${schoolSubdomain}/finance/invoices`, label: 'Invoices', icon: DollarSign },
-        { href: `/${schoolSubdomain}/finance/payments`, label: 'Payments', icon: CheckSquare },
-        { href: `/${schoolSubdomain}/finance/expenses`, label: 'Expenses', icon: Briefcase },
-        { href: `/${schoolSubdomain}/finance/scholarships`, label: 'Scholarships', icon: Percent },
-      ]
-    },
-    {
-      title: 'Resources',
-      items: [
-        { href: `/${schoolSubdomain}/resources/library`, label: 'Library', icon: Library },
-        { href: `/${schoolSubdomain}/resources/transport`, label: 'Transport', icon: Bus },
-        { href: `/${schoolSubdomain}/resources/hostel`, label: 'Hostel', icon: Home },
-        { href: `/${schoolSubdomain}/resources/stores`, label: 'Store', icon: Store },
-      ]
-    },
-    {
-      title: 'Communication',
-      items: [
-        { href: `/${schoolSubdomain}/communication/announcements`, label: 'Announcements', icon: Newspaper },
-      ]
-    },
-    {
-      title: 'School Setup',
-      items: [
-        { href: `/${schoolSubdomain}/settings/academic-years`, label: 'Academic Years', icon: CalendarDays /* or other suitable icon */ },
-        { href: `/${schoolSubdomain}/settings/profile`, label: 'School Profile', icon: Settings },
-        // { href: `/${schoolSubdomain}/settings/academic`, label: 'Academic Settings', icon: BookCopy },
-      ]
+  // Define navigation items based on user role
+  const getNavigationSections = (role) => {
+    const commonItems = [
+      { href: `/${schoolSubdomain}/dashboard`, label: 'Dashboard', icon: LayoutDashboard },
+    ];
+
+    const academicItems = [
+      { href: `/${schoolSubdomain}/academics/school-levels`, label: 'School Levels', icon: Layers },
+      { href: `/${schoolSubdomain}/academics/departments`, label: 'Departments', icon: Briefcase },
+      { href: `/${schoolSubdomain}/academics/classes`, label: 'Classes & Sections', icon: Building },
+      { href: `/${schoolSubdomain}/academics/subjects`, label: 'Subjects', icon: BookOpen },
+      { href: `/${schoolSubdomain}/academics/timetable`, label: 'Timetable', icon: CalendarDays },
+      { href: `/${schoolSubdomain}/academics/examinations`, label: 'Examinations', icon: GraduationCap },
+      { href: `/${schoolSubdomain}/academics/grades`, label: 'Grades', icon: Percent },
+    ];
+
+    const peopleItems = [
+      { href: `/${schoolSubdomain}/people/students`, label: 'Manage Students', icon: Users },
+      { href: `/${schoolSubdomain}/people/teachers`, label: 'Manage Teachers', icon: UserCog },
+    ];
+
+    const attendanceItems = [
+      { href: `/${schoolSubdomain}/attendance/students`, label: 'Student Attendance', icon: CheckSquare },
+      { href: `/${schoolSubdomain}/attendance/staff`, label: 'Staff Attendance', icon: ClipboardList },
+    ];
+
+    // Define sections based on role
+    switch (role) {
+      case 'SUPER_ADMIN':
+      case 'SCHOOL_ADMIN':
+        return [
+          { items: commonItems },
+          { title: 'Academics', items: academicItems },
+          { title: 'People', items: peopleItems },
+          { title: 'Attendance', items: attendanceItems },
+          {
+            title: 'Finance',
+            items: [
+              { href: `/${schoolSubdomain}/finance/overview`, label: 'Financial Overview', icon: PieChart },
+              { href: `/${schoolSubdomain}/finance/fee-structures`, label: 'Fee Structures', icon: FileText },
+              { href: `/${schoolSubdomain}/finance/invoices`, label: 'Invoices', icon: DollarSign },
+              { href: `/${schoolSubdomain}/finance/payments`, label: 'Payments', icon: CheckSquare },
+              { href: `/${schoolSubdomain}/finance/expenses`, label: 'Expenses', icon: Briefcase },
+              { href: `/${schoolSubdomain}/finance/scholarships`, label: 'Scholarships', icon: Percent },
+            ]
+          },
+          {
+            title: 'Resources',
+            items: [
+              { href: `/${schoolSubdomain}/resources/library`, label: 'Library', icon: Library },
+              { href: `/${schoolSubdomain}/resources/transport`, label: 'Transport', icon: Bus },
+              { href: `/${schoolSubdomain}/resources/hostel`, label: 'Hostel', icon: Home },
+              { href: `/${schoolSubdomain}/resources/stores`, label: 'Store', icon: Store },
+            ]
+          },
+          {
+            title: 'Communication',
+            items: [
+              { href: `/${schoolSubdomain}/communication/announcements`, label: 'Announcements', icon: Newspaper },
+            ]
+          },
+          {
+            title: 'School Setup',
+            items: [
+              { href: `/${schoolSubdomain}/settings/academic-years`, label: 'Academic Years', icon: CalendarDays },
+              { href: `/${schoolSubdomain}/settings/profile`, label: 'School Profile', icon: Settings },
+            ]
+          }
+        ];
+      case 'TEACHER':
+        return [
+          { items: [{ href: `/${schoolSubdomain}/dashboard/teacher`, label: 'My Dashboard', icon: LayoutDashboard }] }, // Teacher's specific dashboard
+          {
+            title: 'Academics',
+            items: [
+              { href: `/${schoolSubdomain}/academics/assignments`, label: 'Assignments', icon: CheckSquare },
+              { href: `/${schoolSubdomain}/academics/grades`, label: 'Grades', icon: Percent },
+              { href: `/${schoolSubdomain}/academics/timetable`, label: 'My Timetable', icon: CalendarDays },
+              { href: `/${schoolSubdomain}/academics/examinations`, label: 'Examinations', icon: GraduationCap },
+              { href: `/${schoolSubdomain}/academics/subjects`, label: 'My Subjects', icon: BookOpen },
+            ]
+          },
+          {
+            title: 'People',
+            items: [
+              { href: `/${schoolSubdomain}/people/students`, label: 'My Students', icon: Users },
+              { href: `/${schoolSubdomain}/people/teachers`, label: 'Staff Directory', icon: UserCog }, // Teachers can view staff directory
+            ]
+          },
+          {
+            title: 'Attendance',
+            items: [
+              { href: `/${schoolSubdomain}/attendance/students`, label: 'Student Attendance', icon: CheckSquare },
+              { href: `/${schoolSubdomain}/attendance/staff`, label: 'My Attendance', icon: ClipboardList },
+            ]
+          },
+          {
+            title: 'Communication',
+            items: [
+              { href: `/${schoolSubdomain}/communication/announcements`, label: 'Announcements', icon: Newspaper },
+            ]
+          },
+        ];
+      // Add cases for other roles (STUDENT, PARENT, etc.)
+      default:
+        return [
+          { items: commonItems }, // Minimal access for undefined roles
+        ];
     }
-  ];
+  };
+
+  const navigationSections = getNavigationSections(userRole);
 
   return (
     <>
       {isOpen && <div className="fixed inset-0 z-10 bg-black/50 backdrop-blur-sm md:hidden" onClick={onClose}></div>}
-      
+
       <aside className={`fixed left-0 top-0 z-20 h-screen w-64 bg-white dark:bg-zinc-950 border-r border-zinc-200 dark:border-zinc-800 flex flex-col transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
         <div className="flex items-center justify-between h-16 border-b border-zinc-200 dark:border-zinc-800 px-4 shrink-0">
           <Link href={`/${schoolSubdomain}/dashboard`} className="flex items-center gap-2 group" onClick={onClose}>
-            {schoolLogoUrl ? ( 
-                <Avatar className="h-9 w-9 border border-zinc-300 dark:border-zinc-700"> 
-                    <AvatarImage src={schoolLogoUrl} alt={schoolName || 'School Logo'} /> 
-                    <AvatarFallback className="bg-zinc-200 dark:bg-zinc-700 text-sm font-semibold">{getInitials(schoolName)}</AvatarFallback> 
+            {schoolLogoUrl ? (
+                <Avatar className="h-9 w-9 border border-zinc-300 dark:border-zinc-700">
+                    <AvatarImage src={schoolLogoUrl} alt={schoolName || 'School Logo'} />
+                    <AvatarFallback className="bg-zinc-200 dark:bg-zinc-700 text-sm font-semibold">{getInitials(schoolName)}</AvatarFallback>
                 </Avatar>
-            ) : ( 
-                <div className={`flex items-center justify-center h-9 w-9 rounded-full bg-zinc-200 dark:bg-zinc-700 ${titleTextClasses} font-semibold text-sm`}>{getInitials(schoolName)}</div> 
+            ) : (
+                <div className={`flex items-center justify-center h-9 w-9 rounded-full bg-zinc-200 dark:bg-zinc-700 ${titleTextClasses} font-semibold text-sm`}>{getInitials(schoolName)}</div>
             )}
             <h2 className={`text-lg font-bold ${titleTextClasses} truncate group-hover:opacity-80 transition-opacity`}>{schoolName || 'Sukuu'}</h2>
           </Link>
@@ -190,7 +232,7 @@ function SchoolSidebar({ schoolSubdomain, schoolName, schoolLogoUrl, isOpen, onC
               {section.title && ( <h3 className="px-2 py-2 text-xs font-semibold uppercase text-zinc-400 dark:text-zinc-600 tracking-wider">{section.title}</h3> )}
               <ul className="space-y-1">
                 {section.items.map(item => {
-                  const isActive = currentPathname === item.href || 
+                  const isActive = currentPathname === item.href ||
                                    (item.href !== `/${schoolSubdomain}/dashboard` && currentPathname.startsWith(item.href + '/'));
                   const Icon = item.icon;
                   return (
@@ -224,76 +266,114 @@ export default function SchoolAppLayout({ children }) {
   const subdomain = params.subdomain;
 
   const fetchSchoolData = useCallback(async () => {
-      if (!subdomain) { 
-        setAuthError("Subdomain parameter is missing from URL."); 
-        setIsLoadingSchoolData(false); 
-        return; 
+      if (!subdomain) {
+        setAuthError("Subdomain parameter is missing from URL.");
+        setIsLoadingSchoolData(false);
+        return;
       }
       setIsLoadingSchoolData(true);
       try {
         const response = await fetch(`/api/schools/by-subdomain/${subdomain}`);
-        if (!response.ok) { 
-          const errorData = await response.json().catch(() => ({ error: "Failed to parse error response." })); 
-          throw new Error(errorData.error || "Invalid school domain or school not found."); 
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: "Failed to parse error response." }));
+          throw new Error(errorData.error || "Invalid school domain or school not found.");
         }
         const data = await response.json();
-        if (data.school && data.school.isActive) { 
+        if (data.school && data.school.isActive) {
           setSchoolData(data.school);
-        } else { 
-          throw new Error(data.school && !data.school.isActive ? "This school is currently inactive." : "School not found or inactive."); 
+        } else {
+          throw new Error(data.school && !data.school.isActive ? "This school is currently inactive." : "School not found or inactive.");
         }
-      } catch (err) { 
-        console.error("Subdomain validation error:", err); 
-        setAuthError(err.message); 
+      } catch (err) {
+        console.error("Subdomain validation error:", err);
+        setAuthError(err.message);
         toast.error("School Verification Failed", { description: err.message });
-      } finally { 
-        setIsLoadingSchoolData(false); 
+      } finally {
+        setIsLoadingSchoolData(false);
       }
   }, [subdomain]);
 
   useEffect(() => {
     if (subdomain) { fetchSchoolData(); }
-    else { 
-      setIsLoadingSchoolData(false); 
+    else {
+      setIsLoadingSchoolData(false);
       setAuthError("Unable to determine school from URL. Subdomain is missing.");
-      // Consider redirecting to a global error page or main site if subdomain is absolutely required for this layout
-      // For instance: router.push('/invalid-school-access');
     }
   }, [subdomain, fetchSchoolData]);
 
   useEffect(() => {
     if (isLoadingSchoolData || sessionStatus === 'loading') return;
 
-    const schoolLoginPath = subdomain ? `/${subdomain}/login` : '/login';
+    const schoolAdminLoginPath = subdomain ? `/${subdomain}/login` : '/login';
+    const teacherLoginPath = subdomain ? `/${subdomain}/teacher-login` : '/teacher-login';
 
-    if (sessionStatus === 'unauthenticated') { 
-      router.push(schoolLoginPath); return; 
+    if (sessionStatus === 'unauthenticated') {
+      // If unauthenticated, redirect to admin login by default,
+      // unless the current path is explicitly the teacher login page.
+      if (!window.location.pathname.includes('/teacher-login')) {
+        router.push(schoolAdminLoginPath);
+      }
+      return;
     }
 
     if (sessionStatus === 'authenticated') {
-      if (!schoolData || session.user?.schoolId !== schoolData.id || session.user?.schoolSubdomain !== subdomain ||
-          (session.user?.role !== 'SCHOOL_ADMIN' /* && other valid school roles */) ) {
+      // User is authenticated, now check authorization for the specific school and role
+      if (!schoolData || session.user?.schoolId !== schoolData.id || session.user?.schoolSubdomain !== subdomain) {
         setAuthError("Access denied. You are not authorized for this school or your session is invalid.");
-        // toast.error("Access Denied. Please log in again."); // Toast can be noisy on initial load if session is invalid
-        signOut({ redirect: false }).then(() => { 
-          router.push(`${schoolLoginPath}?error=UnauthorizedSchool`); 
+        signOut({ redirect: false }).then(() => {
+          router.push(`${schoolAdminLoginPath}?error=UnauthorizedSchool`); // Redirect to admin login on school mismatch
         });
-      } else { 
-        setAuthError(null); 
+        return;
       }
+
+      // Role-based redirection after successful login/session check
+      const userRole = session.user?.role;
+      const currentPath = window.location.pathname;
+
+      if (userRole === 'TEACHER') {
+        // If a teacher is on the generic dashboard or admin login page, redirect to teacher dashboard
+        if (currentPath === `/${subdomain}/dashboard` || currentPath === schoolAdminLoginPath) {
+          router.push(`/${subdomain}/dashboard/teacher`);
+          return;
+        }
+        // If a teacher tries to access an admin-only path
+        const adminOnlyPaths = ['/settings', '/finance', '/people/teachers']; // Add more as needed
+        if (adminOnlyPaths.some(path => currentPath.includes(path)) && !currentPath.includes('/dashboard/teacher')) {
+          setAuthError("Access denied. Teachers do not have access to this section.");
+          signOut({ redirect: false }).then(() => {
+            router.push(`${teacherLoginPath}?error=UnauthorizedRole`);
+          });
+          return;
+        }
+      } else { // All other roles (admins, etc.)
+        // If an admin is on the teacher login page, redirect to their main dashboard
+        if (currentPath === teacherLoginPath) {
+          router.push(`/${subdomain}/dashboard`);
+          return;
+        }
+        // If an admin tries to access a teacher-specific dashboard (optional, can let them see it)
+        if (currentPath === `/${subdomain}/dashboard/teacher`) {
+          // Can redirect to main dashboard or allow them to see it. For now, redirect.
+          router.push(`/${subdomain}/dashboard`);
+          return;
+        }
+      }
+
+      // If user is authenticated and authorized for the school and current path, clear error
+      setAuthError(null);
     }
   }, [sessionStatus, session, schoolData, isLoadingSchoolData, subdomain, router]);
-  
+
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
-  if (isLoadingSchoolData || sessionStatus === 'loading') { 
+  if (isLoadingSchoolData || sessionStatus === 'loading') {
     return (
       <div className="flex flex-col h-screen">
         <header className="h-16 border-b flex items-center justify-between px-6 bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 shrink-0">
           <Skeleton className="h-6 w-40 bg-zinc-200 dark:bg-zinc-800 rounded" />
-          <div className="flex items-center space-x-3"> 
-            <Skeleton className="h-8 w-8 rounded-md bg-zinc-200 dark:bg-zinc-800" /> 
-            <Skeleton className="h-8 w-20 rounded-md bg-zinc-200 dark:bg-zinc-800" /> 
+          <div className="flex items-center space-x-3">
+            <Skeleton className="h-8 w-8 rounded-md bg-zinc-200 dark:bg-zinc-800" />
+            <Skeleton className="h-8 w-20 rounded-md bg-zinc-200 dark:bg-zinc-800" />
           </div>
         </header>
         <div className="flex flex-1 overflow-hidden">
@@ -302,7 +382,7 @@ export default function SchoolAppLayout({ children }) {
             {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-9 w-full bg-zinc-200 dark:bg-zinc-800 rounded-md" />)}
           </aside>
           <main className="flex-1 p-6 overflow-y-auto pt-6 md:ml-0 bg-zinc-50 dark:bg-zinc-900">
-            <Skeleton className="h-32 w-full rounded-lg bg-zinc-200 dark:bg-zinc-800" /> 
+            <Skeleton className="h-32 w-full rounded-lg bg-zinc-200 dark:bg-zinc-800" />
             <Skeleton className="h-64 w-full mt-6 rounded-lg bg-zinc-200 dark:bg-zinc-800" />
           </main>
         </div>
@@ -311,42 +391,43 @@ export default function SchoolAppLayout({ children }) {
     );
   }
 
-  if (authError) { 
+  if (authError) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-zinc-100 dark:bg-zinc-950">
-        <Alert variant="destructive" className="max-w-md bg-white dark:bg-zinc-900"> 
-          <AlertTriangle className="h-4 w-4" /> 
-          <AlertTitle className="text-red-700 dark:text-red-400">Access Issue</AlertTitle> 
-          <AlertDescription className="text-red-600 dark:text-red-300">{authError}</AlertDescription> 
+        <Alert variant="destructive" className="max-w-md bg-white dark:bg-zinc-900">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle className="text-red-700 dark:text-red-400">Access Issue</AlertTitle>
+          <AlertDescription className="text-red-600 dark:text-red-300">{authError}</AlertDescription>
         </Alert>
-        {subdomain && <Button onClick={() => router.push(`/${subdomain}/login`)} className="mt-6">Go to Login</Button>}
+        {subdomain && <Button onClick={() => router.push(`/${subdomain}/login`)} className="mt-6">Go to Admin Login</Button>}
+        {subdomain && <Button onClick={() => router.push(`/${subdomain}/teacher-login`)} className="mt-6 ml-2">Go to Teacher Login</Button>}
         {!subdomain && <Button onClick={() => router.push(`/`)} className="mt-6">Go to Homepage</Button>}
         <Toaster richColors theme="system" closeButton position="top-right" />
       </div>
     );
   }
-  
-  // Ensure schoolData and session are valid AND user is authorized for this school's subdomain
+
   if (schoolData && session && session.user.schoolId === schoolData.id && session.user.schoolSubdomain === subdomain) {
     return (
       <SchoolContext.Provider value={schoolData}>
         <div className="flex h-screen bg-zinc-50 dark:bg-zinc-950">
-          <SchoolSidebar 
-            schoolSubdomain={subdomain} 
-            schoolName={schoolData.name} 
-            schoolLogoUrl={schoolData.logoUrl} 
-            isOpen={isSidebarOpen} 
-            onClose={toggleSidebar} 
+          <SchoolSidebar
+            schoolSubdomain={subdomain}
+            schoolName={schoolData.name}
+            schoolLogoUrl={schoolData.logoUrl}
+            isOpen={isSidebarOpen}
+            onClose={toggleSidebar}
+            userRole={session.user.role} // Pass user role to sidebar for dynamic navigation
           />
-          <div className="flex flex-col flex-1 md:ml-64"> {/* This div gets margin for desktop sidebar space */}
-            <SchoolHeader 
-                schoolName={schoolData.name} 
-                schoolLogoUrl={schoolData.logoUrl} 
-                onToggleSidebar={toggleSidebar} 
-                userSession={session} 
+          <div className="flex flex-col flex-1 md:ml-64">
+            <SchoolHeader
+                schoolName={schoolData.name}
+                schoolLogoUrl={schoolData.logoUrl}
+                onToggleSidebar={toggleSidebar}
+                userSession={session}
             />
-            <main className="flex-1 overflow-y-auto pt-16"> {/* pt-16 for header height */}
-              <div className="p-4 md:p-6 lg:p-8"> {/* Actual content padding for pages */}
+            <main className="flex-1 overflow-y-auto pt-16">
+              <div className="p-4 md:p-6 lg:p-8">
                 {children}
               </div>
             </main>
@@ -357,7 +438,6 @@ export default function SchoolAppLayout({ children }) {
     );
   }
 
-  // Fallback if auth checks are still processing or if something unexpected occurs
   return (
     <div className="flex items-center justify-center min-h-screen">
         <p className="text-black dark:text-white">Verifying access or loading school data...</p>
