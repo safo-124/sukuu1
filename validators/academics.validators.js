@@ -36,7 +36,7 @@ export const updateAcademicYearSchema = baseAcademicYearSchema.partial().refine(
 export const academicYearIdSchema = z.string().min(1, "Academic Year ID is required.");
 
 
-// --- Term Schemas (NEW) ---
+// --- Term Schemas ---
 // Base schema for Term
 const baseTermSchema = z.object({
   name: z.string().min(1, "Term name is required.").max(255, "Name is too long."),
@@ -66,9 +66,9 @@ export const updateTermSchema = baseTermSchema.partial().refine(data => {
 // Schema for Term ID parameter
 export const termIdSchema = z.string().min(1, "Term ID is required.");
 
-// --- Class Schemas (Existing, ensure it's compatible) ---
-// Assuming your classSchema is already defined here, e.g.:
-export const classSchema = z.object({
+
+// --- Class Schemas ---
+export const createClassSchema = z.object({
   name: z.string().min(1, "Class name is required.").max(255, "Class name is too long."),
   schoolLevelId: z.string().min(1, "School Level is required."),
   academicYearId: z.string().min(1, "Academic Year is required."),
@@ -78,4 +78,26 @@ export const classSchema = z.object({
     classTeacherId: z.string().optional().nullable(),
   })).optional(),
 });
-// And updateClassSchema, classIdSchema etc. if they exist in this file.
+
+export const updateClassSchema = createClassSchema.partial(); // Assuming sections can also be updated partially
+export const classIdSchema = z.string().min(1, "Class ID is required.");
+
+
+// --- School Level Schemas (Ensuring these are present and correct) ---
+export const createSchoolLevelSchema = z.object({
+  name: z.string().min(1, "School Level name is required.").max(255, "Name is too long."),
+  description: z.string().nullable().optional(),
+});
+
+export const updateSchoolLevelSchema = createSchoolLevelSchema.partial();
+export const schoolLevelIdSchema = z.string().min(1, "School Level ID is required.");
+
+
+// --- Department Schemas (NEWLY ADDED/CONFIRMED) ---
+export const createDepartmentSchema = z.object({
+  name: z.string().min(1, "Department name is required.").max(255, "Name is too long."),
+  description: z.string().nullable().optional(),
+});
+
+export const updateDepartmentSchema = createDepartmentSchema.partial();
+export const departmentIdSchema = z.string().min(1, "Department ID is required.");
