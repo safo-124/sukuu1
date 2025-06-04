@@ -47,13 +47,11 @@ export async function POST(request, { params }) {
     const body = await request.json();
     schoolIdSchema.parse(schoolId); // Validate schoolId from path
 
-    // FIX: Changed 'departmentSchema' to 'createDepartmentSchema'
+    // FIX ON LINE 45: Changed 'departmentSchema' to 'createDepartmentSchema'
     const validation = createDepartmentSchema.safeParse(body);
 
     if (!validation.success) {
-      // Log the validation error for debugging on the server
       console.error("API (POST Department) - Validation failed:", JSON.stringify(validation.error.issues, null, 2));
-      // Return a 400 Bad Request with the validation issues
       return NextResponse.json({ error: 'Invalid input.', issues: validation.error.issues }, { status: 400 });
     }
 
@@ -70,26 +68,28 @@ export async function POST(request, { params }) {
     return NextResponse.json({ department: newDepartment, message: 'Department created successfully.' }, { status: 201 });
   } catch (error) {
     // --- ENHANCED ERROR LOGGING START ---
+    // Log the full error object for detailed debugging
     console.error(`API (POST Department) - Detailed error for school ${schoolId}:`, {
       message: error.message,
-      code: error.code, // Prisma error code (e.g., P2002)
-      meta: error.meta, // Prisma error metadata (e.g., target field)
+      name: error.name,
+      code: error.code, // Prisma error code (e.g., P2002, P2003)
+      clientVersion: error.clientVersion, // Prisma client version
+      meta: error.meta, // Prisma error metadata (e.g., target field, column)
       stack: error.stack,
-      name: error.name
+      // Add more properties if available in the error object you observe
     });
     // --- ENHANCED ERROR LOGGING END ---
 
     if (error instanceof z.ZodError) {
-      // This catch block handles Zod errors that might occur outside of safeParse,
-      // e.g., if params validation was done here.
       return NextResponse.json({ error: 'Validation Error', issues: error.issues }, { status: 400 });
     }
-    // Handle unique constraint violation (P2002) for department name
-    if (error.code === 'P2002' && error.meta?.target?.includes('name')) {
-      return NextResponse.json({ error: 'A department with this name already exists for this school.' }, { status: 409 });
+    // Handle unique constraint violation (P2002)
+    if (error.code === 'P2002') {
+      const targetField = error.meta?.target ? (Array.isArray(error.meta.target) ? error.meta.target.join(', ') : error.meta.target) : 'unknown field(s)';
+      return NextResponse.json({ error: `A department with conflicting unique data already exists. Conflict on: ${targetField}.` }, { status: 409 });
     }
-    // Generic server error
-    return NextResponse.json({ error: 'Failed to create department.' }, { status: 500 });
+    // Generic server error for any other unhandled exceptions
+    return NextResponse.json({ error: 'Failed to create department.', details: error.message || 'An unexpected server error occurred.' }, { status: 500 });
   }
 }
 
