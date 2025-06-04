@@ -67,7 +67,7 @@ export const classSchema = z.object({
   })).optional(),
 });
 
-export const updateClassSchema = classSchema.partial(); // Ensure this uses 'classSchema'
+export const updateClassSchema = classSchema.partial();
 export const classIdSchema = z.string().min(1, "Class ID is required.");
 
 
@@ -89,3 +89,17 @@ export const createDepartmentSchema = z.object({
 
 export const updateDepartmentSchema = createDepartmentSchema.partial();
 export const departmentIdSchema = z.string().min(1, "Department ID is required.");
+
+
+// --- Staff Attendance Schemas (NEW) ---
+export const createStaffAttendanceSchema = z.object({
+  staffId: z.string().min(1, "Staff ID is required."),
+  date: z.string().datetime("Date must be a valid date string (ISO 8601)."),
+  status: z.enum(["PRESENT", "ABSENT", "LATE", "EXCUSED"], {
+    errorMap: () => ({ message: "Invalid attendance status." })
+  }),
+  remarks: z.string().nullable().optional(),
+});
+
+export const updateStaffAttendanceSchema = createStaffAttendanceSchema.partial();
+export const staffAttendanceIdSchema = z.string().min(1, "Staff Attendance ID is required.");
