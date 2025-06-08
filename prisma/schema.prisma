@@ -175,6 +175,7 @@ model User {
   lastLogin         DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
+  studentAttendancesTaken Attendance[] @relation("TakenBy")
 
   schoolId     String?
   school       School?   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
@@ -536,12 +537,13 @@ model Attendance {
   id                  String           @id @default(cuid())
   studentEnrollmentId String
   studentEnrollment   StudentEnrollment @relation("EnrollmentAttendances", fields: [studentEnrollmentId], references: [id], onDelete: Cascade)
-  sectionId           String           // Denormalized for easier queries, but linked via studentEnrollment
+  sectionId           String           // Denormalized, but linked via studentEnrollment
   section             Section          @relation("SectionAttendances", fields: [sectionId], references: [id], onDelete: Cascade)
   date                DateTime         @db.Date
   status              AttendanceStatus
   remarks             String?
   takenById           String           // User ID of the staff who took attendance
+  takenBy             User             @relation("TakenBy", fields: [takenById], references: [id], onDelete: Restrict) // <--- THIS RELATION IS VITAL
   schoolId            String
   school              School           @relation(fields: [schoolId], references: [id], onDelete: Restrict)
   createdAt           DateTime         @default(now())
@@ -550,6 +552,7 @@ model Attendance {
   @@unique([studentEnrollmentId, date])
   @@unique([sectionId, date, studentEnrollmentId], map: "UQ_Attendance_Section_Date_Enrollment")
   @@index([schoolId, date])
+  @@index([takenById]) // <--- NEW INDEX
 }
 
 model StaffAttendance {
@@ -567,6 +570,7 @@ model StaffAttendance {
 
   @@unique([staffId, date])
   @@index([schoolId, date])
+  @@index([takenById])
 }
 
 // --------------------

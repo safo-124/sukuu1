@@ -103,3 +103,17 @@ export const createStaffAttendanceSchema = z.object({
 
 export const updateStaffAttendanceSchema = createStaffAttendanceSchema.partial();
 export const staffAttendanceIdSchema = z.string().min(1, "Staff Attendance ID is required.");
+
+// --- Student Attendance Schemas (NEW) ---
+export const createStudentAttendanceSchema = z.object({
+  studentEnrollmentId: z.string().min(1, "Student Enrollment ID is required."),
+  sectionId: z.string().min(1, "Section ID is required."), // Denormalized, but still required for context
+  date: z.string().datetime("Date must be a valid date string (ISO 8601)."),
+  status: z.enum(["PRESENT", "ABSENT", "LATE", "EXCUSED"], {
+    errorMap: () => ({ message: "Invalid attendance status." })
+  }),
+  remarks: z.string().nullable().optional(),
+});
+
+export const updateStudentAttendanceSchema = createStudentAttendanceSchema.partial();
+export const studentAttendanceIdSchema = z.string().min(1, "Student Attendance ID is required.");
