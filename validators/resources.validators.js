@@ -26,3 +26,25 @@ export const createRoomSchema = z.object({
 
 export const updateRoomSchema = createRoomSchema.partial();
 export const roomIdSchema = z.string().min(1, "Room ID is required.");
+
+// --- Inventory Category Schemas (NEW) ---
+export const createInventoryCategorySchema = z.object({
+  name: z.string().min(1, "Category name is required.").max(255, "Name is too long."),
+});
+
+export const updateInventoryCategorySchema = createInventoryCategorySchema.partial();
+export const inventoryCategoryIdSchema = z.string().min(1, "Inventory Category ID is required.");
+
+
+// --- Inventory Item Schemas (NEW) ---
+export const createInventoryItemSchema = z.object({
+  name: z.string().min(1, "Item name is required.").max(255, "Name is too long."),
+  description: z.string().nullable().optional(),
+  categoryId: z.string().nullable().optional(), // Link to an inventory category
+  quantityInStock: z.coerce.number().int().min(0).default(0),
+  reorderLevel: z.coerce.number().int().min(0).nullable().optional(),
+  supplierInfo: z.string().nullable().optional(),
+});
+
+export const updateInventoryItemSchema = createInventoryItemSchema.partial();
+export const inventoryItemIdSchema = z.string().min(1, "Inventory Item ID is required.");

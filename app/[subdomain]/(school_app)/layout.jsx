@@ -13,7 +13,9 @@ import {
   AlertTriangle,
   Store,
   Layers,
-  PieChart
+  PieChart,
+  HomeIcon,
+  House
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -143,6 +145,8 @@ function SchoolSidebar({ schoolSubdomain, schoolName, schoolLogoUrl, isOpen, onC
           {
             title: 'Resources',
             items: [
+              { href: `/${schoolSubdomain}/resources/buildings`, label: 'Buildings', icon: HomeIcon },
+              { href: `/${schoolSubdomain}/resources/rooms`, label: 'Rooms', icon: House },
               { href: `/${schoolSubdomain}/resources/library`, label: 'Library', icon: Library },
               { href: `/${schoolSubdomain}/resources/transport`, label: 'Transport', icon: Bus },
               { href: `/${schoolSubdomain}/resources/hostel`, label: 'Hostel', icon: Home },
