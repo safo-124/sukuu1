@@ -73,3 +73,36 @@ export const createHostelRoomSchema = z.object({
 
 export const updateHostelRoomSchema = createHostelRoomSchema.partial();
 export const hostelRoomIdSchema = z.string().min(1, "Hostel Room ID is required.");
+// --- Vehicle Schemas (NEW) ---
+export const createVehicleSchema = z.object({
+  registrationNumber: z.string().min(1, "Registration number is required.").max(50, "Registration number is too long."),
+  make: z.string().nullable().optional(),
+  model: z.string().nullable().optional(),
+  capacity: z.coerce.number().int().min(1, "Capacity must be at least 1.").nullable().optional(),
+  status: z.string().nullable().optional(), // e.g., "Active", "Maintenance", "Inactive"
+});
+
+export const updateVehicleSchema = createVehicleSchema.partial();
+export const vehicleIdSchema = z.string().min(1, "Vehicle ID is required.");
+
+
+// --- Route Schemas (NEW) ---
+export const createRouteSchema = z.object({
+  name: z.string().min(1, "Route name is required.").max(255, "Route name is too long."),
+  description: z.string().nullable().optional(),
+  stops: z.array(z.string().min(1, "Stop cannot be empty.")).nullable().optional(), // Array of stop names/descriptions
+});
+
+export const updateRouteSchema = createRouteSchema.partial();
+export const routeIdSchema = z.string().min(1, "Route ID is required.");
+
+
+// --- Driver Schemas (NEW) ---
+export const createDriverSchema = z.object({
+  staffId: z.string().min(1, "Staff ID is required."), // Links to an existing staff member
+  licenseNumber: z.string().min(1, "License number is required.").max(50, "License number is too long."),
+  contactNumber: z.string().nullable().optional(),
+});
+
+export const updateDriverSchema = createDriverSchema.partial();
+export const driverIdSchema = z.string().min(1, "Driver ID is required.");

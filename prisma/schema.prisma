@@ -159,6 +159,9 @@ model School {
   rooms                   Room[] // New relation
   hostels                 Hostel[]
   HostelRoom              HostelRoom[]
+  Vehicle                 Vehicle[]
+  Route                   Route[]
+  Driver                  Driver[]
 
   @@index([subdomain])
   @@index([customDomain])
@@ -491,6 +494,7 @@ model Staff {
   createdAt                 DateTime               @default(now())
   updatedAt                 DateTime               @updatedAt
   Hostel                    Hostel[]
+  Driver                    Driver?
 
   @@unique([schoolId, staffIdNumber])
   @@index([userId])
@@ -1162,4 +1166,55 @@ model HostelRoom {
   @@unique([hostelId, roomNumber])
   @@index([schoolId])
   @@index([hostelId])
+}
+
+model Vehicle {
+  id                 String   @id @default(cuid())
+  registrationNumber String   @unique // Unique registration number per school
+  make               String?
+  model              String?
+  capacity           Int?
+  status             String? // e.g., "Active", "Maintenance", "Inactive"
+  schoolId           String
+  school             School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  // assignments        VehicleAssignment[] // Link to vehicle assignments (future)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([schoolId, registrationNumber])
+  @@index([schoolId])
+}
+
+model Route {
+  id          String   @id @default(cuid())
+  name        String // e.g., "North Loop", "Morning Pick-up Zone A"
+  description String?
+  stops       Json? // JSON array of strings or objects representing stops
+  schoolId    String
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  // assignments VehicleAssignment[] // Link to vehicle assignments (future)
+  // enrollments StudentTransportEnrollment[] // Link to student enrollments (future)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
+}
+
+model Driver {
+  id            String   @id @default(cuid())
+  staffId       String   @unique // Link to existing staff member
+  staff         Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade) // Driver is a Staff member
+  licenseNumber String   @unique // Unique license number per school (or globally if required)
+  contactNumber String?
+  schoolId      String
+  school        School   @relation(fields: [schoolId], references: [id], onDelete: Restrict) // Restrict if Staff is deleted
+  // assignments   VehicleAssignment[] // Link to vehicle assignments (future)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([schoolId, staffId])
+  @@unique([schoolId, licenseNumber]) // License number unique per school
+  @@index([schoolId])
+  @@index([staffId])
 }
