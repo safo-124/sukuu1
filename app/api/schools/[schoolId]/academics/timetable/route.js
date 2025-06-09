@@ -107,6 +107,27 @@ export async function POST(request, { params }) {
 
     const { sectionId, subjectId, staffId, dayOfWeek, startTime, endTime, roomId, overrideConflict } = validation.data;
 
+    // Fetch school settings to get global timetable hours for validation
+    const school = await prisma.school.findUnique({
+        where: { id: schoolId },
+        select: { timetableStartTime: true, timetableEndTime: true }
+    });
+
+    if (!school) {
+        return NextResponse.json({ error: 'School not found for timetable configuration.' }, { status: 404 });
+    }
+
+    // Validate entry times against school's timetable hours
+    const entryStartMinutes = timeToMinutes(startTime);
+    const entryEndMinutes = timeToMinutes(endTime);
+    const schoolStartMinutes = timeToMinutes(school.timetableStartTime);
+    const schoolEndMinutes = timeToMinutes(school.timetableEndTime);
+
+    if (entryStartMinutes < schoolStartMinutes || entryEndMinutes > schoolEndMinutes) {
+        return NextResponse.json({ error: `Timetable entry must be within school hours (${school.timetableStartTime} - ${school.timetableEndTime}).` }, { status: 400 });
+    }
+
+
     // Validate that linked entities belong to the current school
     const [section, subject, staff, room] = await Promise.all([
       prisma.section.findUnique({ where: { id: sectionId, schoolId: schoolId } }),
@@ -122,7 +143,10 @@ export async function POST(request, { params }) {
 
 
     // --- Conflict Detection ---
-    // Check for Section, Staff, and Room conflicts at the exact time slot
+    // Conflict conditions are based on unique constraints:
+    // (schoolId, sectionId, dayOfWeek, startTime)
+    // (schoolId, staffId, dayOfWeek, startTime)
+    // (schoolId, roomId, dayOfWeek, startTime)
     const conflictConditions = [
         { sectionId: sectionId, dayOfWeek: dayOfWeek, startTime: startTime },
         { staffId: staffId, dayOfWeek: dayOfWeek, startTime: startTime },

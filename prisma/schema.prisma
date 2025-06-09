@@ -104,6 +104,10 @@ model School {
   classStartTime        String?  @default("08:00") // Default start time for classes
   classEndTime          String?  @default("17:00") // Default end time for classes
   classIntervalMinutes  Int?     @default(30)     // Default interval duration in minutes (e.g., 30 or 60)
+   // New timetable settings
+  timetableStartTime String @default("08:00") // Default school start time for timetable
+  timetableEndTime   String @default("17:00") // Default school end time for timetable
+
 
 
   // Feature flags

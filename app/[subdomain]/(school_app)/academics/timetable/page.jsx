@@ -42,6 +42,7 @@ const initialTimetableFormData = {
 const TimetableFormFields = ({ formData, onFormChange, onSelectChange, sectionsList, subjectsList, teachersList, roomsList, isLoadingDeps }) => {
   const labelTextClasses = "text-black dark:text-white block text-sm font-medium mb-1 text-left";
   const inputTextClasses = "bg-white/50 dark:bg-zinc-800/50 text-black dark:text-white border-zinc-300 dark:border-zinc-700 focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-500 dark:focus:border-sky-500";
+  // const descriptionTextClasses = "text-zinc-600 dark:text-zinc-400"; // Available from parent
 
   const daysOfWeekOptions = [
     { value: '1', label: 'Monday' },
@@ -175,15 +176,29 @@ export default function ManageTimetablePage() {
     { value: '0', label: 'Sunday' },
   ], []);
 
-  // Time slots for the grid (e.g., 30-minute intervals from 8 AM to 5 PM)
+  // Timetable start/end times from schoolData, with fallbacks
+  const schoolTimetableStartTime = schoolData?.timetableStartTime || "08:00";
+  const schoolTimetableEndTime = schoolData?.timetableEndTime || "17:00";
+
+  // Time slots for the grid (dynamically generated based on school settings)
   const timeSlots = useMemo(() => {
     const slots = [];
-    for (let h = 8; h < 18; h++) { // 8 AM to 5 PM (exclusive of 6 PM)
-      slots.push(`${h.toString().padStart(2, '0')}:00`);
-      if (h < 17) slots.push(`${h.toString().padStart(2, '0')}:30`); // Add :30 for 30-min intervals
+    const startHour = parseInt(schoolTimetableStartTime.split(':')[0], 10);
+    const startMinute = parseInt(schoolTimetableStartTime.split(':')[1], 10);
+    const endHour = parseInt(schoolTimetableEndTime.split(':')[0], 10);
+    const endMinute = parseInt(schoolTimetableEndTime.split(':')[1], 10);
+
+    let currentTime = startHour * 60 + startMinute; // Minutes from midnight
+    const endTotalMinutes = endHour * 60 + endMinute;
+
+    while (currentTime < endTotalMinutes) {
+      const hours = Math.floor(currentTime / 60);
+      const minutes = currentTime % 60;
+      slots.push(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`);
+      currentTime += 30; // 30-minute interval
     }
     return slots;
-  }, []);
+  }, [schoolTimetableStartTime, schoolTimetableEndTime]);
 
   // Helper to convert HH:MM to minutes from midnight
   const timeToMinutes = (timeString) => {
@@ -191,13 +206,21 @@ export default function ManageTimetablePage() {
     return hours * 60 + minutes;
   };
 
-  // Helper to calculate duration in 30-minute blocks
-  const calculateSpan = (startTime, endTime) => {
+  // Helper to calculate duration in 30-minute blocks for positioning
+  const calculateSpanAndOffset = useCallback((startTime, endTime) => {
     const startMins = timeToMinutes(startTime);
     const endMins = timeToMinutes(endTime);
     const durationMins = endMins - startMins;
-    return Math.ceil(durationMins / 30); // Number of 30-minute blocks
-  };
+
+    // Calculate the starting slot index from the grid's first time slot
+    const gridStartTimeMins = timeToMinutes(timeSlots[0]);
+    const offsetMins = startMins - gridStartTimeMins;
+
+    const topOffsetPx = (offsetMins / 30) * 60; // Assuming 60px per 30 mins slot
+    const heightPx = (durationMins / 30) * 60; // Assuming 60px per 30 mins slot
+
+    return { topOffsetPx, heightPx };
+  }, [timeSlots]);
 
 
   // --- Fetching Data ---
@@ -340,7 +363,7 @@ export default function ManageTimetablePage() {
         if (result.issues) err = result.issues.map(i => `${i.path.join('.') || 'Field'}: ${i.message}`).join('; ');
 
         // Check for specific conflict error (status 409)
-        if (response.status === 409 && err.includes('Timetable conflict detected')) {
+        if (response.status === 409 && (err.includes('Timetable conflict detected') || err.includes('This entry would exceed the teacher'))) {
           setConflictMessage(err);
           setPendingSubmitData({ payload, method, url, actionText }); // Store data for re-submission
           setIsDialogOpen(false); // Close the entry form dialog
@@ -436,31 +459,18 @@ export default function ManageTimetablePage() {
     // Each 30-minute slot corresponds to a fixed height (e.g., in px, or a grid row unit)
     const slotHeightPx = 60; // Example: 60px height for each 30-minute slot
 
-    const positioned = [];
-    timetableEntries.forEach(entry => {
-      const startMins = timeToMinutes(entry.startTime);
-      const endMins = timeToMinutes(entry.endTime);
-      const durationMins = endMins - startMins;
+    return timetableEntries.map(entry => {
+      const { topOffsetPx, heightPx } = calculateSpanAndOffset(entry.startTime, entry.endTime);
 
-      // Calculate the starting slot index from 8:00 AM (480 minutes from midnight)
-      const gridStartTimeMins = timeToMinutes(timeSlots[0]); // Usually 8:00 -> 480 mins
-      const startOffsetMins = startMins - gridStartTimeMins;
-
-      const topPx = (startOffsetMins / 30) * slotHeightPx; // Relative to the top of the grid's first time slot
-      const heightPx = (durationMins / 30) * slotHeightPx; // Height of the entry card
-
-      positioned.push({
+      return {
         ...entry,
-        topPx,
-        heightPx,
-        // You'll need logic to handle z-index or horizontal positioning for overlapping entries in the same cell
+        topPx: topOffsetPx,
+        heightPx: heightPx,
+        // For visual stacking if multiple entries in same cell (e.g., if we had sub-columns)
         // For simplicity, they will just overlap if positioned at the exact same top/left.
-        // A more advanced solution would involve tracking collision within a cell and adjusting left/width.
-      });
+      };
     });
-
-    return positioned;
-  }, [timetableEntries, timeSlots]);
+  }, [timetableEntries, calculateSpanAndOffset]);
 
 
   return (
@@ -519,7 +529,7 @@ export default function ManageTimetablePage() {
             <DialogDescription className={descriptionTextClasses}>
               This time slot is already occupied. Do you want to proceed and override?
               <br/>
-              **Warning: Overriding may remove existing conflicting entries.**
+              **Warning: Overriding will delete any existing conflicting entries and is irreversible.**
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -579,7 +589,7 @@ export default function ManageTimetablePage() {
         </div>
       ) : (
         <div className={`${glassCardClasses} overflow-x-auto custom-scrollbar`}>
-          <div className="grid grid-cols-[auto_repeat(7,minmax(120px,1fr))] text-sm border-t border-l border-zinc-200 dark:border-zinc-700">
+          <div className="grid grid-cols-[auto_repeat(7,minmax(120px,1fr))] text-sm border-t border-l border-zinc-200 dark:border-zinc-700" style={{ gridAutoRows: '60px' }}> {/* Fixed row height for 30-min slots */}
             {/* Corner for empty space */}
             <div className="sticky left-0 bg-white dark:bg-zinc-950 z-20 p-2 border-b border-r border-zinc-200 dark:border-zinc-700"></div>
             {/* Day Headers */}
@@ -612,11 +622,14 @@ export default function ManageTimetablePage() {
                           key={entry.id}
                           className="absolute bg-sky-100 dark:bg-sky-900 border border-sky-300 dark:border-sky-700 text-sky-800 dark:text-sky-200 rounded p-1 text-xs cursor-pointer hover:bg-sky-200 dark:hover:bg-sky-800 transition-colors z-10 overflow-hidden break-words"
                           style={{
-                            top: `${entry.topPx % 60}px`, // This should usually be 0 if entry starts on a slot
+                            top: `${entry.topPx}px`, // `topPx` is relative to the start of the grid. But here it should be 0 because we filter for exact start time.
+                            // If entries can start mid-slot, then topPx would be crucial.
+                            // For exact slot starts, top is 0 relative to the cell itself.
                             height: `${entry.heightPx}px`,
-                            left: '2px', // Small padding
-                            right: '2px', // Small padding
-                            zIndex: entry.heightPx > 60 ? 5 : 1, // Higher z-index for taller cards
+                            left: '2px',
+                            right: '2px',
+                            // The z-index and horizontal positioning logic for overlaps in a single cell is complex.
+                            // For now, entries starting at the exact same time will stack.
                           }}
                           title={`
                             ${getSubjectNameDisplay(entry.subjectId)}
