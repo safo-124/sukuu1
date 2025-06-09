@@ -106,3 +106,16 @@ export const createDriverSchema = z.object({
 
 export const updateDriverSchema = createDriverSchema.partial();
 export const driverIdSchema = z.string().min(1, "Driver ID is required.");
+
+// --- Book Schemas (NEW) ---
+export const createBookSchema = z.object({
+  title: z.string().min(1, "Book title is required.").max(255, "Title is too long."),
+  author: z.string().min(1, "Author is required.").max(255, "Author name is too long."),
+  isbn: z.string().nullable().optional(), // ISBN is unique, but optional for input
+  publicationYear: z.coerce.number().int().min(1000).max(new Date().getFullYear() + 5, "Publication year is invalid.").nullable().optional(),
+  genre: z.string().nullable().optional(),
+  copiesAvailable: z.coerce.number().int().min(1, "Copies available must be at least 1.").default(1),
+});
+
+export const updateBookSchema = createBookSchema.partial();
+export const bookIdSchema = z.string().min(1, "Book ID is required.");

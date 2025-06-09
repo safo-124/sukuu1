@@ -162,6 +162,7 @@ model School {
   Vehicle                 Vehicle[]
   Route                   Route[]
   Driver                  Driver[]
+  Book                    Book[]
 
   @@index([subdomain])
   @@index([customDomain])
@@ -1217,4 +1218,24 @@ model Driver {
   @@unique([schoolId, licenseNumber]) // License number unique per school
   @@index([schoolId])
   @@index([staffId])
+}
+
+model Book {
+  id              String   @id @default(cuid())
+  title           String
+  author          String
+  isbn            String?  @unique // Unique ISBN per school (or globally if desired)
+  publicationYear Int?
+  genre           String?
+  copiesAvailable Int      @default(1)
+  schoolId        String
+  school          School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  // checkoutRecords BookCheckout[] // Link to future checkout records
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([schoolId, isbn]) // Ensure ISBN is unique per school
+  @@index([schoolId])
+  @@index([title])
+  @@index([author])
 }
