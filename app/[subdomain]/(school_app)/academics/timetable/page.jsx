@@ -1,16 +1,17 @@
 // app/[subdomain]/(school_app)/academics/timetable/page.jsx
 'use client';
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSchool } from '../../layout';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
+import React from 'react'; // Import React for React.Fragment
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
-} from "@/components/ui/table"; // Still useful for dialogs/skeletons
+} from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose
@@ -18,7 +19,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Clock, CalendarDays, PlusCircle, Loader2, AlertTriangle, Home, BookOpen, UserCog, Layers, Filter, Maximize, Edit3, Trash2, XCircle } from 'lucide-react'; // Added icons
+import { Clock, CalendarDays, PlusCircle, Loader2, AlertTriangle, Home, BookOpen, UserCog, Layers, Filter, Maximize, Edit3, Trash2, XCircle, Grid, List } from 'lucide-react'; // Added Grid, List icons
 
 // Helper function to convert day number to name (JS Date.getDay() standard: Sunday=0, Monday=1, ..., Saturday=6)
 const getDayName = (dayNum) => {
@@ -151,6 +152,8 @@ export default function ManageTimetablePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
 
+  const [isGridView, setIsGridView] = useState(true); // New state to toggle view
+
   // Tailwind class constants
   const titleTextClasses = "text-black dark:text-white";
   const descriptionTextClasses = "text-zinc-600 dark:text-zinc-400";
@@ -212,12 +215,11 @@ export default function ManageTimetablePage() {
     const endMins = timeToMinutes(endTime);
     const durationMins = endMins - startMins;
 
-    // Calculate the starting slot index from the grid's first time slot
-    const gridStartTimeMins = timeToMinutes(timeSlots[0]);
+    const gridStartTimeMins = timeToMinutes(timeSlots[0]); // Time of the very first slot displayed
     const offsetMins = startMins - gridStartTimeMins;
 
-    const topOffsetPx = (offsetMins / 30) * 60; // Assuming 60px per 30 mins slot
-    const heightPx = (durationMins / 30) * 60; // Assuming 60px per 30 mins slot
+    const topOffsetPx = (offsetMins / 30) * 60; // Assuming 60px height for each 30-minute slot
+    const heightPx = (durationMins / 30) * 60; // Height of the entry card in pixels
 
     return { topOffsetPx, heightPx };
   }, [timeSlots]);
@@ -456,20 +458,16 @@ export default function ManageTimetablePage() {
 
   // Group entries for the grid, calculating span and position
   const positionedTimetableEntries = useMemo(() => {
-    // Each 30-minute slot corresponds to a fixed height (e.g., in px, or a grid row unit)
-    const slotHeightPx = 60; // Example: 60px height for each 30-minute slot
-
-    return timetableEntries.map(entry => {
+    const allPositioned = [];
+    timetableEntries.forEach(entry => {
       const { topOffsetPx, heightPx } = calculateSpanAndOffset(entry.startTime, entry.endTime);
-
-      return {
+      allPositioned.push({
         ...entry,
-        topPx: topOffsetPx,
+        topPxRelativeToGridStart: topOffsetPx, // Total offset from the first grid time slot
         heightPx: heightPx,
-        // For visual stacking if multiple entries in same cell (e.g., if we had sub-columns)
-        // For simplicity, they will just overlap if positioned at the exact same top/left.
-      };
+      });
     });
+    return allPositioned;
   }, [timetableEntries, calculateSpanAndOffset]);
 
 
@@ -482,38 +480,59 @@ export default function ManageTimetablePage() {
           </h1>
           <p className={descriptionTextClasses}>Create and manage class schedules for sections, teachers, and rooms.</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setFormError(''); }}>
-          <DialogTrigger asChild>
-            <Button className={primaryButtonClasses} onClick={openAddDialog}> <PlusCircle className="mr-2 h-4 w-4" /> Add Timetable Entry </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-lg md:max-w-2xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
-            <DialogHeader>
-              <DialogTitle className={titleTextClasses}>{editingEntry ? 'Edit Timetable Entry' : 'Add New Timetable Entry'}</DialogTitle>
-              <DialogDescription className={descriptionTextClasses}>
-                {editingEntry ? 'Adjust the details for this timetable slot.' : 'Define a new teaching slot for a section, subject, teacher, and room.'}
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-6 py-1">
-              <TimetableFormFields
-                formData={formData}
-                onFormChange={handleFormChange}
-                onSelectChange={handleSelectChange}
-                sectionsList={sections}
-                subjectsList={subjects}
-                teachersList={teachers}
-                roomsList={rooms}
-                isLoadingDeps={isLoadingDeps}
-              />
-              {formError && ( <p className="text-sm text-red-600 dark:text-red-400 md:col-span-full">{formError}</p> )}
-              <DialogFooter className="pt-6">
-                <DialogClose asChild><Button type="button" variant="outline" className={outlineButtonClasses}>Cancel</Button></DialogClose>
-                <Button type="submit" className={primaryButtonClasses} disabled={isSubmitting || isLoadingDeps}>
-                  {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>{editingEntry ? 'Saving...' : 'Creating...'}</> : editingEntry ? 'Save Changes' : 'Create Entry'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <div className="flex flex-col sm:flex-row gap-2">
+          {/* Add Timetable Entry Button */}
+          <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setFormError(''); }}>
+            <DialogTrigger asChild>
+              <Button className={primaryButtonClasses} onClick={openAddDialog}> <PlusCircle className="mr-2 h-4 w-4" /> Add Timetable Entry </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg md:max-w-2xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+              <DialogHeader>
+                <DialogTitle className={titleTextClasses}>{editingEntry ? 'Edit Timetable Entry' : 'Add New Timetable Entry'}</DialogTitle>
+                <DialogDescription className={descriptionTextClasses}>
+                  {editingEntry ? 'Adjust the details for this timetable slot.' : 'Define a new teaching slot for a section, subject, teacher, and room.'}
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-6 py-1">
+                <TimetableFormFields
+                  formData={formData}
+                  onFormChange={handleFormChange}
+                  onSelectChange={handleSelectChange}
+                  sectionsList={sections}
+                  subjectsList={subjects}
+                  teachersList={teachers}
+                  roomsList={rooms}
+                  isLoadingDeps={isLoadingDeps}
+                />
+                {formError && ( <p className="text-sm text-red-600 dark:text-red-400 md:col-span-full">{formError}</p> )}
+                <DialogFooter className="pt-6">
+                  <DialogClose asChild><Button type="button" variant="outline" className={outlineButtonClasses}>Cancel</Button></DialogClose>
+                  <Button type="submit" className={primaryButtonClasses} disabled={isSubmitting || isLoadingDeps}>
+                    {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>{editingEntry ? 'Saving...' : 'Creating...'}</> : editingEntry ? 'Save Changes' : 'Create Entry'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          {/* View Toggle Buttons */}
+          <Button
+            variant="outline"
+            onClick={() => setIsGridView(true)}
+            className={`${isGridView ? primaryButtonClasses : outlineButtonClasses}`}
+            title="Switch to Grid View"
+          >
+            <Grid className="mr-2 h-4 w-4" /> Grid View
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setIsGridView(false)}
+            className={`${!isGridView ? primaryButtonClasses : outlineButtonClasses}`}
+            title="Switch to Table View"
+          >
+            <List className="mr-2 h-4 w-4" /> Table View
+          </Button>
+        </div>
       </div>
 
       {error && ( <Alert variant="destructive" className="bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300 dark:border-red-700/50"> <AlertTriangle className="h-4 w-4" /> <AlertTitle>Error</AlertTitle> <AlertDescription>{error}</AlertDescription> </Alert> )}
@@ -582,79 +601,141 @@ export default function ManageTimetablePage() {
         </Button>
       </div>
 
-      {/* Timetable Grid Display */}
       {isLoading ? (
         <div className="flex justify-center items-center h-64">
           <Loader2 className="h-10 w-10 animate-spin text-sky-600" />
         </div>
       ) : (
-        <div className={`${glassCardClasses} overflow-x-auto custom-scrollbar`}>
-          <div className="grid grid-cols-[auto_repeat(7,minmax(120px,1fr))] text-sm border-t border-l border-zinc-200 dark:border-zinc-700" style={{ gridAutoRows: '60px' }}> {/* Fixed row height for 30-min slots */}
-            {/* Corner for empty space */}
-            <div className="sticky left-0 bg-white dark:bg-zinc-950 z-20 p-2 border-b border-r border-zinc-200 dark:border-zinc-700"></div>
-            {/* Day Headers */}
-            {getDayOfWeekOptions.map(day => (
-              <div key={day.value} className="text-center font-bold p-2 bg-zinc-100 dark:bg-zinc-800 border-b border-r border-zinc-200 dark:border-zinc-700">
-                {day.label}
-              </div>
-            ))}
-
-            {/* Time Rows */}
-            {timeSlots.map((time, timeIndex) => (
-              <React.Fragment key={time}>
-                {/* Time Slot Header */}
-                <div className="sticky left-0 bg-white dark:bg-zinc-950 z-20 p-2 font-bold border-b border-r border-zinc-200 dark:border-zinc-700 min-h-[60px] flex items-center justify-center">
-                  {time}
-                </div>
-                {/* Cells for each day */}
+        <>
+          {isGridView ? (
+            /* Timetable Grid Display */
+            <div className={`${glassCardClasses} overflow-x-auto custom-scrollbar`}>
+              <div className="grid grid-cols-[auto_repeat(7,minmax(120px,1fr))] text-sm border-t border-l border-zinc-200 dark:border-zinc-700" style={{ gridAutoRows: '60px' }}> {/* Fixed row height for 30-min slots */}
+                {/* Corner for empty space */}
+                <div className="sticky left-0 bg-white dark:bg-zinc-950 z-20 p-2 border-b border-r border-zinc-200 dark:border-zinc-700"></div>
+                {/* Day Headers */}
                 {getDayOfWeekOptions.map(day => (
-                  <div
-                    key={`${day.value}-${time}`}
-                    className="relative p-0 border-b border-r border-zinc-200 dark:border-zinc-700 min-h-[60px]"
-                    // Optional: pre-fill form with clicked day and time for quick add
-                    // onClick={() => { openAddDialog(); setFormData(prev => ({...prev, dayOfWeek: day.value, startTime: time})); }}
-                  >
-                    {/* Filter entries that START EXACTLY at this time slot */}
-                    {positionedTimetableEntries
-                      .filter(entry => entry.dayOfWeek.toString() === day.value && entry.startTime === time)
-                      .map(entry => (
-                        <div
-                          key={entry.id}
-                          className="absolute bg-sky-100 dark:bg-sky-900 border border-sky-300 dark:border-sky-700 text-sky-800 dark:text-sky-200 rounded p-1 text-xs cursor-pointer hover:bg-sky-200 dark:hover:bg-sky-800 transition-colors z-10 overflow-hidden break-words"
-                          style={{
-                            top: `${entry.topPx}px`, // `topPx` is relative to the start of the grid. But here it should be 0 because we filter for exact start time.
-                            // If entries can start mid-slot, then topPx would be crucial.
-                            // For exact slot starts, top is 0 relative to the cell itself.
-                            height: `${entry.heightPx}px`,
-                            left: '2px',
-                            right: '2px',
-                            // The z-index and horizontal positioning logic for overlaps in a single cell is complex.
-                            // For now, entries starting at the exact same time will stack.
-                          }}
-                          title={`
-                            ${getSubjectNameDisplay(entry.subjectId)}
-                            ${getSectionFullName(entry.sectionId)}
-                            ${getTeacherFullName(entry.staffId)}
-                            ${getRoomNameDisplay(entry.roomId)}
-                            (${entry.startTime}-${entry.endTime})
-                          `}
-                          onClick={(e) => {
-                              e.stopPropagation(); // Prevent opening Add dialog when clicking on an existing entry
-                              openEditDialog(entry);
-                          }}
-                        >
-                          <strong className="block truncate">{getSubjectNameDisplay(entry.subjectId)}</strong>
-                          <span className="block truncate text-zinc-700 dark:text-zinc-300">{getSectionFullName(entry.sectionId)}</span>
-                          <span className="block truncate text-zinc-600 dark:text-zinc-400 text-xs">{getTeacherFullName(entry.staffId)}</span>
-                          <span className="block truncate text-zinc-600 dark:text-zinc-400 text-xs">({getRoomNameDisplay(entry.roomId)})</span>
-                        </div>
-                      ))}
+                  <div key={day.value} className="text-center font-bold p-2 bg-zinc-100 dark:bg-zinc-800 border-b border-r border-zinc-200 dark:border-zinc-700">
+                    {day.label}
+                  </div>
+                ))}
+
+                {/* Time Rows */}
+                {timeSlots.map((time, timeIndex) => (
+                  <React.Fragment key={time}>
+                    {/* Time Slot Header */}
+                    <div className="sticky left-0 bg-white dark:bg-zinc-950 z-20 p-2 font-bold border-b border-r border-zinc-200 dark:border-zinc-700 min-h-[60px] flex items-center justify-center">
+                      {time}
+                    </div>
+                    {/* Cells for each day */}
+                    {getDayOfWeekOptions.map(day => (
+                      <div
+                        key={`${day.value}-${time}`}
+                        className="relative p-0 border-b border-r border-zinc-200 dark:border-zinc-700 min-h-[60px]"
+                        // Optional: pre-fill form with clicked day and time for quick add
+                        // onClick={() => { openAddDialog(); setFormData(prev => ({...prev, dayOfWeek: day.value, startTime: time})); }}
+                      >
+                        {/* Render timetable entries that START EXACTLY at this time slot */}
+                        {positionedTimetableEntries
+                          .filter(entry => entry.dayOfWeek.toString() === day.value && entry.startTime === time)
+                          .map((entry, entryIndex) => {
+                            const { topOffsetPx: entryRelativeTop, heightPx: entryHeight } = calculateSpanAndOffset(entry.startTime, entry.endTime);
+                            const cellStartTimeMins = timeToMinutes(time);
+
+                            // Corrected: top in the current cell is 0 if it starts at this slot, height is full span
+                            const relativeTopInCell = 0; // Starts at the top of its grid cell
+                            // The actual topOffsetPx calculation is already for relative to grid start,
+                            // but here we are in a cell. For entries that start exactly at `time`, their relative top in THIS cell is 0.
+                            // If `time` is 08:30 and `entry.startTime` is 08:00, this cell should be empty.
+                            // The filtering above `entry.startTime === time` ensures we only render it once at its true start.
+
+                            return (
+                              <div
+                                key={entry.id}
+                                // Group-hover: Hide children by default, show on parent hover
+                                className="group absolute bg-sky-100 dark:bg-sky-900 border border-sky-300 dark:border-sky-700 text-sky-800 dark:text-sky-200 rounded p-1 text-xs cursor-pointer hover:bg-sky-200 dark:hover:bg-sky-800 transition-colors z-10 overflow-hidden break-words"
+                                style={{
+                                  top: `${relativeTopInCell}px`,
+                                  height: `${entryHeight}px`,
+                                  left: '2px',
+                                  right: '2px',
+                                }}
+                                onClick={(e) => {
+                                    e.stopPropagation(); // Prevent opening Add dialog when clicking on an existing entry
+                                    openEditDialog(entry);
+                                }}
+                              >
+                                <strong className="block truncate">{getSubjectNameDisplay(entry.subjectId)}</strong>
+                                <span className="block truncate text-zinc-700 dark:text-zinc-300">{getSectionFullName(entry.sectionId)}</span>
+                                <span className="block truncate text-zinc-600 dark:text-zinc-400 text-xs">{getTeacherFullName(entry.staffId)}</span>
+                                <span className="block truncate text-zinc-600 dark:text-zinc-400 text-xs">({getRoomNameDisplay(entry.roomId)})</span>
+
+                                {/* Edit/Delete buttons on hover */}
+                                <div className="absolute bottom-1 right-1 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto z-20">
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 p-0.5 text-sky-700 dark:text-sky-300 hover:bg-sky-200 dark:hover:bg-sky-800/70" onClick={(e) => { e.stopPropagation(); openEditDialog(entry); }} title="Edit">
+                                        <Edit3 className="h-4 w-4" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 p-0.5 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800/70" onClick={(e) => { e.stopPropagation(); handleDelete(entry.id); }} title="Delete">
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                              </div>
+                            );
+                          })}
                   </div>
                 ))}
               </React.Fragment>
             ))}
           </div>
         </div>
+          ) : (
+            /* Timetable Table Display (Alternative View) */
+            <div className={`${glassCardClasses} overflow-x-auto`}>
+              <h2 className={`text-xl font-bold ${titleTextClasses} mb-4 flex items-center`}>
+                <List className="mr-2 h-6 w-6 opacity-80"/>Timetable List
+              </h2>
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-zinc-200/80 dark:border-zinc-700/80">
+                    <TableHead className={`${titleTextClasses} font-semibold`}>Section</TableHead>
+                    <TableHead className={`${titleTextClasses} font-semibold`}>Subject</TableHead>
+                    <TableHead className={`${titleTextClasses} font-semibold`}>Teacher</TableHead>
+                    <TableHead className={`${titleTextClasses} font-semibold`}>Day</TableHead>
+                    <TableHead className={`${titleTextClasses} font-semibold`}>Time</TableHead>
+                    <TableHead className={`${titleTextClasses} font-semibold hidden md:table-cell`}>Room</TableHead>
+                    <TableHead className={`text-right ${titleTextClasses} font-semibold`}>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {timetableEntries.length === 0 ? (
+                    <TableRow className="border-zinc-200/50 dark:border-zinc-800/50">
+                      <TableCell colSpan="7" className={`text-center py-10 ${descriptionTextClasses}`}>
+                        No timetable entries found.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    timetableEntries.map((entry) => (
+                      <TableRow key={entry.id} className="border-zinc-200/50 dark:border-zinc-800/50 hover:bg-zinc-500/5 dark:hover:bg-white/5">
+                        <TableCell className={`${descriptionTextClasses} font-medium`}>{getSectionFullName(entry.sectionId)}</TableCell>
+                        <TableCell className={`${descriptionTextClasses}`}>{getSubjectNameDisplay(entry.subjectId)}</TableCell>
+                        <TableCell className={`${descriptionTextClasses}`}>{getTeacherFullName(entry.staffId)}</TableCell>
+                        <TableCell className={`${descriptionTextClasses}`}>{getDayNameDisplay(entry.dayOfWeek)}</TableCell>
+                        <TableCell className={`${descriptionTextClasses}`}>{`${entry.startTime} - ${entry.endTime}`}</TableCell>
+                        <TableCell className={`${descriptionTextClasses} hidden md:table-cell`}>{getRoomNameDisplay(entry.roomId)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1 md:gap-2">
+                            <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} onClick={() => openEditDialog(entry)} title="Edit Timetable Entry"> <Edit3 className="h-4 w-4" /> </Button>
+                            <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8 border-red-300 text-red-600 hover:bg-red-100 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/50`} onClick={() => handleDelete(entry.id)} title="Delete Timetable Entry"> <Trash2 className="h-4 w-4" /> </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
