@@ -1,7 +1,7 @@
 // app/[subdomain]/(school_app)/academics/timetable/page.jsx
 'use client';
 
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSchool } from '../../layout';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
-} from "@/components/ui/table";
+} from "@/components/ui/table"; // Still useful for dialogs/skeletons
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose
@@ -19,12 +19,25 @@ import {
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Clock, CalendarDays, PlusCircle, Loader2, AlertTriangle, Home, BookOpen, UserCog, Layers, Filter, Maximize, Edit3, Trash2, XCircle, Grid, List, Lightbulb } from 'lucide-react';
+import { Clock, CalendarDays, PlusCircle, Loader2, AlertTriangle, Home, BookOpen, UserCog, Layers, Filter, Maximize, Edit3, Trash2, XCircle, Grid, List, Lightbulb } from 'lucide-react'; // Added icons
 
 // Helper function to convert day number to name (JS Date.getDay() standard: Sunday=0, Monday=1, ..., Saturday=6)
 const getDayName = (dayNum) => {
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   return days[dayNum];
+};
+
+// Helper to convert HH:MM to minutes from midnight (NEEDED ON FRONTEND)
+const timeToMinutes = (timeString) => {
+  const [hours, minutes] = timeString.split(':').map(Number);
+  return hours * 60 + minutes;
+};
+
+// Helper to convert minutes past midnight to HH:MM string (NEEDED ON FRONTEND)
+const minutesToTime = (totalMinutes) => {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 };
 
 // Initial form data for Timetable Entry
@@ -45,7 +58,7 @@ const initialSuggestionFormData = {
   subjectId: '',
   staffId: '',
   dayOfWeek: '',
-  durationMinutes: '60', // Default duration for suggestion
+  durationMinutes: '60', // Default duration
   preferredRoomId: '',
 };
 
@@ -221,10 +234,17 @@ export default function ManageTimetablePage() {
     return slots;
   }, [schoolTimetableStartTime, schoolTimetableEndTime]);
 
-  // Helper to convert HH:MM to minutes from midnight
+  // Helper to convert HH:MM to minutes from midnight (DEFINED GLOBALLY IN THIS COMPONENT)
   const timeToMinutes = (timeString) => {
     const [hours, minutes] = timeString.split(':').map(Number);
     return hours * 60 + minutes;
+  };
+
+  // Helper to convert minutes past midnight to HH:MM string (DEFINED GLOBALLY IN THIS COMPONENT)
+  const minutesToTime = (totalMinutes) => {
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   };
 
   // Helper to calculate duration in 30-minute blocks for positioning
@@ -496,13 +516,13 @@ export default function ManageTimetablePage() {
   const handleDragStart = (e, entry) => {
     setDraggingEntry(entry);
     e.dataTransfer.effectAllowed = 'move';
-    // Optional: e.dataTransfer.setDragImage(e.currentTarget, 0, 0);
+    // Optional: e.dataTransfer.setDragImage(e.currentTarget, 0, 0); // Can customize drag image
   };
 
   const handleDragOver = (e, day, time) => {
     e.preventDefault(); // Necessary to allow drop
     setDraggedOverCell({ day, time });
-    e.dataTransfer.dropEffect = 'move';
+    e.dataTransfer.dropEffect = 'move'; // Visual feedback for valid drop target
   };
 
   const handleDragLeave = () => {
@@ -512,19 +532,17 @@ export default function ManageTimetablePage() {
   const handleDrop = (e, targetDay, targetTime) => {
     e.preventDefault();
     if (draggingEntry) {
-      // Prepare new data for the moved entry
+      // Prepare new data for the moved entry (pre-fill dialog)
       const newFormData = {
         ...draggingEntry, // Copy all existing fields (like ID if editing)
         dayOfWeek: parseInt(targetDay, 10),
         startTime: targetTime,
-        // For endTime, we can keep the original duration relative to the new start time
-        // or calculate a default if the interval is fixed.
-        // Let's keep original duration for now
-        endTime: minutesToTime(timeToMinutes(targetTime) + calculateDuration(draggingEntry.startTime, draggingEntry.endTime)),
+        // Calculate new endTime based on original duration
+        endTime: minutesToTime(timeToMinutes(targetTime) + (timeToMinutes(draggingEntry.endTime) - timeToMinutes(draggingEntry.startTime))),
       };
       setFormData(newFormData);
-      setEditingEntry(draggingEntry); // Treat as an edit operation
-      setIsDialogOpen(true); // Open dialog to confirm the move
+      setEditingEntry(draggingEntry); // Treat as an edit operation for existing entry
+      setIsDialogOpen(true); // Open dialog to confirm the move (will be a PUT request)
     }
     setDraggingEntry(null);
     setDraggedOverCell(null);
@@ -534,7 +552,6 @@ export default function ManageTimetablePage() {
     setDraggingEntry(null);
     setDraggedOverCell(null);
   };
-
 
   // --- Timetable Suggestion Logic ---
   const handleSuggestionFormChange = (e) => setSuggestionFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -571,10 +588,10 @@ export default function ManageTimetablePage() {
         setSuggestedSlot(result.suggestedSlot);
         toast.success("Suggested a slot!", { description: `Found slot: Day ${getDayNameDisplay(result.suggestedSlot.dayOfWeek)}, ${result.suggestedSlot.startTime} - ${result.suggestedSlot.endTime}` });
 
-        // Optionally, pre-fill the main Add dialog with the suggestion
+        // Pre-fill the main Add dialog with the suggestion
         setFormData(prev => ({
           ...prev,
-          sectionId: suggestionFormData.sectionId, // Keep original filter criteria
+          sectionId: suggestionFormData.sectionId, // Keep original filter criteria from suggestion form
           subjectId: suggestionFormData.subjectId,
           staffId: suggestionFormData.staffId,
           dayOfWeek: result.suggestedSlot.dayOfWeek.toString(),
@@ -582,7 +599,8 @@ export default function ManageTimetablePage() {
           endTime: result.suggestedSlot.endTime,
           roomId: result.suggestedSlot.roomId || '',
         }));
-        setIsDialogOpen(true); // Open Add dialog with suggested data
+        setIsDialogOpen(true); // Open the main Add/Edit dialog
+        setIsSuggestionDialogOpen(false); // Close suggestion dialog
       }
     } catch (err) {
       toast.error('An unexpected error occurred during suggestion.');
@@ -832,7 +850,6 @@ export default function ManageTimetablePage() {
             /* Timetable Grid Display */
             <div className={`${glassCardClasses} overflow-x-auto custom-scrollbar`}>
               {/* Note: This grid is fixed height per 30-min slot. Cards span visually using absolute positioning. */}
-              {/* Consider adding a clear indicator for empty cells that can be clicked to add a slot */}
               <div
                 className="grid grid-cols-[auto_repeat(7,minmax(120px,1fr))] text-sm border-t border-l border-zinc-200 dark:border-zinc-700"
                 style={{ gridAutoRows: '60px' }} // 30 minutes per 60px height
@@ -867,41 +884,48 @@ export default function ManageTimetablePage() {
                         {/* Render timetable entries that START EXACTLY at this time slot */}
                         {positionedTimetableEntries
                           .filter(entry => entry.dayOfWeek.toString() === day.value && entry.startTime === time)
-                          .map((entry, entryIndex) => (
-                            <div
-                              key={entry.id}
-                              draggable="true" // Make the card draggable
-                              onDragStart={(e) => handleDragStart(e, entry)}
-                              onDragEnd={handleDragEnd}
-                              className="group absolute bg-sky-100 dark:bg-sky-900 border border-sky-300 dark:border-sky-700 text-sky-800 dark:text-sky-200 rounded p-1 text-xs cursor-pointer hover:bg-sky-200 dark:hover:bg-sky-800 transition-colors z-10 overflow-hidden break-words"
-                              style={{
-                                top: `0px`, // Starts at the top of its grid cell
-                                height: `${entry.heightPx}px`,
-                                left: '2px',
-                                right: '2px',
-                                opacity: draggingEntry && draggingEntry.id === entry.id ? 0.5 : 1, // Visual feedback when dragging
-                              }}
-                              onClick={(e) => {
-                                  e.stopPropagation(); // Prevent opening Add dialog when clicking on an existing entry
-                                  openEditDialog(entry);
-                              }}
-                            >
-                              <strong className="block truncate">{getSubjectNameDisplay(entry.subjectId)}</strong>
-                              <span className="block truncate text-zinc-700 dark:text-zinc-300">{getSectionFullName(entry.sectionId)}</span>
-                              <span className="block truncate text-zinc-600 dark:text-zinc-400 text-xs">{getTeacherFullName(entry.staffId)}</span>
-                              <span className="block truncate text-zinc-600 dark:text-zinc-400 text-xs">({getRoomNameDisplay(entry.roomId)})</span>
+                          .map((entry, entryIndex) => {
+                            const { topOffsetPx: entryRelativeTop, heightPx: entryHeight } = calculateSpanAndOffset(entry.startTime, entry.endTime);
+                            const cellStartTimeMins = timeToMinutes(time);
 
-                              {/* Edit/Delete buttons on hover */}
-                              <div className="absolute bottom-1 right-1 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto z-20">
-                                  <Button variant="ghost" size="icon" className="h-6 w-6 p-0.5 text-sky-700 dark:text-sky-300 hover:bg-sky-200 dark:hover:bg-sky-800/70" onClick={(e) => { e.stopPropagation(); openEditDialog(entry); }} title="Edit">
-                                      <Edit3 className="h-4 w-4" />
-                                  </Button>
-                                  <Button variant="ghost" size="icon" className="h-6 w-6 p-0.5 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800/70" onClick={(e) => { e.stopPropagation(); handleDelete(entry.id); }} title="Delete">
-                                      <Trash2 className="h-4 w-4" />
-                                  </Button>
+                            // Corrected: top in the current cell is 0 if it starts at this slot, height is full span
+                            const relativeTopInCell = 0;
+
+                            return (
+                              <div
+                                key={entry.id}
+                                draggable="true" // Make the card draggable
+                                onDragStart={(e) => handleDragStart(e, entry)}
+                                onDragEnd={handleDragEnd}
+                                className="group absolute bg-sky-100 dark:bg-sky-900 border border-sky-300 dark:border-sky-700 text-sky-800 dark:text-sky-200 rounded p-1 text-xs cursor-pointer hover:bg-sky-200 dark:hover:bg-sky-800 transition-colors z-10 overflow-hidden break-words"
+                                style={{
+                                  top: `${relativeTopInCell}px`,
+                                  height: `${entryHeight}px`,
+                                  left: '2px',
+                                  right: '2px',
+                                }}
+                                onClick={(e) => {
+                                    e.stopPropagation(); // Prevent opening Add dialog when clicking on an existing entry
+                                    openEditDialog(entry);
+                                }}
+                              >
+                                <strong className="block truncate">{getSubjectNameDisplay(entry.subjectId)}</strong>
+                                <span className="block truncate text-zinc-700 dark:text-zinc-300">{getSectionFullName(entry.sectionId)}</span>
+                                <span className="block truncate text-zinc-600 dark:text-zinc-400 text-xs">{getTeacherFullName(entry.staffId)}</span>
+                                <span className="block truncate text-zinc-600 dark:text-zinc-400 text-xs">({getRoomNameDisplay(entry.roomId)})</span>
+
+                                {/* Edit/Delete buttons on hover */}
+                                <div className="absolute bottom-1 right-1 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto z-20">
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 p-0.5 text-sky-700 dark:text-sky-300 hover:bg-sky-200 dark:hover:bg-sky-800/70" onClick={(e) => { e.stopPropagation(); openEditDialog(entry); }} title="Edit">
+                                        <Edit3 className="h-4 w-4" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 p-0.5 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800/70" onClick={(e) => { e.stopPropagation(); handleDelete(entry.id); }} title="Delete">
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                       </div>
                     ))}
                   </React.Fragment>
