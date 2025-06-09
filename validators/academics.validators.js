@@ -117,3 +117,42 @@ export const createStudentAttendanceSchema = z.object({
 
 export const updateStudentAttendanceSchema = createStudentAttendanceSchema.partial();
 export const studentAttendanceIdSchema = z.string().min(1, "Student Attendance ID is required.");
+
+
+// --- Timetable Entry Schemas (NEW/UPDATED) ---
+// Base schema for TimetableEntry
+const baseTimetableEntrySchema = z.object({
+  sectionId: z.string().min(1, "Section is required."),
+  subjectId: z.string().min(1, "Subject is required."),
+  staffId: z.string().min(1, "Teacher is required."),
+  dayOfWeek: z.coerce.number().int().min(0).max(6, "Day of week must be 0 (Sunday) to 6 (Saturday)."), // JS Date.getDay() format
+  startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Start time must be in HH:MM format (e.g., 09:00)."),
+  endTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "End time must be in HH:MM format (e.g., 10:30)."),
+  roomId: z.string().nullable().optional(), // Now links to Room model
+});
+
+// Schema for creating a TimetableEntry
+export const createTimetableEntrySchema = baseTimetableEntrySchema.refine(data => {
+  const start = new Date(`2000-01-01T${data.startTime}:00`);
+  const end = new Date(`2000-01-01T${data.endTime}:00`);
+  return start < end;
+}, {
+  message: "End time must be after start time.",
+  path: ["endTime"],
+});
+
+// Schema for updating a TimetableEntry
+export const updateTimetableEntrySchema = baseTimetableEntrySchema.partial().refine(data => {
+  // If both start and end times are provided, validate their order
+  if (data.startTime && data.endTime) {
+    const start = new Date(`2000-01-01T${data.startTime}:00`);
+    const end = new Date(`2000-01-01T${data.endTime}:00`);
+    return start < end;
+  }
+  return true; // No time validation if only one or neither is provided
+}, {
+  message: "End time must be after start time when both are provided.",
+  path: ["endTime"],
+});
+
+export const timetableEntryIdSchema = z.string().min(1, "Timetable Entry ID is required.");

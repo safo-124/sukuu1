@@ -101,6 +101,10 @@ model School {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  classStartTime        String?  @default("08:00") // Default start time for classes
+  classEndTime          String?  @default("17:00") // Default end time for classes
+  classIntervalMinutes  Int?     @default(30)     // Default interval duration in minutes (e.g., 30 or 60)
+
 
   // Feature flags
   hasParentAppAccess      Boolean @default(false)
@@ -157,12 +161,12 @@ model School {
   GradingWeightConfig     GradingWeightConfig[]
   buildings               Building[] // New relation
   rooms                   Room[] // New relation
-  hostels                 Hostel[]
   HostelRoom              HostelRoom[]
   Vehicle                 Vehicle[]
   Route                   Route[]
-  Driver                  Driver[]
-  Book                    Book[]
+  hostels                 Hostel[] // New: Hostels where this staff is a warden
+  drivers                 Driver[]
+  books                   Book[]
 
   @@index([subdomain])
   @@index([customDomain])
@@ -494,8 +498,9 @@ model Staff {
   timetableEntries          TimetableEntry[]
   createdAt                 DateTime               @default(now())
   updatedAt                 DateTime               @updatedAt
-  Hostel                    Hostel[]
-  Driver                    Driver?
+  hostels                   Hostel[] // New: Hostels where this staff is a warden
+  drivers                   Driver[] // Drivers profile for this staff member
+  maxWeeklyTeachingHours    Float?
 
   @@unique([schoolId, staffIdNumber])
   @@index([userId])
@@ -781,19 +786,24 @@ model TimetableEntry {
   section   Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   subjectId String
   subject   Subject  @relation("SubjectTimetableSlots", fields: [subjectId], references: [id])
-  staffId   String // Staff (Teacher) ID
+  staffId   String
   staff     Staff    @relation(fields: [staffId], references: [id])
-  dayOfWeek Int // 0 for Sunday, 1 for Monday, ..., 6 for Saturday (JS Date standard) or 1-7
-  startTime String // HH:MM format
-  endTime   String // HH:MM format
-  roomNo    String?
+  dayOfWeek Int
+  startTime String
+  endTime   String
+  roomId    String? // Changed from roomNo to roomId for Room relation
+  room      Room?    @relation("TimetableRoomSlots", fields: [roomId], references: [id], onDelete: SetNull) // New relation
   schoolId  String
   school    School   @relation(fields: [schoolId], references: [id], onDelete: Restrict)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([schoolId, sectionId, dayOfWeek, startTime]) // Ensure no time conflicts for a section
+  @@unique([schoolId, staffId, dayOfWeek, startTime]) // Ensure no time conflicts for a staff
+  @@unique([schoolId, roomId, dayOfWeek, startTime]) // Ensure no time conflicts for a room
   @@index([schoolId, sectionId, dayOfWeek])
-  @@index([schoolId, staffId, dayOfWeek]) // For teacher's timetable
+  @@index([schoolId, staffId, dayOfWeek])
+  @@index([schoolId, roomId, dayOfWeek]) // New index
 }
 
 // --------------------
@@ -1112,19 +1122,20 @@ model Building {
 }
 
 model Room {
-  id            String         @id @default(cuid())
-  name          String // e.g., "Room 101", "Lab A", "Auditorium"
-  roomType      String? // e.g., "Classroom", "Laboratory", "Library", "Staff Room"
-  capacity      Int?
-  buildingId    String?
-  building      Building?      @relation(fields: [buildingId], references: [id], onDelete: SetNull)
-  schoolId      String
-  school        School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  examSchedules ExamSchedule[] @relation("RoomTimetableSlots") // Link to exam schedules
+  id               String           @id @default(cuid())
+  name             String // e.g., "Room 101", "Lab A", "Auditorium"
+  roomType         String? // e.g., "Classroom", "Laboratory", "Library", "Staff Room"
+  capacity         Int?
+  buildingId       String?
+  building         Building?        @relation(fields: [buildingId], references: [id], onDelete: SetNull)
+  schoolId         String
+  school           School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  examSchedules    ExamSchedule[]   @relation("RoomTimetableSlots") // Link to exam schedules
   // You might also link to TimetableEntry if you implement that later
   // timetableEntries TimetableEntry[] @relation("RoomTimetableSlots")
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  timetableEntries TimetableEntry[] @relation("TimetableRoomSlots")
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   @@unique([schoolId, name])
   @@index([schoolId])
