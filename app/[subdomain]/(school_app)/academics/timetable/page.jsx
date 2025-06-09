@@ -1,7 +1,7 @@
 // app/[subdomain]/(school_app)/academics/timetable/page.jsx
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useSchool } from '../../layout';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
@@ -19,7 +19,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Clock, CalendarDays, PlusCircle, Loader2, AlertTriangle, Home, BookOpen, UserCog, Layers, Filter, Maximize, Edit3, Trash2, XCircle, Grid, List } from 'lucide-react'; // Added Grid, List icons
+import { Clock, CalendarDays, PlusCircle, Loader2, AlertTriangle, Home, BookOpen, UserCog, Layers, Filter, Maximize, Edit3, Trash2, XCircle, Grid, List, Lightbulb } from 'lucide-react';
 
 // Helper function to convert day number to name (JS Date.getDay() standard: Sunday=0, Monday=1, ..., Saturday=6)
 const getDayName = (dayNum) => {
@@ -39,11 +39,21 @@ const initialTimetableFormData = {
   roomId: '',
 };
 
+// Initial form data for Timetable Suggestion
+const initialSuggestionFormData = {
+  sectionId: '',
+  subjectId: '',
+  staffId: '',
+  dayOfWeek: '',
+  durationMinutes: '60', // Default duration for suggestion
+  preferredRoomId: '',
+};
+
+
 // Reusable FormFields Component for Timetable Entry
 const TimetableFormFields = ({ formData, onFormChange, onSelectChange, sectionsList, subjectsList, teachersList, roomsList, isLoadingDeps }) => {
   const labelTextClasses = "text-black dark:text-white block text-sm font-medium mb-1 text-left";
   const inputTextClasses = "bg-white/50 dark:bg-zinc-800/50 text-black dark:text-white border-zinc-300 dark:border-zinc-700 focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-500 dark:focus:border-sky-500";
-  // const descriptionTextClasses = "text-zinc-600 dark:text-zinc-400"; // Available from parent
 
   const daysOfWeekOptions = [
     { value: '1', label: 'Monday' },
@@ -154,6 +164,14 @@ export default function ManageTimetablePage() {
 
   const [isGridView, setIsGridView] = useState(true); // New state to toggle view
 
+  // State for Timetable Suggestion
+  const [isSuggestionDialogOpen, setIsSuggestionDialogOpen] = useState(false);
+  const [suggestionFormData, setSuggestionFormData] = useState({ ...initialSuggestionFormData });
+  const [suggestedSlot, setSuggestedSlot] = useState(null);
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [suggestionError, setSuggestionError] = useState('');
+
+
   // Tailwind class constants
   const titleTextClasses = "text-black dark:text-white";
   const descriptionTextClasses = "text-zinc-600 dark:text-zinc-400";
@@ -183,7 +201,7 @@ export default function ManageTimetablePage() {
   const schoolTimetableStartTime = schoolData?.timetableStartTime || "08:00";
   const schoolTimetableEndTime = schoolData?.timetableEndTime || "17:00";
 
-  // Time slots for the grid (dynamically generated based on school settings)
+  // Time slots for the grid (dynamically generated based on school settings and 30-min intervals)
   const timeSlots = useMemo(() => {
     const slots = [];
     const startHour = parseInt(schoolTimetableStartTime.split(':')[0], 10);
@@ -215,11 +233,11 @@ export default function ManageTimetablePage() {
     const endMins = timeToMinutes(endTime);
     const durationMins = endMins - startMins;
 
-    const gridStartTimeMins = timeToMinutes(timeSlots[0]); // Time of the very first slot displayed
+    const gridStartTimeMins = timeToMinutes(timeSlots[0] || '00:00'); // Time of the very first slot displayed
     const offsetMins = startMins - gridStartTimeMins;
 
     const topOffsetPx = (offsetMins / 30) * 60; // Assuming 60px height for each 30-minute slot
-    const heightPx = (durationMins / 30) * 60; // Height of the entry card in pixels
+    const heightPx = (durationMins / 30) * 60; // Height of the entry card
 
     return { topOffsetPx, heightPx };
   }, [timeSlots]);
@@ -456,6 +474,7 @@ export default function ManageTimetablePage() {
     return room ? room.name : 'N/A';
   }, [rooms]);
 
+
   // Group entries for the grid, calculating span and position
   const positionedTimetableEntries = useMemo(() => {
     const allPositioned = [];
@@ -469,6 +488,110 @@ export default function ManageTimetablePage() {
     });
     return allPositioned;
   }, [timetableEntries, calculateSpanAndOffset]);
+
+  // --- Drag and Drop Logic (Simplified) ---
+  const [draggingEntry, setDraggingEntry] = useState(null);
+  const [draggedOverCell, setDraggedOverCell] = useState(null); // { day: '1', time: '09:00' }
+
+  const handleDragStart = (e, entry) => {
+    setDraggingEntry(entry);
+    e.dataTransfer.effectAllowed = 'move';
+    // Optional: e.dataTransfer.setDragImage(e.currentTarget, 0, 0);
+  };
+
+  const handleDragOver = (e, day, time) => {
+    e.preventDefault(); // Necessary to allow drop
+    setDraggedOverCell({ day, time });
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDragLeave = () => {
+    setDraggedOverCell(null);
+  };
+
+  const handleDrop = (e, targetDay, targetTime) => {
+    e.preventDefault();
+    if (draggingEntry) {
+      // Prepare new data for the moved entry
+      const newFormData = {
+        ...draggingEntry, // Copy all existing fields (like ID if editing)
+        dayOfWeek: parseInt(targetDay, 10),
+        startTime: targetTime,
+        // For endTime, we can keep the original duration relative to the new start time
+        // or calculate a default if the interval is fixed.
+        // Let's keep original duration for now
+        endTime: minutesToTime(timeToMinutes(targetTime) + calculateDuration(draggingEntry.startTime, draggingEntry.endTime)),
+      };
+      setFormData(newFormData);
+      setEditingEntry(draggingEntry); // Treat as an edit operation
+      setIsDialogOpen(true); // Open dialog to confirm the move
+    }
+    setDraggingEntry(null);
+    setDraggedOverCell(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggingEntry(null);
+    setDraggedOverCell(null);
+  };
+
+
+  // --- Timetable Suggestion Logic ---
+  const handleSuggestionFormChange = (e) => setSuggestionFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  const handleSuggestionSelectChange = (name, value) => setSuggestionFormData(prev => ({ ...prev, [name]: value === 'none' ? '' : value }));
+
+  const executeSuggestion = async () => {
+    setIsSuggesting(true);
+    setSuggestedSlot(null);
+    setSuggestionError('');
+
+    try {
+      const payload = {
+        sectionId: suggestionFormData.sectionId || null,
+        subjectId: suggestionFormData.subjectId || null,
+        staffId: suggestionFormData.staffId || null,
+        dayOfWeek: suggestionFormData.dayOfWeek ? parseInt(suggestionFormData.dayOfWeek, 10) : null,
+        durationMinutes: parseInt(suggestionFormData.durationMinutes, 10),
+        preferredRoomId: suggestionFormData.preferredRoomId || null,
+      };
+
+      const response = await fetch(`/api/schools/${schoolData.id}/academics/timetable/suggest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        let err = result.error || `Failed to get suggestion.`;
+        if (result.issues) err = result.issues.map(i => `${i.path.join('.') || 'Field'}: ${i.message}`).join('; ');
+        setSuggestionError(err);
+        toast.error("Suggestion Failed", { description: err });
+      } else {
+        setSuggestedSlot(result.suggestedSlot);
+        toast.success("Suggested a slot!", { description: `Found slot: Day ${getDayNameDisplay(result.suggestedSlot.dayOfWeek)}, ${result.suggestedSlot.startTime} - ${result.suggestedSlot.endTime}` });
+
+        // Optionally, pre-fill the main Add dialog with the suggestion
+        setFormData(prev => ({
+          ...prev,
+          sectionId: suggestionFormData.sectionId, // Keep original filter criteria
+          subjectId: suggestionFormData.subjectId,
+          staffId: suggestionFormData.staffId,
+          dayOfWeek: result.suggestedSlot.dayOfWeek.toString(),
+          startTime: result.suggestedSlot.startTime,
+          endTime: result.suggestedSlot.endTime,
+          roomId: result.suggestedSlot.roomId || '',
+        }));
+        setIsDialogOpen(true); // Open Add dialog with suggested data
+      }
+    } catch (err) {
+      toast.error('An unexpected error occurred during suggestion.');
+      setSuggestionError('An unexpected error occurred.');
+      console.error("Suggestion API error:", err);
+    } finally {
+      setIsSuggesting(false);
+    }
+  };
 
 
   return (
@@ -601,6 +724,104 @@ export default function ManageTimetablePage() {
         </Button>
       </div>
 
+      {/* Suggest API Button & Dialog */}
+      <Dialog open={isSuggestionDialogOpen} onOpenChange={setIsSuggestionDialogOpen}>
+        <DialogTrigger asChild>
+          <Button variant="outline" className="w-fit" onClick={() => {
+            setSuggestionFormData({ ...initialSuggestionFormData });
+            setSuggestedSlot(null);
+            setSuggestionError('');
+            setIsSuggestionDialogOpen(true);
+          }}>
+            <Lightbulb className="mr-2 h-4 w-4" /> Suggest Best Slot
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-md bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+          <DialogHeader>
+            <DialogTitle className={titleTextClasses}>Suggest Timetable Slot</DialogTitle>
+            <DialogDescription className={descriptionTextClasses}>
+              Find the next available conflict-free slot based on criteria.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(e) => { e.preventDefault(); executeSuggestion(); }} className="space-y-4 py-2">
+            {/* Suggestion Form Fields */}
+            <div>
+              <Label htmlFor="s_sectionId" className={descriptionTextClasses}>Section <span className="text-red-500">*</span></Label>
+              <Select name="sectionId" value={suggestionFormData.sectionId || ''} onValueChange={(value) => handleSuggestionSelectChange('sectionId', value)} disabled={isLoadingDeps}>
+                <SelectTrigger className={`${filterInputClasses} mt-1`}> <SelectValue placeholder="Select section" /> </SelectTrigger>
+                <SelectContent><SelectItem value="none">Any Section</SelectItem>{Array.isArray(sections) && sections.map(sec => <SelectItem key={sec.id} value={sec.id}>{getSectionFullName(sec.id)}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="s_subjectId" className={descriptionTextClasses}>Subject <span className="text-red-500">*</span></Label>
+              <Select name="subjectId" value={suggestionFormData.subjectId || ''} onValueChange={(value) => handleSuggestionSelectChange('subjectId', value)} disabled={isLoadingDeps}>
+                <SelectTrigger className={`${filterInputClasses} mt-1`}> <SelectValue placeholder="Select subject" /> </SelectTrigger>
+                <SelectContent><SelectItem value="none">Any Subject</SelectItem>{Array.isArray(subjects) && subjects.map(sub => <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="s_staffId" className={descriptionTextClasses}>Teacher <span className="text-red-500">*</span></Label>
+              <Select name="staffId" value={suggestionFormData.staffId || ''} onValueChange={(value) => handleSuggestionSelectChange('staffId', value)} disabled={isLoadingDeps}>
+                <SelectTrigger className={`${filterInputClasses} mt-1`}> <SelectValue placeholder="Select teacher" /> </SelectTrigger>
+                <SelectContent><SelectItem value="none">Any Teacher</SelectItem>{Array.isArray(teachers) && teachers.map(teach => <SelectItem key={teach.id} value={teach.id}>{getTeacherFullName(teach.id)}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="s_dayOfWeek" className={descriptionTextClasses}>Day of Week <span className="text-red-500">*</span></Label>
+              <Select name="dayOfWeek" value={suggestionFormData.dayOfWeek?.toString() || ''} onValueChange={(value) => handleSuggestionSelectChange('dayOfWeek', value)} disabled={isLoadingDeps}>
+                <SelectTrigger className={`${filterInputClasses} mt-1`}> <SelectValue placeholder="Select day" /> </SelectTrigger>
+                <SelectContent><SelectItem value="none">Any Day</SelectItem>{getDayOfWeekOptions.map(day => <SelectItem key={day.value} value={day.value}>{day.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="s_durationMinutes" className={descriptionTextClasses}>Duration (minutes) <span className="text-red-500">*</span></Label>
+              <Input id="s_durationMinutes" name="durationMinutes" type="number" min="15" step="15" value={suggestionFormData.durationMinutes || ''} onChange={handleSuggestionFormChange} required className={`${filterInputClasses} mt-1`} placeholder="e.g., 60" />
+            </div>
+            <div>
+              <Label htmlFor="s_preferredRoomId" className={descriptionTextClasses}>Preferred Room (Optional)</Label>
+              <Select name="preferredRoomId" value={suggestionFormData.preferredRoomId || ''} onValueChange={(value) => handleSuggestionSelectChange('preferredRoomId', value === 'none' ? '' : value)} disabled={isLoadingDeps}>
+                <SelectTrigger className={`${filterInputClasses} mt-1`}> <SelectValue placeholder="Select room" /> </SelectTrigger>
+                <SelectContent><SelectItem value="none">Any Room</SelectItem>{Array.isArray(rooms) && rooms.map(room => <SelectItem key={room.id} value={room.id}>{room.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            {suggestionError && ( <p className="text-sm text-red-600 dark:text-red-400">{suggestionError}</p> )}
+            <DialogFooter className="pt-4">
+              <Button type="submit" className={primaryButtonClasses} disabled={isSuggesting || isLoadingDeps}>
+                {isSuggesting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Suggesting...</> : 'Find Slot'}
+              </Button>
+            </DialogFooter>
+          </form>
+          {suggestedSlot && (
+            <Alert className="mt-4 bg-green-500/10 border-green-500/30 text-green-700 dark:text-green-300 dark:border-green-700/50">
+              <Lightbulb className="h-4 w-4" />
+              <AlertTitle>Suggested Slot:</AlertTitle>
+              <AlertDescription>
+                **{getDayNameDisplay(suggestedSlot.dayOfWeek)}** from {suggestedSlot.startTime} to {suggestedSlot.endTime} {suggestedSlot.roomId ? `in ${getRoomNameDisplay(suggestedSlot.roomId)}` : ''}.
+              </AlertDescription>
+              <Button variant="outline" className="mt-2" onClick={() => {
+                // Pre-fill main form and open it
+                setFormData(prev => ({
+                  ...prev,
+                  sectionId: suggestionFormData.sectionId,
+                  subjectId: suggestionFormData.subjectId,
+                  staffId: suggestionFormData.staffId,
+                  dayOfWeek: suggestedSlot.dayOfWeek.toString(),
+                  startTime: suggestedSlot.startTime,
+                  endTime: suggestedSlot.endTime,
+                  roomId: suggestedSlot.roomId || '',
+                }));
+                setIsDialogOpen(true); // Open the main Add/Edit dialog
+                setIsSuggestionDialogOpen(false); // Close suggestion dialog
+              }}>
+                Use this slot
+              </Button>
+            </Alert>
+          )}
+        </DialogContent>
+      </Dialog>
+
+
+      {/* Timetable Grid Display */}
       {isLoading ? (
         <div className="flex justify-center items-center h-64">
           <Loader2 className="h-10 w-10 animate-spin text-sky-600" />
@@ -610,7 +831,13 @@ export default function ManageTimetablePage() {
           {isGridView ? (
             /* Timetable Grid Display */
             <div className={`${glassCardClasses} overflow-x-auto custom-scrollbar`}>
-              <div className="grid grid-cols-[auto_repeat(7,minmax(120px,1fr))] text-sm border-t border-l border-zinc-200 dark:border-zinc-700" style={{ gridAutoRows: '60px' }}> {/* Fixed row height for 30-min slots */}
+              {/* Note: This grid is fixed height per 30-min slot. Cards span visually using absolute positioning. */}
+              {/* Consider adding a clear indicator for empty cells that can be clicked to add a slot */}
+              <div
+                className="grid grid-cols-[auto_repeat(7,minmax(120px,1fr))] text-sm border-t border-l border-zinc-200 dark:border-zinc-700"
+                style={{ gridAutoRows: '60px' }} // 30 minutes per 60px height
+                onMouseLeave={handleDragLeave} // Clear dragged over cell on mouse leave
+              >
                 {/* Corner for empty space */}
                 <div className="sticky left-0 bg-white dark:bg-zinc-950 z-20 p-2 border-b border-r border-zinc-200 dark:border-zinc-700"></div>
                 {/* Day Headers */}
@@ -631,63 +858,56 @@ export default function ManageTimetablePage() {
                     {getDayOfWeekOptions.map(day => (
                       <div
                         key={`${day.value}-${time}`}
-                        className="relative p-0 border-b border-r border-zinc-200 dark:border-zinc-700 min-h-[60px]"
-                        // Optional: pre-fill form with clicked day and time for quick add
-                        // onClick={() => { openAddDialog(); setFormData(prev => ({...prev, dayOfWeek: day.value, startTime: time})); }}
+                        className={`relative p-0 border-b border-r border-zinc-200 dark:border-zinc-700 min-h-[60px]
+                          ${draggedOverCell?.day === day.value && draggedOverCell?.time === time ? 'bg-sky-200/50 dark:bg-sky-800/50' : ''}`}
+                        onDragOver={(e) => handleDragOver(e, day.value, time)}
+                        onDrop={(e) => handleDrop(e, day.value, time)}
+                        onDragLeave={handleDragLeave}
                       >
                         {/* Render timetable entries that START EXACTLY at this time slot */}
                         {positionedTimetableEntries
                           .filter(entry => entry.dayOfWeek.toString() === day.value && entry.startTime === time)
-                          .map((entry, entryIndex) => {
-                            const { topOffsetPx: entryRelativeTop, heightPx: entryHeight } = calculateSpanAndOffset(entry.startTime, entry.endTime);
-                            const cellStartTimeMins = timeToMinutes(time);
+                          .map((entry, entryIndex) => (
+                            <div
+                              key={entry.id}
+                              draggable="true" // Make the card draggable
+                              onDragStart={(e) => handleDragStart(e, entry)}
+                              onDragEnd={handleDragEnd}
+                              className="group absolute bg-sky-100 dark:bg-sky-900 border border-sky-300 dark:border-sky-700 text-sky-800 dark:text-sky-200 rounded p-1 text-xs cursor-pointer hover:bg-sky-200 dark:hover:bg-sky-800 transition-colors z-10 overflow-hidden break-words"
+                              style={{
+                                top: `0px`, // Starts at the top of its grid cell
+                                height: `${entry.heightPx}px`,
+                                left: '2px',
+                                right: '2px',
+                                opacity: draggingEntry && draggingEntry.id === entry.id ? 0.5 : 1, // Visual feedback when dragging
+                              }}
+                              onClick={(e) => {
+                                  e.stopPropagation(); // Prevent opening Add dialog when clicking on an existing entry
+                                  openEditDialog(entry);
+                              }}
+                            >
+                              <strong className="block truncate">{getSubjectNameDisplay(entry.subjectId)}</strong>
+                              <span className="block truncate text-zinc-700 dark:text-zinc-300">{getSectionFullName(entry.sectionId)}</span>
+                              <span className="block truncate text-zinc-600 dark:text-zinc-400 text-xs">{getTeacherFullName(entry.staffId)}</span>
+                              <span className="block truncate text-zinc-600 dark:text-zinc-400 text-xs">({getRoomNameDisplay(entry.roomId)})</span>
 
-                            // Corrected: top in the current cell is 0 if it starts at this slot, height is full span
-                            const relativeTopInCell = 0; // Starts at the top of its grid cell
-                            // The actual topOffsetPx calculation is already for relative to grid start,
-                            // but here we are in a cell. For entries that start exactly at `time`, their relative top in THIS cell is 0.
-                            // If `time` is 08:30 and `entry.startTime` is 08:00, this cell should be empty.
-                            // The filtering above `entry.startTime === time` ensures we only render it once at its true start.
-
-                            return (
-                              <div
-                                key={entry.id}
-                                // Group-hover: Hide children by default, show on parent hover
-                                className="group absolute bg-sky-100 dark:bg-sky-900 border border-sky-300 dark:border-sky-700 text-sky-800 dark:text-sky-200 rounded p-1 text-xs cursor-pointer hover:bg-sky-200 dark:hover:bg-sky-800 transition-colors z-10 overflow-hidden break-words"
-                                style={{
-                                  top: `${relativeTopInCell}px`,
-                                  height: `${entryHeight}px`,
-                                  left: '2px',
-                                  right: '2px',
-                                }}
-                                onClick={(e) => {
-                                    e.stopPropagation(); // Prevent opening Add dialog when clicking on an existing entry
-                                    openEditDialog(entry);
-                                }}
-                              >
-                                <strong className="block truncate">{getSubjectNameDisplay(entry.subjectId)}</strong>
-                                <span className="block truncate text-zinc-700 dark:text-zinc-300">{getSectionFullName(entry.sectionId)}</span>
-                                <span className="block truncate text-zinc-600 dark:text-zinc-400 text-xs">{getTeacherFullName(entry.staffId)}</span>
-                                <span className="block truncate text-zinc-600 dark:text-zinc-400 text-xs">({getRoomNameDisplay(entry.roomId)})</span>
-
-                                {/* Edit/Delete buttons on hover */}
-                                <div className="absolute bottom-1 right-1 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto z-20">
-                                    <Button variant="ghost" size="icon" className="h-6 w-6 p-0.5 text-sky-700 dark:text-sky-300 hover:bg-sky-200 dark:hover:bg-sky-800/70" onClick={(e) => { e.stopPropagation(); openEditDialog(entry); }} title="Edit">
-                                        <Edit3 className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6 p-0.5 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800/70" onClick={(e) => { e.stopPropagation(); handleDelete(entry.id); }} title="Delete">
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </div>
+                              {/* Edit/Delete buttons on hover */}
+                              <div className="absolute bottom-1 right-1 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto z-20">
+                                  <Button variant="ghost" size="icon" className="h-6 w-6 p-0.5 text-sky-700 dark:text-sky-300 hover:bg-sky-200 dark:hover:bg-sky-800/70" onClick={(e) => { e.stopPropagation(); openEditDialog(entry); }} title="Edit">
+                                      <Edit3 className="h-4 w-4" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6 p-0.5 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800/70" onClick={(e) => { e.stopPropagation(); handleDelete(entry.id); }} title="Delete">
+                                      <Trash2 className="h-4 w-4" />
+                                  </Button>
                               </div>
-                            );
-                          })}
-                  </div>
+                            </div>
+                          ))}
+                      </div>
+                    ))}
+                  </React.Fragment>
                 ))}
-              </React.Fragment>
-            ))}
-          </div>
-        </div>
+              </div>
+            </div>
           ) : (
             /* Timetable Table Display (Alternative View) */
             <div className={`${glassCardClasses} overflow-x-auto`}>

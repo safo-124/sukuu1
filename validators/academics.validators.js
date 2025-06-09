@@ -1,8 +1,10 @@
 // validators/academics.validators.js
 import { z } from 'zod';
 
+// Re-using schoolIdSchema for consistency.
 export const schoolIdSchema = z.string().min(1, "School ID is required.");
 
+// --- Academic Year Schemas ---
 const baseAcademicYearSchema = z.object({
   name: z.string().min(1).max(255),
   startDate: z.string().datetime(),
@@ -28,6 +30,7 @@ export const updateAcademicYearSchema = baseAcademicYearSchema.partial().refine(
 export const academicYearIdSchema = z.string().min(1);
 
 
+// --- Term Schemas ---
 const baseTermSchema = z.object({
   name: z.string().min(1).max(255),
   startDate: z.string().datetime(),
@@ -52,6 +55,7 @@ export const updateTermSchema = baseTermSchema.partial().refine(data => {
 export const termIdSchema = z.string().min(1);
 
 
+// --- Class Schemas ---
 export const createClassSchema = z.object({
   name: z.string().min(1).max(255),
   schoolLevelId: z.string().min(1),
@@ -67,6 +71,7 @@ export const updateClassSchema = createClassSchema.partial();
 export const classIdSchema = z.string().min(1);
 
 
+// --- School Level Schemas ---
 export const createSchoolLevelSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().nullable().optional(),
@@ -76,6 +81,7 @@ export const updateSchoolLevelSchema = createSchoolLevelSchema.partial();
 export const schoolLevelIdSchema = z.string().min(1);
 
 
+// --- Department Schemas ---
 export const createDepartmentSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().nullable().optional(),
@@ -85,6 +91,7 @@ export const updateDepartmentSchema = createDepartmentSchema.partial();
 export const departmentIdSchema = z.string().min(1);
 
 
+// --- Staff Attendance Schemas ---
 export const createStaffAttendanceSchema = z.object({
   staffId: z.string().min(1),
   date: z.string().datetime(),
@@ -96,6 +103,7 @@ export const updateStaffAttendanceSchema = createStaffAttendanceSchema.partial()
 export const staffAttendanceIdSchema = z.string().min(1);
 
 
+// --- Teacher/Staff Schemas ---
 export const createTeacherSchema = z.object({
   firstName: z.string().min(1).max(100),
   lastName: z.string().min(1).max(100),
@@ -125,6 +133,7 @@ export const updateTeacherSchema = z.object({
 export const teacherIdSchema = z.string().min(1);
 
 
+// --- Student Attendance Schemas ---
 export const createStudentAttendanceSchema = z.object({
   studentEnrollmentId: z.string().min(1),
   sectionId: z.string().min(1),
@@ -137,6 +146,7 @@ export const updateStudentAttendanceSchema = createStudentAttendanceSchema.parti
 export const studentAttendanceIdSchema = z.string().min(1);
 
 
+// --- Timetable Entry Schemas ---
 const baseTimetableEntrySchema = z.object({
   sectionId: z.string().min(1),
   subjectId: z.string().min(1),
@@ -162,6 +172,7 @@ export const updateTimetableEntrySchema = baseTimetableEntrySchema.partial();
 export const timetableEntryIdSchema = z.string().min(1);
 
 
+// --- School Profile Schemas ---
 export const updateSchoolProfileSchema = z.object({
   name: z.string().min(1).optional(),
   address: z.string().nullable().optional(),
@@ -179,4 +190,14 @@ export const updateSchoolProfileSchema = z.object({
 }, {
   message: "Timetable end time must be after start time.",
   path: ["timetableEndTime"],
+});
+
+// --- Timetable Suggestion Schema (NEW) ---
+export const generateTimetableSuggestionSchema = z.object({
+  sectionId: z.string().min(1, "Section is required."),
+  subjectId: z.string().min(1, "Subject is required."),
+  staffId: z.string().min(1, "Teacher is required."),
+  dayOfWeek: z.coerce.number().int().min(0).max(6, "Day of week must be 0 (Sunday) to 6 (Saturday)."),
+  durationMinutes: z.coerce.number().int().min(15, "Duration must be at least 15 minutes.").max(240, "Duration cannot exceed 4 hours (240 minutes)."), // Max 4 hours for a single slot suggestion
+  preferredRoomId: z.string().nullable().optional(),
 });
