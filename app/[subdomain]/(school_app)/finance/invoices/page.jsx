@@ -22,7 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   FilePlus2, Edit3, Trash2, DollarSign, Loader2, AlertTriangle, PlusCircle, User, Tags, Package, Scale, Eye, FileText, Printer
-} from 'lucide-react'; // Added Printer icon
+} from 'lucide-react';
 
 // Initial form data for Invoice
 const initialInvoiceFormData = {
@@ -36,6 +36,7 @@ const initialInvoiceFormData = {
   initialItemQuantity: 1,
   initialItemUnitPrice: '',
   initialItemFeeStructureId: '',
+  initialItemInventoryItemId: '', // NEW: For initial item inventory link
 };
 
 // Initial form data for Invoice Item
@@ -46,11 +47,13 @@ const initialInvoiceItemFormData = {
   quantity: 1,
   unitPrice: '',
   feeStructureId: '',
+  inventoryItemId: '', // NEW: For invoice item inventory link
 };
 
 
 // Reusable FormFields Component for Invoice (Main Dialog)
-const InvoiceFormFields = ({ formData, onFormChange, onSelectChange, studentsList, feeStructuresList, isLoadingDeps, isEdit = false }) => {
+// Added inventoryItemsList prop
+const InvoiceFormFields = ({ formData, onFormChange, onSelectChange, studentsList, feeStructuresList, inventoryItemsList, isLoadingDeps, isEdit = false }) => {
   const labelTextClasses = "text-black dark:text-white block text-sm font-medium mb-1 text-left";
   const inputTextClasses = "bg-white/50 dark:bg-zinc-800/50 text-black dark:text-white border-zinc-300 dark:border-zinc-700 focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-500 dark:focus:border-sky-500";
 
@@ -61,8 +64,34 @@ const InvoiceFormFields = ({ formData, onFormChange, onSelectChange, studentsLis
 
   const getFeeStructureName = useCallback((id) => {
     const fs = feeStructuresList.find(f => f.id === id);
-    return fs ? `${fs.name} ($${fs.amount})` : 'N/A';
+    return fs ? `${fs.name} ($${fs.amount.toFixed(2)})` : 'N/A';
   }, [feeStructuresList]);
+
+  const getInventoryItemDisplayName = useCallback((id) => {
+    const invItem = inventoryItemsList.find(item => item.id === id);
+    return invItem ? `${invItem.name} (Stock: ${invItem.quantityInStock})` : 'N/A';
+  }, [inventoryItemsList]);
+
+  // Handle auto-fill for initial item when Fee Structure or Inventory Item is selected
+  const handleInitialItemSelectChange = (name, value) => {
+    onSelectChange(name, value); // Update form data for the selected field
+
+    if (name === 'initialItemFeeStructureId' && value !== 'none' && value !== '') {
+      const selectedFeeStructure = feeStructuresList.find(fs => fs.id === value);
+      if (selectedFeeStructure) {
+        onFormChange({ target: { name: 'initialItemDescription', value: selectedFeeStructure.name } });
+        onFormChange({ target: { name: 'initialItemUnitPrice', value: selectedFeeStructure.amount.toString() } });
+        onSelectChange('initialItemInventoryItemId', ''); // Clear inventory item if fee structure selected
+      }
+    } else if (name === 'initialItemInventoryItemId' && value !== 'none' && value !== '') {
+      const selectedInventoryItem = inventoryItemsList.find(item => item.id === value);
+      if (selectedInventoryItem) {
+        onFormChange({ target: { name: 'initialItemDescription', value: selectedInventoryItem.name } });
+        onFormChange({ target: { name: 'initialItemUnitPrice', value: selectedInventoryItem.unitPrice?.toString() || '' } }); // Assuming inventory item has unitPrice
+        onSelectChange('initialItemFeeStructureId', ''); // Clear fee structure if inventory item selected
+      }
+    }
+  };
 
 
   return (
@@ -107,21 +136,24 @@ const InvoiceFormFields = ({ formData, onFormChange, onSelectChange, studentsLis
       {!isEdit && ( // Initial item section only for creation
         <>
           <div className="sm:col-span-2 border-t pt-4 mt-4 text-lg font-semibold text-zinc-800 dark:text-zinc-200">Initial Invoice Item</div>
+          {/* NEW: Inventory Item Selector for initial item */}
           <div>
-            <Label htmlFor="initialItemDescription" className={labelTextClasses}>Item Description <span className="text-red-500">*</span></Label>
-            <Input id="initialItemDescription" name="initialItemDescription" value={formData.initialItemDescription || ''} onChange={onFormChange} required className={`${inputTextClasses} mt-1`} placeholder="e.g., Annual Tuition Fee" />
+            <Label htmlFor="initialItemInventoryItemId" className={labelTextClasses}>Link to Inventory Item (Optional)</Label>
+            <Select name="initialItemInventoryItemId" value={formData.initialItemInventoryItemId || 'none'} onValueChange={(value) => handleInitialItemSelectChange('initialItemInventoryItemId', value === 'none' ? '' : value)} disabled={isLoadingDeps}>
+              <SelectTrigger className={`${inputTextClasses} mt-1`}> <SelectValue placeholder="Select inventory item" /> </SelectTrigger>
+              <SelectContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700">
+                <SelectItem value="none">No Inventory Item</SelectItem>
+                {!isLoadingDeps && (!Array.isArray(inventoryItemsList) || inventoryItemsList.length === 0) && <SelectItem value="no-inv-items" disabled>No inventory items available</SelectItem>}
+                {Array.isArray(inventoryItemsList) && inventoryItemsList.map(item => (
+                  <SelectItem key={item.id} value={item.id}>{getInventoryItemDisplayName(item.id)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <div>
-            <Label htmlFor="initialItemUnitPrice" className={labelTextClasses}>Unit Price <span className="text-red-500">*</span></Label>
-            <Input id="initialItemUnitPrice" name="initialItemUnitPrice" type="number" step="0.01" min="0" value={formData.initialItemUnitPrice || ''} onChange={onFormChange} required className={`${inputTextClasses} mt-1`} placeholder="e.g., 100.00" />
-          </div>
-          <div>
-            <Label htmlFor="initialItemQuantity" className={labelTextClasses}>Quantity <span className="text-red-500">*</span></Label>
-            <Input id="initialItemQuantity" name="initialItemQuantity" type="number" step="1" min="1" value={formData.initialItemQuantity || 1} onChange={onFormChange} required className={`${inputTextClasses} mt-1`} />
-          </div>
+          {/* Existing Fee Structure Selector for initial item */}
           <div>
             <Label htmlFor="initialItemFeeStructureId" className={labelTextClasses}>Link to Fee Structure (Optional)</Label>
-            <Select name="initialItemFeeStructureId" value={formData.initialItemFeeStructureId || 'none'} onValueChange={(value) => onSelectChange('initialItemFeeStructureId', value === 'none' ? '' : value)} disabled={isLoadingDeps}>
+            <Select name="initialItemFeeStructureId" value={formData.initialItemFeeStructureId || 'none'} onValueChange={(value) => handleInitialItemSelectChange('initialItemFeeStructureId', value === 'none' ? '' : value)} disabled={isLoadingDeps || (formData.initialItemInventoryItemId && formData.initialItemInventoryItemId !== 'none')}> {/* Disable if inventory item selected */}
               <SelectTrigger className={`${inputTextClasses} mt-1`}> <SelectValue placeholder="Select fee structure" /> </SelectTrigger>
               <SelectContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700">
                 <SelectItem value="none">No Fee Structure</SelectItem>
@@ -132,6 +164,19 @@ const InvoiceFormFields = ({ formData, onFormChange, onSelectChange, studentsLis
               </SelectContent>
             </Select>
           </div>
+          {/* Description and Unit Price for initial item - can be autofilled */}
+          <div>
+            <Label htmlFor="initialItemDescription" className={labelTextClasses}>Item Description <span className="text-red-500">*</span></Label>
+            <Input id="initialItemDescription" name="initialItemDescription" value={formData.initialItemDescription || ''} onChange={onFormChange} required={!formData.initialItemFeeStructureId && !formData.initialItemInventoryItemId} className={`${inputTextClasses} mt-1`} placeholder="e.g., Annual Tuition Fee" />
+          </div>
+          <div>
+            <Label htmlFor="initialItemQuantity" className={labelTextClasses}>Quantity <span className="text-red-500">*</span></Label>
+            <Input id="initialItemQuantity" name="initialItemQuantity" type="number" step="1" min="1" value={formData.initialItemQuantity || 1} onChange={onFormChange} required className={`${inputTextClasses} mt-1`} />
+          </div>
+          <div>
+            <Label htmlFor="initialItemUnitPrice" className={labelTextClasses}>Unit Price <span className="text-red-500">*</span></Label>
+            <Input id="initialItemUnitPrice" name="initialItemUnitPrice" type="number" step="0.01" min="0" value={formData.initialItemUnitPrice || ''} onChange={onFormChange} required={!formData.initialItemFeeStructureId && !formData.initialItemInventoryItemId} className={`${inputTextClasses} mt-1`} placeholder="e.g., 100.00" />
+          </div>
         </>
       )}
     </div>
@@ -139,20 +184,48 @@ const InvoiceFormFields = ({ formData, onFormChange, onSelectChange, studentsLis
 };
 
 // Reusable FormFields Component for Invoice Item (Nested Dialog)
-const InvoiceItemFormFields = ({ formData, onFormChange, onSelectChange, feeStructuresList, isLoadingDeps }) => {
+// Added inventoryItemsList prop
+const InvoiceItemFormFields = ({ formData, onFormChange, onSelectChange, feeStructuresList, inventoryItemsList, isLoadingDeps }) => {
   const labelTextClasses = "text-black dark:text-white block text-sm font-medium mb-1 text-left";
   const inputTextClasses = "bg-white/50 dark:bg-zinc-800/50 text-black dark:text-white border-zinc-300 dark:border-zinc-700 focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-500 dark:focus:border-sky-500";
 
   const getFeeStructureName = useCallback((id) => {
     const fs = feeStructuresList.find(f => f.id === id);
-    return fs ? `${fs.name} ($${fs.amount})` : 'N/A';
+    return fs ? `${fs.name} ($${fs.amount.toFixed(2)})` : 'N/A';
   }, [feeStructuresList]);
+
+  const getInventoryItemDisplayName = useCallback((id) => {
+    const invItem = inventoryItemsList.find(item => item.id === id);
+    return invItem ? `${invItem.name} (Stock: ${invItem.quantityInStock})` : 'N/A';
+  }, [inventoryItemsList]);
+
+  // Handle auto-fill for item when Fee Structure or Inventory Item is selected
+  const handleItemSelectChange = (name, value) => {
+    onSelectChange(name, value); // Update form data for the selected field
+
+    if (name === 'feeStructureId' && value !== 'none' && value !== '') {
+      const selectedFeeStructure = feeStructuresList.find(fs => fs.id === value);
+      if (selectedFeeStructure) {
+        onFormChange({ target: { name: 'description', value: selectedFeeStructure.name } });
+        onFormChange({ target: { name: 'unitPrice', value: selectedFeeStructure.amount.toString() } });
+        onSelectChange('inventoryItemId', ''); // Clear inventory item if fee structure selected
+      }
+    } else if (name === 'inventoryItemId' && value !== 'none' && value !== '') {
+      const selectedInventoryItem = inventoryItemsList.find(item => item.id === value);
+      if (selectedInventoryItem) {
+        onFormChange({ target: { name: 'description', value: selectedInventoryItem.name } });
+        onFormChange({ target: { name: 'unitPrice', value: selectedInventoryItem.unitPrice?.toString() || '' } }); // Assuming inventory item has unitPrice
+        onSelectChange('feeStructureId', ''); // Clear fee structure if inventory item selected
+      }
+    }
+  };
+
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
       <div className="sm:col-span-2">
         <Label htmlFor="itemDescription" className={labelTextClasses}>Description <span className="text-red-500">*</span></Label>
-        <Input id="itemDescription" name="description" value={formData.description || ''} onChange={onFormChange} required className={`${inputTextClasses} mt-1`} />
+        <Input id="itemDescription" name="description" value={formData.description || ''} onChange={onFormChange} required={!formData.feeStructureId && !formData.inventoryItemId} className={`${inputTextClasses} mt-1`} />
       </div>
       <div>
         <Label htmlFor="itemQuantity" className={labelTextClasses}>Quantity <span className="text-red-500">*</span></Label>
@@ -160,11 +233,26 @@ const InvoiceItemFormFields = ({ formData, onFormChange, onSelectChange, feeStru
       </div>
       <div>
         <Label htmlFor="itemUnitPrice" className={labelTextClasses}>Unit Price <span className="text-red-500">*</span></Label>
-        <Input id="itemUnitPrice" name="unitPrice" type="number" step="0.01" min="0" value={formData.unitPrice || ''} onChange={onFormChange} required className={`${inputTextClasses} mt-1`} />
+        <Input id="itemUnitPrice" name="unitPrice" type="number" step="0.01" min="0" value={formData.unitPrice || ''} onChange={onFormChange} required={!formData.feeStructureId && !formData.inventoryItemId} className={`${inputTextClasses} mt-1`} />
       </div>
-      <div className="sm:col-span-2">
-        <Label htmlFor="itemFeeStructureId" className={labelTextClasses}>Link to Fee Structure (Optional)</Label>
-        <Select name="feeStructureId" value={formData.feeStructureId || 'none'} onValueChange={(value) => onSelectChange('feeStructureId', value === 'none' ? '' : value)} disabled={isLoadingDeps}>
+      {/* NEW: Inventory Item Selector */}
+      <div>
+        <Label htmlFor="inventoryItemId" className={labelTextClasses}>Link to Inventory Item (Optional)</Label>
+        <Select name="inventoryItemId" value={formData.inventoryItemId || 'none'} onValueChange={(value) => handleItemSelectChange('inventoryItemId', value === 'none' ? '' : value)} disabled={isLoadingDeps || (formData.feeStructureId && formData.feeStructureId !== 'none')}> {/* Disable if fee structure selected */}
+          <SelectTrigger className={`${inputTextClasses} mt-1`}> <SelectValue placeholder="Select inventory item" /> </SelectTrigger>
+          <SelectContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700">
+            <SelectItem value="none">No Inventory Item</SelectItem>
+            {!isLoadingDeps && (!Array.isArray(inventoryItemsList) || inventoryItemsList.length === 0) && <SelectItem value="no-inv-items" disabled>No inventory items available</SelectItem>}
+            {Array.isArray(inventoryItemsList) && inventoryItemsList.map(item => (
+              <SelectItem key={item.id} value={item.id}>{getInventoryItemDisplayName(item.id)}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {/* Existing Fee Structure Selector */}
+      <div>
+        <Label htmlFor="feeStructureId" className={labelTextClasses}>Link to Fee Structure (Optional)</Label>
+        <Select name="feeStructureId" value={formData.feeStructureId || 'none'} onValueChange={(value) => handleItemSelectChange('feeStructureId', value === 'none' ? '' : value)} disabled={isLoadingDeps || (formData.inventoryItemId && formData.inventoryItemId !== 'none')}> {/* Disable if inventory item selected */}
           <SelectTrigger className={`${inputTextClasses} mt-1`}> <SelectValue placeholder="Select fee structure" /> </SelectTrigger>
           <SelectContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700">
             <SelectItem value="none">No Fee Structure</SelectItem>
@@ -187,6 +275,7 @@ export default function ManageInvoicesPage() {
   const [invoices, setInvoices] = useState([]);
   const [students, setStudents] = useState([]); // For student dropdown
   const [feeStructures, setFeeStructures] = useState([]); // For fee structure dropdown (initial item/invoice item)
+  const [inventoryItems, setInventoryItems] = useState([]); // NEW: For inventory item dropdown
 
   const [isLoading, setIsLoading] = useState(true); // For main table
   const [isLoadingDeps, setIsLoadingDeps] = useState(true); // For dropdowns
@@ -236,9 +325,10 @@ export default function ManageInvoicesPage() {
     let overallError = null;
 
     try {
-      const [studentsRes, feeStructuresRes] = await Promise.allSettled([
+      const [studentsRes, feeStructuresRes, inventoryItemsRes] = await Promise.allSettled([ // NEW: Fetch inventoryItems
         fetch(`/api/schools/${schoolData.id}/people/students`),
         fetch(`/api/schools/${schoolData.id}/finance/fee-structures`),
+        fetch(`/api/schools/${schoolData.id}/resources/inventory-items`),
       ]);
 
       // Process Students
@@ -260,6 +350,17 @@ export default function ManageInvoicesPage() {
         console.error("Fee Structures fetch failed:", errorData);
         overallError = overallError || new Error(errorData.error || 'Failed to fetch fee structures.');
       }
+
+      // NEW: Process Inventory Items
+      if (inventoryItemsRes.status === 'fulfilled' && inventoryItemsRes.value.ok) {
+        const inventoryItemsData = await inventoryItemsRes.value.json();
+        setInventoryItems(Array.isArray(inventoryItemsData.items) ? inventoryItemsData.items : []); // Assuming items is the key
+      } else {
+        const errorData = inventoryItemsRes.status === 'rejected' ? inventoryItemsRes.reason : await inventoryItemsRes.value.json().catch(() => ({}));
+        console.error("Inventory Items fetch failed:", errorData);
+        overallError = overallError || new Error(errorData.error || 'Failed to fetch inventory items.');
+      }
+
 
       if (overallError) {
         throw overallError;
@@ -326,12 +427,13 @@ export default function ManageInvoicesPage() {
     };
 
     // Only include initialItem if creating a new invoice and it's populated
-    if (!isEditing && (invoiceFormData.initialItemDescription || invoiceFormData.initialItemFeeStructureId)) {
+    if (!isEditing && (invoiceFormData.initialItemDescription || invoiceFormData.initialItemFeeStructureId || invoiceFormData.initialItemInventoryItemId)) { // Check new field
       payload.initialItem = {
         description: invoiceFormData.initialItemDescription,
         quantity: parseInt(invoiceFormData.initialItemQuantity, 10),
         unitPrice: parseFloat(invoiceFormData.initialItemUnitPrice),
         feeStructureId: invoiceFormData.initialItemFeeStructureId || null,
+        inventoryItemId: invoiceFormData.initialItemInventoryItemId || null, // NEW: Include in payload
       };
     }
 
@@ -396,6 +498,7 @@ export default function ManageInvoicesPage() {
       quantity: parseInt(invoiceItemFormData.quantity, 10),
       unitPrice: parseFloat(invoiceItemFormData.unitPrice),
       feeStructureId: invoiceItemFormData.feeStructureId || null,
+      inventoryItemId: invoiceItemFormData.inventoryItemId || null, // NEW: Include in payload
     };
 
     try {
@@ -430,6 +533,7 @@ export default function ManageInvoicesPage() {
       quantity: item.quantity,
       unitPrice: item.unitPrice,
       feeStructureId: item.feeStructureId || '',
+      inventoryItemId: item.inventoryItemId || '', // NEW: Populate from existing data
     });
   };
 
@@ -443,6 +547,7 @@ export default function ManageInvoicesPage() {
       quantity: parseInt(invoiceItemFormData.quantity, 10),
       unitPrice: parseFloat(invoiceItemFormData.unitPrice),
       feeStructureId: invoiceItemFormData.feeStructureId || null,
+      inventoryItemId: invoiceItemFormData.inventoryItemId || null, // NEW: Include in payload
     };
 
     try {
@@ -504,9 +609,14 @@ export default function ManageInvoicesPage() {
 
   const getFeeStructureName = useCallback((id) => {
     const fs = feeStructures.find(f => f.id === id);
-    // FIX: Corrected template literal syntax for consistency
-    return fs ? `${fs.name} ($${fs.amount})` : 'N/A';
+    return fs ? `${fs.name} ($${fs.amount.toFixed(2)})` : 'N/A';
   }, [feeStructures]);
+
+  // NEW: Helper for Inventory Item Name
+  const getInventoryItemNameDisplay = useCallback((id) => {
+    const invItem = inventoryItems.find(item => item.id === id);
+    return invItem ? `${invItem.name} (Stock: ${invItem.quantityInStock})` : 'N/A';
+  }, [inventoryItems]);
 
   const getInvoiceStatusBadge = (status) => {
     let className = "px-2 py-1 rounded-full text-xs font-semibold";
@@ -550,6 +660,7 @@ export default function ManageInvoicesPage() {
                 onSelectChange={handleInvoiceSelectChange}
                 studentsList={students}
                 feeStructuresList={feeStructures}
+                inventoryItemsList={inventoryItems} // NEW: Pass inventoryItemsList
                 isLoadingDeps={isLoadingDeps}
                 isEdit={!!editingInvoice}
               />
@@ -649,6 +760,7 @@ export default function ManageInvoicesPage() {
                 onFormChange={handleInvoiceItemFormChange}
                 onSelectChange={handleInvoiceItemSelectChange}
                 feeStructuresList={feeStructures}
+                inventoryItemsList={inventoryItems} // NEW: Pass inventoryItemsList
                 isLoadingDeps={isLoadingDeps}
               />
               {itemFormError && ( <p className="text-sm text-red-600 dark:text-red-400 md:col-span-full">{itemFormError}</p> )}
@@ -676,12 +788,13 @@ export default function ManageInvoicesPage() {
                     <TableHead className={`${titleTextClasses} font-semibold text-right`}>Qty</TableHead>
                     <TableHead className={`${titleTextClasses} font-semibold text-right`}>Unit Price</TableHead>
                     <TableHead className={`${titleTextClasses} font-semibold text-right`}>Total</TableHead>
+                    <TableHead className={`${titleTextClasses} font-semibold text-center`}>Source</TableHead> {/* NEW Column */}
                     <TableHead className={`text-right ${titleTextClasses} font-semibold`}>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {viewingInvoiceItems?.items?.length === 0 ? (
-                    <TableRow><TableCell colSpan="5" className="text-center text-zinc-500 py-4">No items added to this invoice yet.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan="6" className="text-center text-zinc-500 py-4">No items added to this invoice yet.</TableCell></TableRow>
                   ) : (
                     viewingInvoiceItems?.items?.map(item => (
                       <TableRow key={item.id}>
@@ -689,6 +802,11 @@ export default function ManageInvoicesPage() {
                         <TableCell className={`${descriptionTextClasses} text-right`}>{item.quantity}</TableCell>
                         <TableCell className={`${descriptionTextClasses} text-right`}>${item.unitPrice.toFixed(2)}</TableCell>
                         <TableCell className={`${descriptionTextClasses} text-right`}>${item.totalPrice.toFixed(2)}</TableCell>
+                        <TableCell className={`${descriptionTextClasses} text-center`}>
+                          {item.feeStructureId ? <Tags className="h-4 w-4 inline-block mr-1 text-sky-600" title="From Fee Structure" /> : ''}
+                          {item.inventoryItemId ? <Package className="h-4 w-4 inline-block mr-1 text-purple-600" title="From Inventory" /> : ''}
+                          {/* If neither, it's a custom item */}
+                        </TableCell> {/* NEW Cell */}
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
                             <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleEditItem(item)} title="Edit Item"><Edit3 className="h-4 w-4" /></Button>

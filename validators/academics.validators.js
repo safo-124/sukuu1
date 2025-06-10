@@ -55,8 +55,8 @@ export const updateTermSchema = baseTermSchema.partial().refine(data => {
 export const termIdSchema = z.string().min(1);
 
 
-// --- Class Schemas ---
-export const createClassSchema = z.object({
+// --- Class Schemas (ENSURE 'export' is present) ---
+export const classSchema = z.object({ // Make sure 'export' is here
   name: z.string().min(1).max(255),
   schoolLevelId: z.string().min(1),
   academicYearId: z.string().min(1),
@@ -67,7 +67,7 @@ export const createClassSchema = z.object({
   })).optional(),
 });
 
-export const updateClassSchema = createClassSchema.partial();
+export const updateClassSchema = classSchema.partial(); // Ensure this uses 'classSchema'
 export const classIdSchema = z.string().min(1);
 
 
@@ -192,12 +192,12 @@ export const updateSchoolProfileSchema = z.object({
   path: ["timetableEndTime"],
 });
 
-// --- Timetable Suggestion Schema (NEW) ---
+// --- Timetable Suggestion Schema ---
 export const generateTimetableSuggestionSchema = z.object({
-  sectionId: z.string().min(1, "Section is required."),
-  subjectId: z.string().min(1, "Subject is required."),
-  staffId: z.string().min(1, "Teacher is required."),
-  dayOfWeek: z.coerce.number().int().min(0).max(6, "Day of week must be 0 (Sunday) to 6 (Saturday)."),
-  durationMinutes: z.coerce.number().int().min(15, "Duration must be at least 15 minutes.").max(240, "Duration cannot exceed 4 hours (240 minutes)."), // Max 4 hours for a single slot suggestion
+  sectionId: z.string().min(1).optional(),
+  subjectId: z.string().min(1).optional(),
+  staffId: z.string().min(1).optional(),
+  dayOfWeek: z.coerce.number().int().min(0).max(6).optional(),
+  durationMinutes: z.coerce.number().int().min(15).max(240),
   preferredRoomId: z.string().nullable().optional(),
 });

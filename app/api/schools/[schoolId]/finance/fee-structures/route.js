@@ -20,7 +20,7 @@ export async function GET(request, { params }) {
   const { searchParams } = new URL(request.url);
   const academicYearIdFilter = searchParams.get('academicYearId');
   const classIdFilter = searchParams.get('classId');
-  const schoolLevelIdFilter = searchParams.get('schoolLevelId'); // NEW: Filter by schoolLevelId
+  const schoolLevelIdFilter = searchParams.get('schoolLevelId');
 
   try {
     schoolIdSchema.parse(schoolId);
@@ -29,7 +29,7 @@ export async function GET(request, { params }) {
       schoolId: schoolId,
       ...(academicYearIdFilter && { academicYearId: academicYearIdFilter }),
       ...(classIdFilter && { classId: classIdFilter }),
-      ...(schoolLevelIdFilter && { schoolLevelId: schoolLevelIdFilter }), // NEW: Add to where clause
+      ...(schoolLevelIdFilter && { schoolLevelId: schoolLevelIdFilter }),
     };
 
     const feeStructures = await prisma.feeStructure.findMany({
@@ -37,7 +37,7 @@ export async function GET(request, { params }) {
       include: {
         academicYear: { select: { id: true, name: true } },
         class: { select: { id: true, name: true } },
-        schoolLevel: { select: { id: true, name: true } }, // NEW: Include schoolLevel
+        schoolLevel: { select: { id: true, name: true } }, // Include schoolLevel
       },
       orderBy: [
         { academicYear: { startDate: 'desc' } },
@@ -84,18 +84,18 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: 'Invalid input.', issues: validation.error.issues }, { status: 400 });
     }
 
-    const { name, description, amount, frequency, academicYearId, classId, schoolLevelId } = validation.data; // NEW: destructure schoolLevelId
+    const { name, description, amount, frequency, academicYearId, classId, schoolLevelId } = validation.data;
 
     // Validate linked entities belong to the school
-    const [academicYear, _class, _schoolLevel] = await Promise.all([ // NEW: include _schoolLevel
+    const [academicYear, _class, _schoolLevel] = await Promise.all([
       prisma.academicYear.findUnique({ where: { id: academicYearId, schoolId: schoolId } }),
       classId ? prisma.class.findUnique({ where: { id: classId, schoolId: schoolId } }) : Promise.resolve(null),
-      schoolLevelId ? prisma.schoolLevel.findUnique({ where: { id: schoolLevelId, schoolId: schoolId } }) : Promise.resolve(null), // NEW: Validate schoolLevel
+      schoolLevelId ? prisma.schoolLevel.findUnique({ where: { id: schoolLevelId, schoolId: schoolId } }) : Promise.resolve(null),
     ]);
 
     if (!academicYear) return NextResponse.json({ error: 'Academic Year not found or does not belong to this school.' }, { status: 400 });
     if (classId && !_class) return NextResponse.json({ error: 'Class not found or does not belong to this school.' }, { status: 400 });
-    if (schoolLevelId && !_schoolLevel) return NextResponse.json({ error: 'School Level not found or does not belong to this school.' }, { status: 400 }); // NEW: error for schoolLevel
+    if (schoolLevelId && !_schoolLevel) return NextResponse.json({ error: 'School Level not found or does not belong to this school.' }, { status: 400 });
 
 
     const newFeeStructure = await prisma.feeStructure.create({
@@ -106,7 +106,7 @@ export async function POST(request, { params }) {
         frequency,
         academicYearId,
         classId: classId || null,
-        schoolLevelId: schoolLevelId || null, // NEW: Include in data
+        schoolLevelId: schoolLevelId || null,
         schoolId: schoolId,
       },
     });
@@ -125,10 +125,9 @@ export async function POST(request, { params }) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Validation Error', issues: error.issues }, { status: 400 });
     }
-    // Handle unique constraint violation (P2002) for name, academicYearId, classId, schoolLevelId (NEW)
+    // Handle unique constraint violation (P2002) for name, academicYearId, classId, schoolLevelId
     if (error.code === 'P2002') {
       const targetField = error.meta?.target ? (Array.isArray(error.meta.target) ? error.meta.target.join(', ') : error.meta.target) : 'unknown field(s)';
-      // Updated message to reflect the new unique constraint on schoolLevelId
       if (targetField.includes('name') && targetField.includes('academicYearId') && (targetField.includes('classId') || targetField.includes('schoolLevelId'))) {
         return NextResponse.json({ error: 'A fee structure with this name already exists for this academic year, class, and/or school level combination.' }, { status: 409 });
       }

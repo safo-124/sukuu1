@@ -5,7 +5,7 @@ import { classSchema, schoolIdSchema } from '@/validators/academics.validators';
 import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { z } from 'zod'; // Ensure Zod is imported
+import { z } from 'zod';
 
 // GET handler to list all classes for a specific school
 export async function GET(request, { params }) {
@@ -26,7 +26,7 @@ export async function GET(request, { params }) {
   const skip = (page - 1) * limit;
 
   try {
-    schoolIdSchema.parse(schoolId); // Validate schoolId from path
+    schoolIdSchema.parse(schoolId);
 
     const whereClause = {
       schoolId: schoolId,
@@ -78,7 +78,14 @@ export async function GET(request, { params }) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Validation Error', issues: error.issues }, { status: 400 });
     }
-    console.error(`API (GET Classes) - Error for school ${schoolId}:`, error);
+    console.error(`API (GET Classes) - Error for school ${schoolId}:`, {
+      message: error.message,
+      name: error.name,
+      code: error.code,
+      clientVersion: error.clientVersion,
+      meta: error.meta,
+      stack: error.stack,
+    });
     return NextResponse.json({ error: 'Failed to fetch classes.' }, { status: 500 });
   }
 }
@@ -94,7 +101,7 @@ export async function POST(request, { params }) {
 
   try {
     const body = await request.json();
-    schoolIdSchema.parse(schoolId); // Validate schoolId from path
+    schoolIdSchema.parse(schoolId);
 
     // FIX: Ensure classSchema is correctly used here
     // Add defensive check to ensure classSchema is a function before calling safeParse
@@ -164,16 +171,14 @@ export async function POST(request, { params }) {
     return NextResponse.json({ success: true, class: newClassWithSections }, { status: 201 });
 
   } catch (error) {
-    // --- ENHANCED ERROR LOGGING START ---
     console.error(`API (POST Class) - Detailed error for school ${schoolId}:`, {
       message: error.message,
       name: error.name,
-      code: error.code, // Prisma error code (e.g., P2002, P2003)
-      clientVersion: error.clientVersion, // Prisma client version
-      meta: error.meta, // Prisma error metadata (e.g., target field, column)
+      code: error.code,
+      clientVersion: error.clientVersion,
+      meta: error.meta,
       stack: error.stack,
     });
-    // --- ENHANCED ERROR LOGGING END ---
 
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Validation Error', issues: error.issues }, { status: 400 });
@@ -194,7 +199,11 @@ export async function POST(request, { params }) {
       const targetField = error.meta?.target ? (Array.isArray(error.meta.target) ? error.meta.target.join(', ') : error.meta.target) : 'unknown field(s)';
       return NextResponse.json({ error: `A class or section with conflicting unique data already exists. Conflict on: ${targetField}.` }, { status: 409 });
     }
-    // Generic server error for any other unhandled exceptions
+    // Handle foreign key constraint error (P2003)
+    if (error.code === 'P2003') {
+        const field = error.meta?.field_name || 'a related record';
+        return NextResponse.json({ error: `Invalid ${field} provided. Ensure it exists and belongs to this school.` }, { status: 400 });
+    }
     return NextResponse.json({ error: 'Failed to create class.', details: error.message || 'An unexpected server error occurred.' }, { status: 500 });
   }
 }

@@ -9,7 +9,7 @@ import { schoolIdSchema, createAcademicYearSchema } from '@/validators/academics
 // GET /api/schools/[schoolId]/academic-years
 // Fetches all academic years for a specific school
 export async function GET(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId } = params; // This is the line generating the Next.js warning
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'TEACHER')) {
@@ -36,8 +36,17 @@ export async function GET(request, { params }) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Validation Error', issues: error.issues }, { status: 400 });
     }
-    console.error(`Error fetching academic years for school ${schoolId}:`, error);
-    return NextResponse.json({ error: 'Failed to retrieve academic years.' }, { status: 500 });
+    // --- ENHANCED ERROR LOGGING START ---
+    console.error(`API (GET AcademicYears) - Detailed error for school ${schoolId}:`, {
+      message: error.message,
+      name: error.name,
+      code: error.code, // Prisma error code (e.g., P2002, P2003)
+      clientVersion: error.clientVersion, // Prisma client version
+      meta: error.meta, // Prisma error metadata (e.g., target field, column)
+      stack: error.stack,
+    });
+    // --- ENHANCED ERROR LOGGING END ---
+    return NextResponse.json({ error: 'Failed to retrieve academic years.', details: error.message || 'An unexpected server error occurred.' }, { status: 500 });
   }
 }
 
@@ -85,14 +94,26 @@ export async function POST(request, { params }) {
 
     return NextResponse.json({ academicYear: newAcademicYear, message: 'Academic year created successfully.' }, { status: 201 });
   } catch (error) {
+    console.error(`API (POST AcademicYear) - Detailed error for school ${schoolId}:`, {
+      message: error.message,
+      name: error.name,
+      code: error.code,
+      clientVersion: error.clientVersion,
+      meta: error.meta,
+      stack: error.stack,
+    });
+
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Validation Error', issues: error.issues }, { status: 400 });
     }
     // Handle unique constraint violation for @@unique([schoolId, name])
     if (error.code === 'P2002') {
-      return NextResponse.json({ error: 'An academic year with this name already exists for this school.' }, { status: 409 });
+      const targetField = error.meta?.target ? (Array.isArray(error.meta.target) ? error.meta.target.join(', ') : error.meta.target) : 'unknown field(s)';
+      if (targetField.includes('name')) {
+        return NextResponse.json({ error: 'An academic year with this name already exists for this school.' }, { status: 409 });
+      }
+      return NextResponse.json({ error: `A unique constraint was violated. Conflict on: ${targetField}.` }, { status: 409 });
     }
-    console.error(`Error creating academic year for school ${schoolId}:`, error);
-    return NextResponse.json({ error: 'Failed to create academic year.' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to create academic year.', details: error.message || 'An unexpected server error occurred.' }, { status: 500 });
   }
 }

@@ -21,7 +21,7 @@ export const createFeeStructureSchema = z.object({
 export const updateFeeStructureSchema = createFeeStructureSchema.partial();
 export const feeStructureIdSchema = z.string().min(1, "Fee Structure ID is required.");
 
-// --- Invoice Schemas (FIXED) ---
+// --- Invoice Schemas ---
 // Define the base shape of the invoice fields
 const baseInvoiceShape = {
   studentId: z.string().min(1, "Student is required."),
@@ -36,9 +36,13 @@ const initialInvoiceItemSchemaForCreate = z.object({
   quantity: z.coerce.number().int().min(1, "Quantity must be at least 1.").default(1),
   unitPrice: z.coerce.number().min(0, "Unit price cannot be negative."),
   feeStructureId: z.string().nullable().optional(),
+  inventoryItemId: z.string().nullable().optional(),
+}).refine(data => {
+  // If an inventory item is selected, description and unitPrice might be derived/validated against it.
+  return true;
 });
 
-// Schema for creating an Invoice
+
 export const createInvoiceSchema = z.object(baseInvoiceShape).extend({
   initialItem: initialInvoiceItemSchemaForCreate.optional(),
 }).refine(data => new Date(data.dueDate) >= new Date(data.issueDate), {
@@ -66,13 +70,34 @@ export const updateInvoiceSchema = z.object(baseInvoiceShape).partial().extend({
 export const invoiceIdSchema = z.string().min(1, "Invoice ID is required.");
 
 
-// --- Invoice Item Schemas ---
-export const createInvoiceItemSchema = z.object({
+// --- Invoice Item Schemas (FIXED) ---
+// Define the base shape for Invoice Item
+const baseInvoiceItemShape = {
   description: z.string().min(1, "Item description is required.").max(255, "Description is too long."),
   quantity: z.coerce.number().int().min(1, "Quantity must be at least 1.").default(1),
   unitPrice: z.coerce.number().min(0, "Unit price cannot be negative."),
   feeStructureId: z.string().nullable().optional(),
+  inventoryItemId: z.string().nullable().optional(),
+};
+
+// Schema for creating an Invoice Item
+export const createInvoiceItemSchema = z.object(baseInvoiceItemShape).refine(data => {
+  // If inventoryItemId is provided, description and unitPrice might be derived/validated against it.
+  if (data.inventoryItemId && (!data.description || data.unitPrice === undefined)) {
+    // This part of the refine needs the full inventory item data, which is only available at API level.
+    // For schema level, we mostly check basic types.
+  }
+  return true;
 });
 
-export const updateInvoiceItemSchema = createInvoiceItemSchema.partial();
+// Schema for updating an Invoice Item
+// Apply .partial() to the base shape, then apply refine (if needed)
+export const updateInvoiceItemSchema = z.object(baseInvoiceItemShape).partial().refine(data => {
+  // If inventoryItemId is provided, description and unitPrice might be derived/validated against it.
+  if (data.inventoryItemId && (data.description === '' || data.unitPrice === undefined)) {
+    // This validation is better done at API level after fetching inventory item details.
+  }
+  return true;
+});
+
 export const invoiceItemIdSchema = z.string().min(1, "Invoice Item ID is required.");

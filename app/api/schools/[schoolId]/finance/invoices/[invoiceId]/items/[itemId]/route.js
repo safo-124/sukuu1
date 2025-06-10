@@ -33,7 +33,8 @@ export async function GET(request, { params }) {
     const invoiceItem = await prisma.invoiceItem.findUnique({
       where: { id: itemId, invoiceId: invoiceId, schoolId: schoolId }, // Filter by all three for security
       include: {
-        feeStructure: { select: { id: true, name: true, amount: true } }
+        feeStructure: { select: { id: true, name: true, amount: true } },
+        inventoryItem: { select: { id: true, name: true, quantityInStock: true, unitPrice: true } }
       }
     });
 
@@ -68,8 +69,8 @@ export async function GET(request, { params }) {
   }
 }
 
-// PUT /api/schools/[schoolId]/finance/invoices/[invoiceId]/items/[itemId]
-// Updates an existing invoice item and adjusts parent invoice's total amount
+// PUT /api/schools/[schoolId]/finance/invoices/[invoiceId]/items/[itemId]/route.js
+// Updates an existing invoice item and adjusts parent invoice's total amount and inventory stock
 export async function PUT(request, { params }) {
   const { schoolId, invoiceId, itemId } = params;
   const session = await getServerSession(authOptions);
@@ -90,7 +91,7 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: 'Invalid input.', issues: validation.error.issues }, { status: 400 });
     }
 
-    const { description, quantity, unitPrice, feeStructureId } = validation.data;
+    const { description, quantity, unitPrice, feeStructureId, inventoryItemId } = validation.data;
 
     const updatedItem = await prisma.$transaction(async (tx) => {
       // 1. Verify parent invoice and existing item
@@ -112,31 +113,75 @@ export async function PUT(request, { params }) {
         throw new Error(`Cannot modify items on an invoice with status ${invoice.status}.`);
       }
 
-      // 2. Calculate old and new item totals
+      // 2. Calculate old and new item totals and handle inventory stock adjustment
       const oldItemTotalPrice = existingItem.totalPrice;
-      const newItemQuantity = quantity ?? existingItem.quantity;
-      const newItemUnitPrice = unitPrice ?? existingItem.unitPrice;
+      const oldQuantity = existingItem.quantity;
+      const oldInventoryItemId = existingItem.inventoryItemId;
+
+      const newItemQuantity = quantity ?? oldQuantity; // Use new quantity if provided, else old
+      const newItemUnitPrice = unitPrice ?? existingItem.unitPrice; // Use new unit price if provided, else old
       let newFeeStructureId = feeStructureId !== undefined ? (feeStructureId || null) : existingItem.feeStructureId;
+      let newInventoryItemId = inventoryItemId !== undefined ? (inventoryItemId || null) : oldInventoryItemId;
 
       // Validate new feeStructureId if provided
       if (newFeeStructureId) {
         const feeStructureExists = await tx.feeStructure.findUnique({
           where: { id: newFeeStructureId, schoolId: schoolId },
         });
-        if (!feeStructureExists) {
-          throw new Error('Provided fee structure for item does not exist or does not belong to this school.');
-        }
+        if (!feeStructureExists) { throw new Error('Provided fee structure for item does not exist or does not belong to this school.'); }
+      }
+
+      // Validate new inventoryItemId if provided/changed
+      let newInventoryItem = null;
+      if (newInventoryItemId) {
+          newInventoryItem = await tx.inventoryItem.findUnique({
+              where: { id: newInventoryItemId, schoolId: schoolId }
+          });
+          if (!newInventoryItem) { throw new Error('Provided inventory item does not exist or does not belong to this school.'); }
       }
 
       const newItemTotalPrice = newItemQuantity * newItemUnitPrice;
 
-      // 3. Update the Invoice Item itself
+      // Adjust stock:
+      // Case 1: Inventory item is removed or changed
+      if (oldInventoryItemId && oldInventoryItemId !== newInventoryItemId) {
+          // Return old quantity to old inventory item
+          await tx.inventoryItem.update({
+              where: { id: oldInventoryItemId },
+              data: { quantityInStock: { increment: oldQuantity } }
+          });
+      }
+      // Case 2: Inventory item is added or changed to a new one
+      if (newInventoryItemId && oldInventoryItemId !== newInventoryItemId) {
+          // Decrement new inventory item stock
+          if (newInventoryItem.quantityInStock < newItemQuantity) {
+              throw new Error(`Insufficient stock for ${newInventoryItem.name}. Available: ${newInventoryItem.quantityInStock}, Requested: ${newItemQuantity}.`);
+          }
+          await tx.inventoryItem.update({
+              where: { id: newInventoryItemId },
+              data: { quantityInStock: { decrement: newItemQuantity } }
+          });
+      }
+      // Case 3: Same Inventory item, only quantity changed
+      else if (oldInventoryItemId && oldInventoryItemId === newInventoryItemId && newItemQuantity !== oldQuantity) {
+          const quantityDifference = newItemQuantity - oldQuantity;
+          if (quantityDifference > 0 && newInventoryItem.quantityInStock < quantityDifference) {
+              throw new Error(`Insufficient stock for ${newInventoryItem.name}. Need ${quantityDifference} more, available: ${newInventoryItem.quantityInStock}.`);
+          }
+          await tx.inventoryItem.update({
+              where: { id: oldInventoryItemId },
+              data: { quantityInStock: { decrement: quantityDifference } } // Decrement if positive, increment if negative
+          });
+      }
+
+      // 3. Update the Invoice Item record itself
       const itemUpdateData = {
           description: description ?? existingItem.description,
           quantity: newItemQuantity,
           unitPrice: newItemUnitPrice,
           totalPrice: newItemTotalPrice,
           feeStructureId: newFeeStructureId,
+          inventoryItemId: newInventoryItemId,
       };
 
       const updatedItemRecord = await tx.invoiceItem.update({
@@ -150,19 +195,18 @@ export async function PUT(request, { params }) {
         where: { id: invoiceId },
         data: {
           totalAmount: invoice.totalAmount + totalAmountDifference,
-          // Re-evaluate status if needed, e.g., if totalAmount becomes 0, change to DRAFT
-          // status: (invoice.totalAmount + totalAmountDifference) === 0 ? 'DRAFT' : invoice.status
         },
       });
 
       return updatedItemRecord;
     });
 
-    // Fetch the updated item with its fee structure for response
+    // Fetch the updated item with its fee structure and inventory item for response
     const fetchedUpdatedItem = await prisma.invoiceItem.findUnique({
         where: { id: updatedItem.id },
         include: {
-            feeStructure: { select: { id: true, name: true } }
+            feeStructure: { select: { id: true, name: true } },
+            inventoryItem: { select: { id: true, name: true, quantityInStock: true } }
         }
     });
 
@@ -181,7 +225,7 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: 'Validation Error', issues: error.issues }, { status: 400 });
     }
     // Handle specific errors thrown manually
-    if (error.message.includes('Invoice not found') || error.message.includes('Invoice item not found') || error.message.includes('Fee structure not found') || error.message.includes('Cannot modify items')) {
+    if (error.message.includes('Invoice not found') || error.message.includes('item not found') || error.message.includes('Fee structure not found') || error.message.includes('Inventory item not found') || error.message.includes('Insufficient stock') || error.message.includes('Cannot modify items')) {
         return NextResponse.json({ error: error.message }, { status: 400 });
     }
     // Handle unique constraint violations
@@ -199,7 +243,7 @@ export async function PUT(request, { params }) {
 }
 
 // DELETE /api/schools/[schoolId]/finance/invoices/[invoiceId]/items/[itemId]/route.js
-// Deletes an invoice item and adjusts parent invoice's total amount
+// Deletes an invoice item and adjusts parent invoice's total amount and returns stock to InventoryItem
 export async function DELETE(request, { params }) {
   const { schoolId, invoiceId, itemId } = params;
   const session = await getServerSession(authOptions);
@@ -233,17 +277,25 @@ export async function DELETE(request, { params }) {
         throw new Error(`Cannot delete items from an invoice with status ${invoice.status}.`);
       }
 
-      // 2. Delete the Invoice Item
+      // 2. Increment InventoryItem stock if linked
+      if (existingItem.inventoryItemId) {
+        await tx.inventoryItem.update({
+          where: { id: existingItem.inventoryItemId },
+          data: { quantityInStock: { increment: existingItem.quantity } }, // Return quantity to stock
+        });
+      }
+
+      // 3. Delete the Invoice Item
       const deletedItemRecord = await tx.invoiceItem.delete({
         where: { id: itemId },
       });
 
-      // 3. Update the parent Invoice's totalAmount
+      // 4. Update the parent Invoice's totalAmount
       await tx.invoice.update({
         where: { id: invoiceId },
         data: {
           totalAmount: invoice.totalAmount - deletedItemRecord.totalPrice,
-          // Re-evaluate status if needed, e.g., if totalAmount becomes 0, change to DRAFT
+          // Re-evaluate status if needed, e.g., if totalAmount becomes 0
         },
       });
 
