@@ -250,6 +250,7 @@ model SchoolLevel {
   staffLevelAssignments StaffLevelAssignment[] // Staff assigned to this level
   staffSubjectLevels    StaffSubjectLevel[]    @relation("LevelSubjectsTaught") // Subjects taught at this level by staff
   subjectLinks          SubjectSchoolLevel[] // Subjects that exist at this level
+  feeStructures       FeeStructure[]        @relation("LevelFeeStructures") 
 
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
@@ -863,10 +864,16 @@ model FeeStructure {
   schoolId       String
   school         School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   invoiceItems   InvoiceItem[]
+  schoolLevelId  String?        // NEW: Link to SchoolLevel for general fees
+  schoolLevel    SchoolLevel?   @relation("LevelFeeStructures", fields: [schoolLevelId], references: [id], onDelete: SetNull) // NEW RELATION
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  @@unique([schoolId, name, academicYearId, classId])
+  @@unique([schoolId, name, academicYearId, classId, schoolLevelId]) // UPDATED unique constraint
+  @@index([schoolId])
+  @@index([academicYearId])
+  @@index([classId])
+  @@index([schoolLevelId])
 }
 
 model Invoice {
