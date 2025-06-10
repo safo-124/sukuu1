@@ -21,28 +21,35 @@ export const createFeeStructureSchema = z.object({
 export const updateFeeStructureSchema = createFeeStructureSchema.partial();
 export const feeStructureIdSchema = z.string().min(1, "Fee Structure ID is required.");
 
-// --- Invoice Schemas (NEW) ---
-export const createInvoiceSchema = z.object({
+// --- Invoice Schemas (FIXED) ---
+// Define the base shape of the invoice fields
+const baseInvoiceShape = {
   studentId: z.string().min(1, "Student is required."),
-  issueDate: z.string().datetime("Issue date must be a valid date and time string (ISO 8601).").optional().default(new Date().toISOString()),
+  issueDate: z.string().datetime("Issue date must be a valid date and time string (ISO 8601)."),
   dueDate: z.string().datetime("Due date must be a valid date and time string (ISO 8601)."),
   notes: z.string().nullable().optional(),
-  // totalAmount, paidAmount, status are managed by backend logic or cascade from items/payments
+};
 
-  // For initial invoice creation, we'll allow an optional initial item
-  initialItem: z.object({
-    description: z.string().min(1, "Item description is required.").max(255, "Description is too long."),
-    quantity: z.coerce.number().int().min(1, "Quantity must be at least 1.").default(1),
-    unitPrice: z.coerce.number().min(0, "Unit price cannot be negative."),
-    feeStructureId: z.string().nullable().optional(), // Link to an existing fee structure if applicable
-  }).optional(),
+// Define a schema for the initial item that can be included in createInvoiceSchema
+const initialInvoiceItemSchemaForCreate = z.object({
+  description: z.string().min(1, "Item description is required.").max(255, "Description is too long."),
+  quantity: z.coerce.number().int().min(1, "Quantity must be at least 1.").default(1),
+  unitPrice: z.coerce.number().min(0, "Unit price cannot be negative."),
+  feeStructureId: z.string().nullable().optional(),
+});
+
+// Schema for creating an Invoice
+export const createInvoiceSchema = z.object(baseInvoiceShape).extend({
+  initialItem: initialInvoiceItemSchemaForCreate.optional(),
 }).refine(data => new Date(data.dueDate) >= new Date(data.issueDate), {
   message: "Due date must be on or after issue date.",
   path: ["dueDate"],
 });
 
-export const updateInvoiceSchema = createInvoiceSchema.partial().extend({
-  invoiceNumber: z.string().min(1, "Invoice number is required.").optional(), // Can be updated manually sometimes
+// Schema for updating an Invoice
+// Apply .partial() to the base shape, then extend and refine
+export const updateInvoiceSchema = z.object(baseInvoiceShape).partial().extend({
+  invoiceNumber: z.string().min(1, "Invoice number is required.").optional(),
   totalAmount: z.coerce.number().min(0).optional(),
   paidAmount: z.coerce.number().min(0).optional(),
   status: z.enum(["DRAFT", "SENT", "PAID", "PARTIALLY_PAID", "OVERDUE", "VOID", "CANCELLED"]).optional(),
@@ -55,16 +62,16 @@ export const updateInvoiceSchema = createInvoiceSchema.partial().extend({
   message: "Due date must be on or after issue date when both are provided.",
   path: ["dueDate"],
 });
+
 export const invoiceIdSchema = z.string().min(1, "Invoice ID is required.");
 
 
-// --- Invoice Item Schemas (NEW) ---
+// --- Invoice Item Schemas ---
 export const createInvoiceItemSchema = z.object({
   description: z.string().min(1, "Item description is required.").max(255, "Description is too long."),
   quantity: z.coerce.number().int().min(1, "Quantity must be at least 1.").default(1),
   unitPrice: z.coerce.number().min(0, "Unit price cannot be negative."),
-  feeStructureId: z.string().nullable().optional(), // Link to an existing fee structure if applicable
-  // invoiceId will be handled by the nested API route parameter
+  feeStructureId: z.string().nullable().optional(),
 });
 
 export const updateInvoiceItemSchema = createInvoiceItemSchema.partial();
