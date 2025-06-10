@@ -101,3 +101,19 @@ export const updateInvoiceItemSchema = z.object(baseInvoiceItemShape).partial().
 });
 
 export const invoiceItemIdSchema = z.string().min(1, "Invoice Item ID is required.");
+
+// --- Payment Schemas (NEW) ---
+export const createPaymentSchema = z.object({
+  invoiceId: z.string().min(1, "Invoice ID is required."),
+  amount: z.coerce.number().min(0.01, "Payment amount must be positive."),
+  paymentDate: z.string().datetime("Payment date must be a valid date and time string (ISO 8601).").optional().default(new Date().toISOString()),
+  // Assuming PaymentMethod is an enum in Prisma schema: CASH, BANK_TRANSFER, CREDIT_CARD, MOBILE_MONEY, ONLINE_GATEWAY, OTHER
+  paymentMethod: z.enum(["CASH", "BANK_TRANSFER", "CREDIT_CARD", "MOBILE_MONEY", "ONLINE_GATEWAY", "OTHER"], {
+    errorMap: () => ({ message: "Invalid payment method." })
+  }),
+  referenceId: z.string().nullable().optional(), // Transaction ID or check number
+  notes: z.string().nullable().optional(),
+});
+
+export const updatePaymentSchema = createPaymentSchema.partial();
+export const paymentIdSchema = z.string().min(1, "Payment ID is required.");
