@@ -91,24 +91,22 @@ enum PurchaseOrderStatus {
 // --------------------
 
 model School {
-  id           String   @id @default(cuid())
-  name         String   @unique
-  address      String?
-  contactInfo  String?
-  logoUrl      String?
-  subdomain    String?  @unique
-  customDomain String?  @unique
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  classStartTime        String?  @default("08:00") // Default start time for classes
-  classEndTime          String?  @default("17:00") // Default end time for classes
-  classIntervalMinutes  Int?     @default(30)     // Default interval duration in minutes (e.g., 30 or 60)
-   // New timetable settings
-  timetableStartTime String @default("08:00") // Default school start time for timetable
-  timetableEndTime   String @default("17:00") // Default school end time for timetable
-
-
+  id                   String   @id @default(cuid())
+  name                 String   @unique
+  address              String?
+  contactInfo          String?
+  logoUrl              String?
+  subdomain            String?  @unique
+  customDomain         String?  @unique
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  classStartTime       String?  @default("08:00") // Default start time for classes
+  classEndTime         String?  @default("17:00") // Default end time for classes
+  classIntervalMinutes Int?     @default(30) // Default interval duration in minutes (e.g., 30 or 60)
+  // New timetable settings
+  timetableStartTime   String   @default("08:00") // Default school start time for timetable
+  timetableEndTime     String   @default("17:00") // Default school end time for timetable
 
   // Feature flags
   hasParentAppAccess      Boolean @default(false)
@@ -250,7 +248,7 @@ model SchoolLevel {
   staffLevelAssignments StaffLevelAssignment[] // Staff assigned to this level
   staffSubjectLevels    StaffSubjectLevel[]    @relation("LevelSubjectsTaught") // Subjects taught at this level by staff
   subjectLinks          SubjectSchoolLevel[] // Subjects that exist at this level
-  feeStructures       FeeStructure[]        @relation("LevelFeeStructures") 
+  feeStructures         FeeStructure[]         @relation("LevelFeeStructures")
 
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
@@ -864,8 +862,8 @@ model FeeStructure {
   schoolId       String
   school         School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   invoiceItems   InvoiceItem[]
-  schoolLevelId  String?        // NEW: Link to SchoolLevel for general fees
-  schoolLevel    SchoolLevel?   @relation("LevelFeeStructures", fields: [schoolLevelId], references: [id], onDelete: SetNull) // NEW RELATION
+  schoolLevelId  String? // NEW: Link to SchoolLevel for general fees
+  schoolLevel    SchoolLevel?  @relation("LevelFeeStructures", fields: [schoolLevelId], references: [id], onDelete: SetNull) // NEW RELATION
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -898,19 +896,21 @@ model Invoice {
 }
 
 model InvoiceItem {
-  id             String        @id @default(cuid())
-  invoiceId      String
-  invoice        Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  feeStructureId String?
-  feeStructure   FeeStructure? @relation(fields: [feeStructureId], references: [id], onDelete: SetNull)
-  description    String
-  quantity       Int           @default(1)
-  unitPrice      Float
-  totalPrice     Float
-  schoolId       String
-  school         School        @relation(fields: [schoolId], references: [id], onDelete: Restrict)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id              String         @id @default(cuid())
+  invoiceId       String
+  invoice         Invoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  feeStructureId  String?
+  feeStructure    FeeStructure?  @relation(fields: [feeStructureId], references: [id], onDelete: SetNull)
+  description     String
+  quantity        Int            @default(1)
+  unitPrice       Float
+  totalPrice      Float
+  inventoryItemId String? // Already exists
+  inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull) // Already exists
+  schoolId        String
+  school          School         @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   @@index([schoolId])
 }
@@ -1109,6 +1109,7 @@ model InventoryItem {
   purchaseOrderItems PurchaseOrderItem[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
+  InvoiceItem        InvoiceItem[]
 
   @@unique([schoolId, name])
   @@index([schoolId])

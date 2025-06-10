@@ -36,7 +36,7 @@ const initialInvoiceFormData = {
   initialItemQuantity: 1,
   initialItemUnitPrice: '',
   initialItemFeeStructureId: '',
-  initialItemInventoryItemId: '', // NEW: For initial item inventory link
+  initialItemInventoryItemId: '',
 };
 
 // Initial form data for Invoice Item
@@ -47,12 +47,11 @@ const initialInvoiceItemFormData = {
   quantity: 1,
   unitPrice: '',
   feeStructureId: '',
-  inventoryItemId: '', // NEW: For invoice item inventory link
+  inventoryItemId: '',
 };
 
 
 // Reusable FormFields Component for Invoice (Main Dialog)
-// Added inventoryItemsList prop
 const InvoiceFormFields = ({ formData, onFormChange, onSelectChange, studentsList, feeStructuresList, inventoryItemsList, isLoadingDeps, isEdit = false }) => {
   const labelTextClasses = "text-black dark:text-white block text-sm font-medium mb-1 text-left";
   const inputTextClasses = "bg-white/50 dark:bg-zinc-800/50 text-black dark:text-white border-zinc-300 dark:border-zinc-700 focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-500 dark:focus:border-sky-500";
@@ -136,7 +135,7 @@ const InvoiceFormFields = ({ formData, onFormChange, onSelectChange, studentsLis
       {!isEdit && ( // Initial item section only for creation
         <>
           <div className="sm:col-span-2 border-t pt-4 mt-4 text-lg font-semibold text-zinc-800 dark:text-zinc-200">Initial Invoice Item</div>
-          {/* NEW: Inventory Item Selector for initial item */}
+          {/* Inventory Item Selector for initial item */}
           <div>
             <Label htmlFor="initialItemInventoryItemId" className={labelTextClasses}>Link to Inventory Item (Optional)</Label>
             <Select name="initialItemInventoryItemId" value={formData.initialItemInventoryItemId || 'none'} onValueChange={(value) => handleInitialItemSelectChange('initialItemInventoryItemId', value === 'none' ? '' : value)} disabled={isLoadingDeps}>
@@ -145,7 +144,9 @@ const InvoiceFormFields = ({ formData, onFormChange, onSelectChange, studentsLis
                 <SelectItem value="none">No Inventory Item</SelectItem>
                 {!isLoadingDeps && (!Array.isArray(inventoryItemsList) || inventoryItemsList.length === 0) && <SelectItem value="no-inv-items" disabled>No inventory items available</SelectItem>}
                 {Array.isArray(inventoryItemsList) && inventoryItemsList.map(item => (
-                  <SelectItem key={item.id} value={item.id}>{getInventoryItemDisplayName(item.id)}</SelectItem>
+                  <SelectItem key={item.id} value={item.id}>
+                    {getInventoryItemDisplayName(item.id)}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -159,7 +160,9 @@ const InvoiceFormFields = ({ formData, onFormChange, onSelectChange, studentsLis
                 <SelectItem value="none">No Fee Structure</SelectItem>
                 {!isLoadingDeps && (!Array.isArray(feeStructuresList) || feeStructuresList.length === 0) && <SelectItem value="no-fees" disabled>No fee structures available</SelectItem>}
                 {Array.isArray(feeStructuresList) && feeStructuresList.map(fee => (
-                  <SelectItem key={fee.id} value={fee.id}>{getFeeStructureName(fee.id)}</SelectItem>
+                  <SelectItem key={fee.id} value={fee.id}>
+                    {getFeeStructureName(fee.id)}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -184,7 +187,6 @@ const InvoiceFormFields = ({ formData, onFormChange, onSelectChange, studentsLis
 };
 
 // Reusable FormFields Component for Invoice Item (Nested Dialog)
-// Added inventoryItemsList prop
 const InvoiceItemFormFields = ({ formData, onFormChange, onSelectChange, feeStructuresList, inventoryItemsList, isLoadingDeps }) => {
   const labelTextClasses = "text-black dark:text-white block text-sm font-medium mb-1 text-left";
   const inputTextClasses = "bg-white/50 dark:bg-zinc-800/50 text-black dark:text-white border-zinc-300 dark:border-zinc-700 focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-500 dark:focus:border-sky-500";
@@ -235,7 +237,7 @@ const InvoiceItemFormFields = ({ formData, onFormChange, onSelectChange, feeStru
         <Label htmlFor="itemUnitPrice" className={labelTextClasses}>Unit Price <span className="text-red-500">*</span></Label>
         <Input id="itemUnitPrice" name="unitPrice" type="number" step="0.01" min="0" value={formData.unitPrice || ''} onChange={onFormChange} required={!formData.feeStructureId && !formData.inventoryItemId} className={`${inputTextClasses} mt-1`} />
       </div>
-      {/* NEW: Inventory Item Selector */}
+      {/* Inventory Item Selector */}
       <div>
         <Label htmlFor="inventoryItemId" className={labelTextClasses}>Link to Inventory Item (Optional)</Label>
         <Select name="inventoryItemId" value={formData.inventoryItemId || 'none'} onValueChange={(value) => handleItemSelectChange('inventoryItemId', value === 'none' ? '' : value)} disabled={isLoadingDeps || (formData.feeStructureId && formData.feeStructureId !== 'none')}> {/* Disable if fee structure selected */}
@@ -244,12 +246,14 @@ const InvoiceItemFormFields = ({ formData, onFormChange, onSelectChange, feeStru
             <SelectItem value="none">No Inventory Item</SelectItem>
             {!isLoadingDeps && (!Array.isArray(inventoryItemsList) || inventoryItemsList.length === 0) && <SelectItem value="no-inv-items" disabled>No inventory items available</SelectItem>}
             {Array.isArray(inventoryItemsList) && inventoryItemsList.map(item => (
-              <SelectItem key={item.id} value={item.id}>{getInventoryItemDisplayName(item.id)}</SelectItem>
+              <SelectItem key={item.id} value={item.id}>
+                {getInventoryItemDisplayName(item.id)}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
-      {/* Existing Fee Structure Selector */}
+      {/* Fee Structure Selector */}
       <div>
         <Label htmlFor="feeStructureId" className={labelTextClasses}>Link to Fee Structure (Optional)</Label>
         <Select name="feeStructureId" value={formData.feeStructureId || 'none'} onValueChange={(value) => handleItemSelectChange('feeStructureId', value === 'none' ? '' : value)} disabled={isLoadingDeps || (formData.inventoryItemId && formData.inventoryItemId !== 'none')}> {/* Disable if inventory item selected */}
@@ -275,14 +279,14 @@ export default function ManageInvoicesPage() {
   const [invoices, setInvoices] = useState([]);
   const [students, setStudents] = useState([]); // For student dropdown
   const [feeStructures, setFeeStructures] = useState([]); // For fee structure dropdown (initial item/invoice item)
-  const [inventoryItems, setInventoryItems] = useState([]); // NEW: For inventory item dropdown
+  const [inventoryItems, setInventoryItems] = useState([]); // For inventory item dropdown
 
   const [isLoading, setIsLoading] = useState(true); // For main table
   const [isLoadingDeps, setIsLoadingDeps] = useState(true); // For dropdowns
   const [error, setError] = useState('');
 
   const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
-  const [isItemDialogOpen, setIsItemDialogOpen] = useState(false); // New dialog for invoice items
+  const [isItemDialogOpen, setIsItemDialogOpen] = useState(false); // Dialog for invoice items
 
   const [invoiceFormData, setInvoiceFormData] = useState({ ...initialInvoiceFormData });
   const [invoiceItemFormData, setInvoiceItemFormData] = useState({ ...initialInvoiceItemFormData });
@@ -325,7 +329,7 @@ export default function ManageInvoicesPage() {
     let overallError = null;
 
     try {
-      const [studentsRes, feeStructuresRes, inventoryItemsRes] = await Promise.allSettled([ // NEW: Fetch inventoryItems
+      const [studentsRes, feeStructuresRes, inventoryItemsRes] = await Promise.allSettled([ // Fetch inventoryItems
         fetch(`/api/schools/${schoolData.id}/people/students`),
         fetch(`/api/schools/${schoolData.id}/finance/fee-structures`),
         fetch(`/api/schools/${schoolData.id}/resources/inventory-items`),
@@ -351,10 +355,10 @@ export default function ManageInvoicesPage() {
         overallError = overallError || new Error(errorData.error || 'Failed to fetch fee structures.');
       }
 
-      // NEW: Process Inventory Items
+      // Process Inventory Items
       if (inventoryItemsRes.status === 'fulfilled' && inventoryItemsRes.value.ok) {
         const inventoryItemsData = await inventoryItemsRes.value.json();
-        setInventoryItems(Array.isArray(inventoryItemsData.items) ? inventoryItemsData.items : []); // Assuming items is the key
+        setInventoryItems(Array.isArray(inventoryItemsData.items) ? inventoryItemsData.items : []);
       } else {
         const errorData = inventoryItemsRes.status === 'rejected' ? inventoryItemsRes.reason : await inventoryItemsRes.value.json().catch(() => ({}));
         console.error("Inventory Items fetch failed:", errorData);
@@ -427,13 +431,13 @@ export default function ManageInvoicesPage() {
     };
 
     // Only include initialItem if creating a new invoice and it's populated
-    if (!isEditing && (invoiceFormData.initialItemDescription || invoiceFormData.initialItemFeeStructureId || invoiceFormData.initialItemInventoryItemId)) { // Check new field
+    if (!isEditing && (invoiceFormData.initialItemDescription || invoiceFormData.initialItemFeeStructureId || invoiceFormData.initialItemInventoryItemId)) {
       payload.initialItem = {
         description: invoiceFormData.initialItemDescription,
         quantity: parseInt(invoiceFormData.initialItemQuantity, 10),
         unitPrice: parseFloat(invoiceFormData.initialItemUnitPrice),
         feeStructureId: invoiceFormData.initialItemFeeStructureId || null,
-        inventoryItemId: invoiceFormData.initialItemInventoryItemId || null, // NEW: Include in payload
+        inventoryItemId: invoiceFormData.initialItemInventoryItemId || null,
       };
     }
 
@@ -455,7 +459,7 @@ export default function ManageInvoicesPage() {
       } else {
         toast.success(`Invoice "${result.invoice?.invoiceNumber}" ${actionText}d successfully!`);
         setIsInvoiceDialogOpen(false);
-        fetchInvoices(); // Re-fetch invoices
+        fetchInvoices(); // Re-fetch invoices to update the main table
       }
     } catch (err) { toast.error('An unexpected error occurred.'); setInvoiceFormError('An unexpected error occurred.');
     } finally { setIsLoading(false); }
@@ -498,7 +502,7 @@ export default function ManageInvoicesPage() {
       quantity: parseInt(invoiceItemFormData.quantity, 10),
       unitPrice: parseFloat(invoiceItemFormData.unitPrice),
       feeStructureId: invoiceItemFormData.feeStructureId || null,
-      inventoryItemId: invoiceItemFormData.inventoryItemId || null, // NEW: Include in payload
+      inventoryItemId: invoiceItemFormData.inventoryItemId || null,
     };
 
     try {
@@ -516,9 +520,9 @@ export default function ManageInvoicesPage() {
         toast.success(`Item "${result.invoiceItem?.description}" added successfully!`);
         setInvoiceItemFormData({ ...initialInvoiceItemFormData, invoiceId: viewingInvoiceItems.id }); // Reset form
         setEditingInvoiceItem(null);
-        // Refresh the viewing invoice's items and the main invoices list
-        fetchInvoiceForItemsDialog(viewingInvoiceItems.id);
-        fetchInvoices();
+        // CRITICAL: Re-fetch the parent invoice and the main invoices list to update totals
+        fetchInvoiceForItemsDialog(viewingInvoiceItems.id); // Update dialog's invoice total and items
+        fetchInvoices(); // Update the main invoice table's total
       }
     } catch (err) { toast.error('An unexpected error occurred.'); setItemFormError('An unexpected error occurred.');
     } finally { setIsSubmittingItem(false); }
@@ -533,7 +537,7 @@ export default function ManageInvoicesPage() {
       quantity: item.quantity,
       unitPrice: item.unitPrice,
       feeStructureId: item.feeStructureId || '',
-      inventoryItemId: item.inventoryItemId || '', // NEW: Populate from existing data
+      inventoryItemId: item.inventoryItemId || '',
     });
   };
 
@@ -547,7 +551,7 @@ export default function ManageInvoicesPage() {
       quantity: parseInt(invoiceItemFormData.quantity, 10),
       unitPrice: parseFloat(invoiceItemFormData.unitPrice),
       feeStructureId: invoiceItemFormData.feeStructureId || null,
-      inventoryItemId: invoiceItemFormData.inventoryItemId || null, // NEW: Include in payload
+      inventoryItemId: invoiceItemFormData.inventoryItemId || null,
     };
 
     try {
@@ -565,9 +569,9 @@ export default function ManageInvoicesPage() {
         toast.success(`Item "${result.invoiceItem?.description}" updated successfully!`);
         setInvoiceItemFormData({ ...initialInvoiceItemFormData, invoiceId: viewingInvoiceItems.id }); // Reset form
         setEditingInvoiceItem(null);
-        // Refresh the viewing invoice's items and the main invoices list
-        fetchInvoiceForItemsDialog(viewingInvoiceItems.id);
-        fetchInvoices();
+        // CRITICAL: Re-fetch the parent invoice and the main invoices list to update totals
+        fetchInvoiceForItemsDialog(viewingInvoiceItems.id); // Update dialog's invoice total and items
+        fetchInvoices(); // Update the main invoice table's total
       }
     } catch (err) { toast.error('An unexpected error occurred.'); setItemFormError('An unexpected error occurred.');
     } finally { setIsSubmittingItem(false); }
@@ -583,20 +587,22 @@ export default function ManageInvoicesPage() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Deletion failed.");
       toast.success(result.message || `Item "${itemDescription}" deleted.`, { id: toastId });
-      fetchInvoiceForItemsDialog(viewingInvoiceItems.id); // Refresh items for current invoice
-      fetchInvoices(); // Refresh main invoices list
+      // CRITICAL: Re-fetch the parent invoice and the main invoices list to update totals
+      fetchInvoiceForItemsDialog(viewingInvoiceItems.id); // Update dialog's invoice total and items
+      fetchInvoices(); // Update the main invoice table's total
     } catch (err) { toast.error(`Deletion Failed: ${err.message}`, { id: toastId }); }
   };
 
   // Function to re-fetch the specific invoice being viewed for its items
+  // This function is correctly defined and called.
   const fetchInvoiceForItemsDialog = useCallback(async (invoiceId) => {
     if (!schoolData?.id || !invoiceId) return;
     try {
       const response = await fetch(`/api/schools/${schoolData.id}/finance/invoices/${invoiceId}`);
-      if (!response.ok) { const errData = await response.json().catch(() => ({})); throw new Error(errData.error || 'Failed to fetch invoice items.'); }
+      if (!response.ok) { const errData = await response.json().catch(() => ({})); throw new Error(errData.error || 'Failed to fetch invoice data for items dialog.'); }
       const data = await response.json();
-      setViewingInvoiceItems(data.invoice); // Update the invoice data in state
-    } catch (err) { toast.error("Error refreshing invoice items", { description: err.message });
+      setViewingInvoiceItems(data.invoice); // This updates the state that drives the dialog's total
+    } catch (err) { toast.error("Error refreshing invoice items/total", { description: err.message });
     }
   }, [schoolData?.id]);
 
@@ -612,7 +618,7 @@ export default function ManageInvoicesPage() {
     return fs ? `${fs.name} ($${fs.amount.toFixed(2)})` : 'N/A';
   }, [feeStructures]);
 
-  // NEW: Helper for Inventory Item Name
+  // Helper for Inventory Item Name
   const getInventoryItemNameDisplay = useCallback((id) => {
     const invItem = inventoryItems.find(item => item.id === id);
     return invItem ? `${invItem.name} (Stock: ${invItem.quantityInStock})` : 'N/A';
@@ -660,7 +666,7 @@ export default function ManageInvoicesPage() {
                 onSelectChange={handleInvoiceSelectChange}
                 studentsList={students}
                 feeStructuresList={feeStructures}
-                inventoryItemsList={inventoryItems} // NEW: Pass inventoryItemsList
+                inventoryItemsList={inventoryItems}
                 isLoadingDeps={isLoadingDeps}
                 isEdit={!!editingInvoice}
               />
@@ -747,6 +753,7 @@ export default function ManageInvoicesPage() {
             <DialogTitle className={titleTextClasses}>Manage Items for Invoice #{viewingInvoiceItems?.invoiceNumber}</DialogTitle>
             <DialogDescription className={descriptionTextClasses}>
               Add, edit, or remove items from this invoice. Invoice total will update automatically.
+              {/* This is the line displaying the total. It will refresh after fetchInvoiceForItemsDialog completes. */}
               <p className="mt-2 text-sm font-semibold text-sky-600 dark:text-sky-400">Current Total: ${viewingInvoiceItems?.totalAmount.toFixed(2)}</p>
             </DialogDescription>
           </DialogHeader>
@@ -760,7 +767,7 @@ export default function ManageInvoicesPage() {
                 onFormChange={handleInvoiceItemFormChange}
                 onSelectChange={handleInvoiceItemSelectChange}
                 feeStructuresList={feeStructures}
-                inventoryItemsList={inventoryItems} // NEW: Pass inventoryItemsList
+                inventoryItemsList={inventoryItems}
                 isLoadingDeps={isLoadingDeps}
               />
               {itemFormError && ( <p className="text-sm text-red-600 dark:text-red-400 md:col-span-full">{itemFormError}</p> )}
@@ -788,7 +795,7 @@ export default function ManageInvoicesPage() {
                     <TableHead className={`${titleTextClasses} font-semibold text-right`}>Qty</TableHead>
                     <TableHead className={`${titleTextClasses} font-semibold text-right`}>Unit Price</TableHead>
                     <TableHead className={`${titleTextClasses} font-semibold text-right`}>Total</TableHead>
-                    <TableHead className={`${titleTextClasses} font-semibold text-center`}>Source</TableHead> {/* NEW Column */}
+                    <TableHead className={`${titleTextClasses} font-semibold text-center`}>Source</TableHead>
                     <TableHead className={`text-right ${titleTextClasses} font-semibold`}>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -806,7 +813,7 @@ export default function ManageInvoicesPage() {
                           {item.feeStructureId ? <Tags className="h-4 w-4 inline-block mr-1 text-sky-600" title="From Fee Structure" /> : ''}
                           {item.inventoryItemId ? <Package className="h-4 w-4 inline-block mr-1 text-purple-600" title="From Inventory" /> : ''}
                           {/* If neither, it's a custom item */}
-                        </TableCell> {/* NEW Cell */}
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
                             <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleEditItem(item)} title="Edit Item"><Edit3 className="h-4 w-4" /></Button>

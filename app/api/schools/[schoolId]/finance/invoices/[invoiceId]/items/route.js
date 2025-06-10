@@ -10,7 +10,7 @@ import { invoiceIdSchema, createInvoiceItemSchema } from '@/validators/finance.v
 // GET /api/schools/[schoolId]/finance/invoices/[invoiceId]/items
 // Fetches all invoice items for a specific invoice
 export async function GET(request, { params }) {
-  const { schoolId, invoiceId } = params;
+  const { schoolId, invoiceId } = params; // Destructure invoiceId here for GET
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'ACCOUNTANT' && session.user?.role !== 'SECRETARY' && session.user?.role !== 'PARENT')) {
@@ -55,13 +55,12 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Validation Error', issues: error.issues }, { status: 400 });
     }
     console.error(`API (GET Invoice Items) - Error for school ${schoolId}, invoice ${invoiceId}:`, {
-      message: error?.message || 'No message provided.', // Defensive check
-      name: error?.name || 'UnknownError',           // Defensive check
+      message: error?.message || 'No message provided.',
+      name: error?.name || 'UnknownError',
       code: error?.code,
       clientVersion: error?.clientVersion,
       meta: error?.meta,
       stack: error?.stack,
-      // Attempt to log the error object itself if properties are missing
       fullError: error,
     });
     return NextResponse.json({ error: 'Failed to retrieve invoice items.', details: error?.message || 'An unexpected server error occurred.' }, { status: 500 });
@@ -71,7 +70,7 @@ export async function GET(request, { params }) {
 // POST /api/schools/[schoolId]/finance/invoices/[invoiceId]/items
 // Creates a new invoice item for a specific invoice, and updates invoice total
 export async function POST(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId, invoiceId } = params; // FIX: Destructure invoiceId here for POST
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'ACCOUNTANT' && session.user?.role !== 'SECRETARY')) {
@@ -186,13 +185,13 @@ export async function POST(request, { params }) {
     return NextResponse.json({ invoiceItem: fetchedNewItem, message: 'Invoice item added successfully.' }, { status: 201 });
   } catch (error) {
     console.error(`API (POST Invoice Item) - Detailed error for school ${schoolId}, invoice ${invoiceId}:`, {
-      message: error?.message || 'No message provided.', // Defensive check
-      name: error?.name || 'UnknownError',           // Defensive check
+      message: error?.message || 'No message provided.',
+      name: error?.name || 'UnknownError',
       code: error?.code,
       clientVersion: error?.clientVersion,
       meta: error?.meta,
       stack: error?.stack,
-      fullError: error, // Log the full error object as well
+      fullError: error,
     });
 
     if (error instanceof z.ZodError) {
