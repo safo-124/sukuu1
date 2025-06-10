@@ -117,3 +117,39 @@ export const createPaymentSchema = z.object({
 
 export const updatePaymentSchema = createPaymentSchema.partial();
 export const paymentIdSchema = z.string().min(1, "Payment ID is required.");
+
+// --- Expense Category Schemas (NEW) ---
+export const createExpenseCategorySchema = z.object({
+  name: z.string().min(1, "Category name is required.").max(255, "Name is too long."),
+  description: z.string().nullable().optional(),
+});
+
+export const updateExpenseCategorySchema = createExpenseCategorySchema.partial();
+export const expenseCategoryIdSchema = z.string().min(1, "Expense Category ID is required.");
+
+
+// --- Expense Schemas (NEW) ---
+export const createExpenseSchema = z.object({
+  description: z.string().min(1, "Expense description is required.").max(255, "Description is too long."),
+  amount: z.coerce.number().min(0, "Amount cannot be negative."),
+  date: z.string().datetime("Date must be a valid date string (ISO 8601).").optional().default(new Date().toISOString()),
+  categoryId: z.string().min(1, "Category is required."),
+  vendorId: z.string().nullable().optional(), // Link to a vendor
+  receiptUrl: z.string().url("Invalid receipt URL.").nullable().optional(),
+  // paidById will be current user's ID
+});
+
+export const updateExpenseSchema = createExpenseSchema.partial();
+export const expenseIdSchema = z.string().min(1, "Expense ID is required.");
+
+// --- Vendor Schemas (NEW) ---
+export const createVendorSchema = z.object({
+  name: z.string().min(1, "Vendor name is required.").max(255, "Name is too long."),
+  contactPerson: z.string().nullable().optional(),
+  email: z.string().email("Invalid email address.").nullable().optional(),
+  phone: z.string().nullable().optional(),
+  address: z.string().nullable().optional(),
+});
+
+export const updateVendorSchema = createVendorSchema.partial();
+export const vendorIdSchema = z.string().min(1, "Vendor ID is required.");

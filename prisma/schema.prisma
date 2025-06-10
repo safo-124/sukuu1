@@ -146,14 +146,14 @@ model School {
   timetableEntries        TimetableEntry[]
   feeStructures           FeeStructure[]
   invoices                Invoice[]
-  expenses                Expense[]
+  expenses                Expense[] // UPDATED: Now links to User for paidBy
   expenseCategories       ExpenseCategory[]
   vendors                 Vendor[]
   purchaseOrders          PurchaseOrder[]
   inventoryCategories     InventoryCategory[]
   inventoryItems          InventoryItem[]
   invoiceItems            InvoiceItem[]
-  payments                Payment[] // UPDATED: Now links to User for processedBy
+  payments                Payment[]
   purchaseOrderItems      PurchaseOrderItem[]
   leaveTypes              LeaveType[]
   leaveApplications       LeaveApplication[]
@@ -196,7 +196,8 @@ model User {
 
   staffAttendancesTaken   StaffAttendance[] @relation("StaffAttendanceTakenBy")
   studentAttendancesTaken Attendance[]      @relation("TakenBy")
-  paymentsProcessed       Payment[]         @relation("ProcessedBy") // NEW: Inverse relation for Payment.processedById
+  paymentsProcessed       Payment[]         @relation("ProcessedBy")
+  expensesPaid            Expense[]         @relation("PaidByExpense") // NEW: Inverse relation for Expense.paidById
 
   @@index([email])
   @@index([schoolId])
@@ -246,7 +247,7 @@ model SchoolLevel {
   staffLevelAssignments StaffLevelAssignment[]
   staffSubjectLevels    StaffSubjectLevel[]    @relation("LevelSubjectsTaught")
   subjectLinks          SubjectSchoolLevel[]
-  feeStructures         FeeStructure[]         @relation("LevelFeeStructures") // NEW: Inverse relation from FeeStructure
+  feeStructures         FeeStructure[]         @relation("LevelFeeStructures")
 
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
@@ -786,19 +787,19 @@ model TimetableEntry {
   dayOfWeek Int
   startTime String
   endTime   String
-  roomId    String? // Changed from roomNo to roomId for Room relation
-  room      Room?    @relation("TimetableRoomSlots", fields: [roomId], references: [id], onDelete: SetNull) // New relation
+  roomId    String?
+  room      Room?    @relation("TimetableRoomSlots", fields: [roomId], references: [id], onDelete: SetNull)
   schoolId  String
   school    School   @relation(fields: [schoolId], references: [id], onDelete: Restrict)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([schoolId, sectionId, dayOfWeek, startTime]) // Ensure no time conflicts for a section
-  @@unique([schoolId, staffId, dayOfWeek, startTime]) // Ensure no time conflicts for a staff
-  @@unique([schoolId, roomId, dayOfWeek, startTime]) // Ensure no time conflicts for a room
+  @@unique([schoolId, sectionId, dayOfWeek, startTime])
+  @@unique([schoolId, staffId, dayOfWeek, startTime])
+  @@unique([schoolId, roomId, dayOfWeek, startTime])
   @@index([schoolId, sectionId, dayOfWeek])
   @@index([schoolId, staffId, dayOfWeek])
-  @@index([schoolId, roomId, dayOfWeek]) // New index
+  @@index([schoolId, roomId, dayOfWeek])
 }
 
 // --------------------
@@ -849,19 +850,19 @@ model FeeStructure {
   academicYear   AcademicYear  @relation("YearFeeStructures", fields: [academicYearId], references: [id])
   classId        String?
   class          Class?        @relation("ClassFeeStructures", fields: [classId], references: [id])
-  schoolLevelId  String? // NEW: Link to SchoolLevel for general fees
-  schoolLevel    SchoolLevel?  @relation("LevelFeeStructures", fields: [schoolLevelId], references: [id], onDelete: SetNull) // NEW RELATION
+  schoolLevelId  String?
+  schoolLevel    SchoolLevel?  @relation("LevelFeeStructures", fields: [schoolLevelId], references: [id], onDelete: SetNull)
   schoolId       String
   school         School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   invoiceItems   InvoiceItem[]
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  @@unique([schoolId, name, academicYearId, classId, schoolLevelId]) // UPDATED unique constraint
+  @@unique([schoolId, name, academicYearId, classId, schoolLevelId])
   @@index([schoolId])
   @@index([academicYearId])
   @@index([classId])
-  @@index([schoolLevelId]) // NEW INDEX
+  @@index([schoolLevelId])
 }
 
 model Invoice {
@@ -877,7 +878,7 @@ model Invoice {
   notes         String?
   schoolId      String
   school        School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  items         InvoiceItem[] // Invoice items linked here
+  items         InvoiceItem[]
   payments      Payment[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
@@ -915,14 +916,14 @@ model Payment {
   referenceId   String?
   notes         String?
   processedById String? // User ID
-  processedBy   User?         @relation("ProcessedBy", fields: [processedById], references: [id], onDelete: SetNull) // NEW RELATION
+  processedBy   User?         @relation("ProcessedBy", fields: [processedById], references: [id], onDelete: SetNull)
   schoolId      String
   school        School        @relation(fields: [schoolId], references: [id], onDelete: Restrict)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
   @@index([schoolId, invoiceId])
-  @@index([processedById]) // NEW INDEX
+  @@index([processedById])
 }
 
 model ExpenseCategory {
@@ -948,13 +949,15 @@ model Expense {
   vendorId    String?
   vendor      Vendor?         @relation(fields: [vendorId], references: [id], onDelete: SetNull)
   receiptUrl  String?
-  paidById    String
+  paidById    String // User ID of staff who recorded/paid
+  paidBy      User            @relation("PaidByExpense", fields: [paidById], references: [id], onDelete: Restrict) // NEW RELATION
   schoolId    String
   school      School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
   @@index([schoolId, date])
+  @@index([paidById]) // NEW INDEX
 }
 
 model LeaveType {
@@ -1125,7 +1128,7 @@ model Room {
   schoolId         String
   school           School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   examSchedules    ExamSchedule[]   @relation("RoomTimetableSlots")
-  timetableEntries TimetableEntry[] @relation("TimetableRoomSlots") // NEW: Link to TimetableEntry
+  timetableEntries TimetableEntry[] @relation("TimetableRoomSlots")
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 

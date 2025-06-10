@@ -55,8 +55,8 @@ export const updateTermSchema = baseTermSchema.partial().refine(data => {
 export const termIdSchema = z.string().min(1);
 
 
-// --- Class Schemas (ENSURE 'export' is present) ---
-export const classSchema = z.object({ // Make sure 'export' is here
+// --- Class Schemas ---
+export const createClassSchema = z.object({
   name: z.string().min(1).max(255),
   schoolLevelId: z.string().min(1),
   academicYearId: z.string().min(1),
@@ -67,7 +67,7 @@ export const classSchema = z.object({ // Make sure 'export' is here
   })).optional(),
 });
 
-export const updateClassSchema = classSchema.partial(); // Ensure this uses 'classSchema'
+export const updateClassSchema = createClassSchema.partial();
 export const classIdSchema = z.string().min(1);
 
 
@@ -166,6 +166,8 @@ export const createTimetableEntrySchema = baseTimetableEntrySchema.refine(data =
   path: ["endTime"],
 });
 
+// FIX: updateTimetableEntrySchema is now defined as a partial of baseTimetableEntrySchema,
+// ensuring it's a ZodObject that can be extended in the API routes.
 export const updateTimetableEntrySchema = baseTimetableEntrySchema.partial();
 
 
@@ -201,3 +203,29 @@ export const generateTimetableSuggestionSchema = z.object({
   durationMinutes: z.coerce.number().int().min(15).max(240),
   preferredRoomId: z.string().nullable().optional(),
 });
+
+// --- Payroll Schemas (FIXED) ---
+// Define base shape for PayrollRecord
+const basePayrollRecordShape = {
+  staffId: z.string().min(1, "Staff member is required."),
+  payPeriodStart: z.string().datetime("Pay period start date must be a valid date string (ISO 8601)."),
+  payPeriodEnd: z.string().datetime("Pay period end date must be a valid date string (ISO 8601)."),
+  basicSalary: z.coerce.number().min(0, "Basic salary cannot be negative."),
+  allowances: z.coerce.number().min(0).nullable().optional(),
+  deductions: z.coerce.number().min(0).nullable().optional(),
+  paymentDate: z.string().datetime("Payment date must be a valid date string (ISO 8601).").nullable().optional(),
+  isPaid: z.boolean().default(false),
+};
+
+// Schema for creating PayrollRecord
+export const createPayrollRecordSchema = z.object(basePayrollRecordShape).refine(data => new Date(data.payPeriodStart) < new Date(data.payPeriodEnd), {
+    message: "Pay period end date must be after start date.",
+    path: ["payPeriodEnd"]
+}).refine(data => {
+    // Net salary calculation is typically backend, but ensure basic components are reasonable
+    if (data.basicSalary < (data.deductions || 0)) {
+        // This is a soft constraint, typically handled by calculation, but can be a warning
+    }
+    return true;
+});
+

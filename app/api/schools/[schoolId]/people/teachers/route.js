@@ -13,8 +13,8 @@ export async function GET(request, { params }) {
   const { schoolId } = params;
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'HR_MANAGER' && session.user?.role !== 'TEACHER' && session.user?.role !== 'HOSTEL_WARDEN')) {
-    // Added HOSTEL_WARDEN here as they need to select wardens for hostels
+  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'HR_MANAGER' && session.user?.role !== 'TEACHER' && session.user?.role !== 'HOSTEL_WARDEN' && session.user?.role !== 'ACCOUNTANT' && session.user?.role !== 'SECRETARY')) {
+    // Broaden access for roles that might need to select staff for payroll, etc.
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -117,7 +117,7 @@ export async function POST(request, { params }) {
     const newTeacher = await prisma.$transaction(async (tx) => {
       // 1. Check for existing user with this email in this school
       const existingUser = await tx.user.findFirst({
-        where: { email: email, schoolId: schoolId },
+        where: { email: email, schoolId: schoolId }
       });
       if (existingUser) {
         throw new Error('A user with this email already exists in this school.');
@@ -213,8 +213,8 @@ export async function POST(request, { params }) {
     }
     // Handle foreign key constraint errors (P2003)
     if (error.code === 'P2003') {
-      const field = error.meta?.field_name || 'a related record';
-      return NextResponse.json({ error: `Invalid ${field} provided. Ensure it exists and belongs to this school.` }, { status: 400 });
+        const field = error.meta?.field_name || 'a related record';
+        return NextResponse.json({ error: `Invalid ${field} provided. Ensure it exists and belongs to this school.` }, { status: 400 });
     }
     return NextResponse.json({ error: 'Failed to create teacher.', details: error.message || 'An unexpected server error occurred.' }, { status: 500 });
   }

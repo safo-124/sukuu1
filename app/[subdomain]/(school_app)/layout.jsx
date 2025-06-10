@@ -9,14 +9,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
-  Sun, Moon, LayoutDashboard, Users, UserCog, BookOpen, LogOut, Menu, X as CloseIcon, Settings, GraduationCap, CalendarDays, Building, Library, Bus, ClipboardList, Briefcase, CheckSquare, DollarSign, FileText, Percent, BookCopy, Newspaper, Home, // Comprehensive icon list
-  AlertTriangle,
-  Store,
-  Layers,
-  PieChart,
-  HomeIcon,
-  House
-} from 'lucide-react';
+  Sun, Moon, LayoutDashboard, Users, UserCog, BookOpen, LogOut, Menu, X as CloseIcon, Settings, GraduationCap, CalendarDays, Building, Library, Bus, ClipboardList, Briefcase, CheckSquare, DollarSign, FileText, Percent, BookCopy, Newspaper, Home, // Common icons
+  AlertTriangle, Store, Layers, PieChart, Receipt // Added Receipt icon for Payroll
+} from 'lucide-react'; // Ensure all used Lucide icons are imported
 import { useTheme } from 'next-themes';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -122,6 +117,40 @@ function SchoolSidebar({ schoolSubdomain, schoolName, schoolLogoUrl, isOpen, onC
       { href: `/${schoolSubdomain}/attendance/staff`, label: 'Staff Attendance', icon: ClipboardList },
     ];
 
+    // NEW: HR Items
+    const hrItems = [
+        { href: `/${schoolSubdomain}/hr/payroll`, label: 'Payroll', icon: Receipt },
+        // Add more HR items here (e.g., Leave Management)
+    ];
+
+    const financeItems = [
+        { href: `/${schoolSubdomain}/finance/overview`, label: 'Financial Overview', icon: PieChart },
+        { href: `/${schoolSubdomain}/finance/fee-structures`, label: 'Fee Structures', icon: FileText },
+        { href: `/${schoolSubdomain}/finance/invoices`, label: 'Invoices', icon: DollarSign },
+        { href: `/${schoolSubdomain}/finance/payments`, label: 'Payments', icon: CheckSquare },
+        { href: `/${schoolSubdomain}/finance/expenses`, label: 'Expenses', icon: Briefcase },
+        { href: `/${schoolSubdomain}/finance/scholarships`, label: 'Scholarships', icon: Percent },
+    ];
+
+    const resourceItems = [
+        { href: `/${schoolSubdomain}/resources/buildings`, label: 'Buildings', icon: Building },
+        { href: `/${schoolSubdomain}/resources/rooms`, label: 'Rooms', icon: Home }, // Use Home icon for general rooms
+        { href: `/${schoolSubdomain}/resources/library`, label: 'Library', icon: Library },
+        { href: `/${schoolSubdomain}/resources/transport`, label: 'Transport', icon: Bus },
+        { href: `/${schoolSubdomain}/resources/hostel`, label: 'Hostel', icon: Home }, // Use Home icon for general hostel
+        { href: `/${schoolSubdomain}/resources/stores`, label: 'Store', icon: Store },
+    ];
+
+    const communicationItems = [
+        { href: `/${schoolSubdomain}/communication/announcements`, label: 'Announcements', icon: Newspaper },
+    ];
+
+    const schoolSetupItems = [
+        { href: `/${schoolSubdomain}/settings/academic-years`, label: 'Academic Years', icon: CalendarDays },
+        { href: `/${schoolSubdomain}/settings/profile`, label: 'School Profile', icon: Settings },
+    ];
+
+
     // Define sections based on role
     switch (role) {
       case 'SUPER_ADMIN':
@@ -131,45 +160,30 @@ function SchoolSidebar({ schoolSubdomain, schoolName, schoolLogoUrl, isOpen, onC
           { title: 'Academics', items: academicItems },
           { title: 'People', items: peopleItems },
           { title: 'Attendance', items: attendanceItems },
-          {
-            title: 'Finance',
-            items: [
-              { href: `/${schoolSubdomain}/finance/overview`, label: 'Financial Overview', icon: PieChart },
-              { href: `/${schoolSubdomain}/finance/fee-structures`, label: 'Fee Structures', icon: FileText },
-              { href: `/${schoolSubdomain}/finance/invoices`, label: 'Invoices', icon: DollarSign },
-              { href: `/${schoolSubdomain}/finance/payments`, label: 'Payments', icon: CheckSquare },
-              { href: `/${schoolSubdomain}/finance/expenses`, label: 'Expenses', icon: Briefcase },
-              { href: `/${schoolSubdomain}/finance/scholarships`, label: 'Scholarships', icon: Percent },
-            ]
-          },
-          {
-            title: 'Resources',
-            items: [
-              { href: `/${schoolSubdomain}/resources/buildings`, label: 'Buildings', icon: HomeIcon },
-              { href: `/${schoolSubdomain}/resources/rooms`, label: 'Rooms', icon: House },
-              { href: `/${schoolSubdomain}/resources/library`, label: 'Library', icon: Library },
-              { href: `/${schoolSubdomain}/resources/transport`, label: 'Transport', icon: Bus },
-              { href: `/${schoolSubdomain}/resources/hostel`, label: 'Hostel', icon: Home },
-              { href: `/${schoolSubdomain}/resources/stores`, label: 'Store', icon: Store },
-            ]
-          },
-          {
-            title: 'Communication',
-            items: [
-              { href: `/${schoolSubdomain}/communication/announcements`, label: 'Announcements', icon: Newspaper },
-            ]
-          },
-          {
-            title: 'School Setup',
-            items: [
-              { href: `/${schoolSubdomain}/settings/academic-years`, label: 'Academic Years', icon: CalendarDays },
-              { href: `/${schoolSubdomain}/settings/profile`, label: 'School Profile', icon: Settings },
-            ]
-          }
+          { title: 'Finance', items: financeItems }, // Use defined financeItems
+          { title: 'Human Resources', items: hrItems }, // NEW HR Section
+          { title: 'Resources', items: resourceItems }, // Use defined resourceItems
+          { title: 'Communication', items: communicationItems }, // Use defined communicationItems
+          { title: 'School Setup', items: schoolSetupItems } // Use defined schoolSetupItems
+        ];
+      case 'HR_MANAGER': // HR Manager has access to HR and parts of People/Attendance/Settings
+        return [
+            { items: commonItems },
+            { title: 'People', items: peopleItems },
+            { title: 'Attendance', items: attendanceItems },
+            { title: 'Human Resources', items: hrItems }, // NEW HR Section
+            { title: 'School Setup', items: [{ href: `/${schoolSubdomain}/settings/profile`, label: 'School Profile', icon: Settings }] } // Limited settings
+        ];
+      case 'ACCOUNTANT': // Accountant has access to Finance and parts of HR/People/Settings
+        return [
+            { items: commonItems },
+            { title: 'Finance', items: financeItems },
+            { title: 'Human Resources', items: hrItems.filter(item => item.label === 'Payroll') }, // Only Payroll
+            { title: 'People', items: [{ href: `/${schoolSubdomain}/people/teachers`, label: 'Staff Directory', icon: UserCog }] }, // Staff Directory
         ];
       case 'TEACHER':
         return [
-          { items: [{ href: `/${schoolSubdomain}/dashboard/teacher`, label: 'My Dashboard', icon: LayoutDashboard }] }, // Teacher's specific dashboard
+          { items: [{ href: `/${schoolSubdomain}/dashboard/teacher`, label: 'My Dashboard', icon: LayoutDashboard }] },
           {
             title: 'Academics',
             items: [
@@ -184,7 +198,7 @@ function SchoolSidebar({ schoolSubdomain, schoolName, schoolLogoUrl, isOpen, onC
             title: 'People',
             items: [
               { href: `/${schoolSubdomain}/people/students`, label: 'My Students', icon: Users },
-              { href: `/${schoolSubdomain}/people/teachers`, label: 'Staff Directory', icon: UserCog }, // Teachers can view staff directory
+              { href: `/${schoolSubdomain}/people/teachers`, label: 'Staff Directory', icon: UserCog },
             ]
           },
           {
@@ -194,6 +208,7 @@ function SchoolSidebar({ schoolSubdomain, schoolName, schoolLogoUrl, isOpen, onC
               { href: `/${schoolSubdomain}/attendance/staff`, label: 'My Attendance', icon: ClipboardList },
             ]
           },
+          { title: 'Human Resources', items: hrItems.filter(item => item.label === 'Payroll') }, // Teachers can view their own payroll records
           {
             title: 'Communication',
             items: [
@@ -201,7 +216,102 @@ function SchoolSidebar({ schoolSubdomain, schoolName, schoolLogoUrl, isOpen, onC
             ]
           },
         ];
-      // Add cases for other roles (STUDENT, PARENT, etc.)
+      // Add cases for other roles (SECRETARY, PROCUREMENT_OFFICER, LIBRARIAN, TRANSPORT_MANAGER, HOSTEL_WARDEN, STUDENT, PARENT)
+      case 'SECRETARY':
+        return [
+          { items: commonItems },
+          { title: 'Academics', items: academicItems.filter(item => ['School Levels', 'Departments', 'Classes & Sections', 'Subjects', 'Timetable'].includes(item.label)) },
+          { title: 'People', items: peopleItems },
+          { title: 'Attendance', items: attendanceItems },
+          { title: 'Finance', items: financeItems.filter(item => ['Fee Structures', 'Invoices', 'Payments'].includes(item.label)) },
+          { title: 'Human Resources', items: hrItems },
+          { title: 'Resources', items: resourceItems.filter(item => ['Buildings', 'Rooms'].includes(item.label)) }, // Secretaries might manage general school resources
+          { title: 'Communication', items: communicationItems },
+          { title: 'School Setup', items: schoolSetupItems }
+        ];
+      case 'PROCUREMENT_OFFICER':
+        return [
+          { items: commonItems },
+          { title: 'Finance', items: financeItems.filter(item => ['Expenses'].includes(item.label)) },
+          { title: 'Resources', items: resourceItems.filter(item => ['Store'].includes(item.label)) },
+          // Add Procurement specific routes
+        ];
+      case 'LIBRARIAN':
+        return [
+          { items: commonItems },
+          { title: 'Resources', items: [{ href: `/${schoolSubdomain}/resources/library`, label: 'Library', icon: Library }] },
+          // Add Library specific routes
+        ];
+      case 'TRANSPORT_MANAGER':
+        return [
+          { items: commonItems },
+          { title: 'Resources', items: [{ href: `/${schoolSubdomain}/resources/transport`, label: 'Transport', icon: Bus }] },
+          // Add Transport specific routes
+        ];
+      case 'HOSTEL_WARDEN':
+        return [
+          { items: commonItems },
+          { title: 'Resources', items: [{ href: `/${schoolSubdomain}/resources/hostel`, label: 'Hostel', icon: Home }] },
+          // Add Hostel specific routes
+        ];
+      case 'STUDENT':
+        return [
+          { items: commonItems },
+          {
+            title: 'Academics',
+            items: [
+              { href: `/${schoolSubdomain}/academics/assignments`, label: 'My Assignments', icon: CheckSquare },
+              { href: `/${schoolSubdomain}/academics/grades`, label: 'My Grades', icon: Percent },
+              { href: `/${schoolSubdomain}/academics/timetable`, label: 'My Timetable', icon: CalendarDays },
+              { href: `/${schoolSubdomain}/academics/examinations`, label: 'My Exams', icon: GraduationCap },
+              { href: `/${schoolSubdomain}/academics/subjects`, label: 'My Subjects', icon: BookOpen },
+            ]
+          },
+          { href: `/${schoolSubdomain}/attendance/students`, label: 'My Attendance', icon: CheckSquare },
+          {
+            title: 'Finance',
+            items: [
+              { href: `/${schoolSubdomain}/finance/invoices`, label: 'My Invoices', icon: DollarSign },
+              { href: `/${schoolSubdomain}/finance/payments`, label: 'My Payments', icon: CheckSquare },
+            ]
+          },
+          {
+            title: 'Resources',
+            items: [
+              { href: `/${schoolSubdomain}/resources/library`, label: 'Library', icon: Library },
+              { href: `/${schoolSubdomain}/resources/hostel`, label: 'My Hostel', icon: Home },
+            ]
+          },
+          {
+            title: 'Communication',
+            items: [
+              { href: `/${schoolSubdomain}/communication/announcements`, label: 'Announcements', icon: Newspaper },
+            ]
+          },
+        ];
+      case 'PARENT':
+        return [
+          { items: commonItems },
+          {
+            title: 'Children',
+            items: [
+              { href: `/${schoolSubdomain}/people/students`, label: 'My Children', icon: Users }, // Link to manage children
+            ]
+          },
+          {
+            title: 'Finance',
+            items: [
+              { href: `/${schoolSubdomain}/finance/invoices`, label: 'Children\'s Invoices', icon: DollarSign },
+              { href: `/${schoolSubdomain}/finance/payments`, label: 'Children\'s Payments', icon: CheckSquare },
+            ]
+          },
+          {
+            title: 'Communication',
+            items: [
+              { href: `/${schoolSubdomain}/communication/announcements`, label: 'Announcements', icon: Newspaper },
+            ]
+          },
+        ];
       default:
         return [
           { items: commonItems }, // Minimal access for undefined roles
@@ -341,7 +451,7 @@ export default function SchoolAppLayout({ children }) {
           return;
         }
         // If a teacher tries to access an admin-only path
-        const adminOnlyPaths = ['/settings', '/finance', '/people/teachers']; // Add more as needed
+        const adminOnlyPaths = ['/settings', '/finance', '/people/teachers', '/hr/payroll']; // Added HR payroll to admin-only paths for teachers
         if (adminOnlyPaths.some(path => currentPath.includes(path)) && !currentPath.includes('/dashboard/teacher')) {
           setAuthError("Access denied. Teachers do not have access to this section.");
           signOut({ redirect: false }).then(() => {
