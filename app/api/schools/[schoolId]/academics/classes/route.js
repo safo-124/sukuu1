@@ -1,6 +1,5 @@
 // app/api/schools/[schoolId]/academics/classes/route.js
 import prisma from '@/lib/prisma';
-// FIX: Ensure classSchema is imported correctly
 import { classSchema, schoolIdSchema } from '@/validators/academics.validators';
 import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
@@ -12,7 +11,7 @@ export async function GET(request, { params }) {
   const { schoolId } = params;
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {
+  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'TEACHER' && session.user?.role !== 'SECRETARY' && session.user?.role !== 'ACCOUNTANT')) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -78,14 +77,17 @@ export async function GET(request, { params }) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Validation Error', issues: error.issues }, { status: 400 });
     }
-    console.error(`API (GET Classes) - Error for school ${schoolId}:`, {
-      message: error.message,
-      name: error.name,
-      code: error.code,
-      clientVersion: error.clientVersion,
-      meta: error.meta,
-      stack: error.stack,
+    // --- ENHANCED ERROR LOGGING START ---
+    console.error(`API (GET Classes) - Detailed error for school ${schoolId}:`, {
+      message: error?.message || 'No message provided.',
+      name: error?.name || 'UnknownError',
+      code: error?.code,
+      clientVersion: error?.clientVersion,
+      meta: error?.meta,
+      stack: error?.stack,
+      fullError: error,
     });
+    // --- ENHANCED ERROR LOGGING END ---
     return NextResponse.json({ error: 'Failed to fetch classes.' }, { status: 500 });
   }
 }
@@ -103,8 +105,6 @@ export async function POST(request, { params }) {
     const body = await request.json();
     schoolIdSchema.parse(schoolId);
 
-    // FIX: Ensure classSchema is correctly used here
-    // Add defensive check to ensure classSchema is a function before calling safeParse
     if (typeof classSchema === 'undefined' || typeof classSchema.safeParse !== 'function') {
       console.error("API (POST Class) - classSchema is not a valid Zod schema or undefined. Check validator file and import.");
       return NextResponse.json({ error: 'Server configuration error: Class validator not correctly loaded.'}, { status: 500 });
@@ -147,7 +147,7 @@ export async function POST(request, { params }) {
         const sectionCreateData = sectionDefinitions.map(sectionDef => ({
           name: sectionDef.name,
           classId: newClass.id,
-          schoolId: schoolId, // Denormalize schoolId for easier querying on Section model
+          schoolId: schoolId,
         }));
 
         await tx.section.createMany({
@@ -172,22 +172,21 @@ export async function POST(request, { params }) {
 
   } catch (error) {
     console.error(`API (POST Class) - Detailed error for school ${schoolId}:`, {
-      message: error.message,
-      name: error.name,
-      code: error.code,
-      clientVersion: error.clientVersion,
-      meta: error.meta,
-      stack: error.stack,
+      message: error?.message || 'No message provided.',
+      name: error?.name || 'UnknownError',
+      code: error?.code,
+      clientVersion: error?.clientVersion,
+      meta: error?.meta,
+      stack: error?.stack,
+      fullError: error,
     });
 
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Validation Error', issues: error.issues }, { status: 400 });
     }
-    // Handle specific errors thrown from within the transaction
     if (error.message.includes('invalid') || error.message.includes('not found')) {
         return NextResponse.json({ error: error.message }, { status: 400 });
     }
-    // Handle Prisma unique constraint violation
     if (error.code === 'P2002') {
       if (error.meta?.target?.includes('UQ_Class_School_Name_Year_Level')) {
         return NextResponse.json({ error: 'A class with this name already exists for the selected school level and academic year.' }, { status: 409 });
@@ -195,15 +194,13 @@ export async function POST(request, { params }) {
       if (error.meta?.target?.includes('UQ_Section_Class_Name')) {
         return NextResponse.json({ error: 'One of the section names provided already exists for this new class.' }, { status: 409 });
       }
-      // Generic unique constraint error
       const targetField = error.meta?.target ? (Array.isArray(error.meta.target) ? error.meta.target.join(', ') : error.meta.target) : 'unknown field(s)';
       return NextResponse.json({ error: `A class or section with conflicting unique data already exists. Conflict on: ${targetField}.` }, { status: 409 });
     }
-    // Handle foreign key constraint error (P2003)
     if (error.code === 'P2003') {
         const field = error.meta?.field_name || 'a related record';
         return NextResponse.json({ error: `Invalid ${field} provided. Ensure it exists and belongs to this school.` }, { status: 400 });
     }
-    return NextResponse.json({ error: 'Failed to create class.', details: error.message || 'An unexpected server error occurred.' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to create class.', details: error?.message || 'An unexpected server error occurred.' }, { status: 500 });
   }
 }
