@@ -43,20 +43,20 @@ const initialExamScheduleFormData = {
   date: '',
   startTime: '',
   endTime: '',
-  room: '',
+  room: '', // Updated from roomId to match your schema
   maxMarks: '',
 };
 
 // --- Reusable Form Components ---
-const ExamFormFields = ({ formData, onFormChange, onSelectChange, academicYears, isLoadingDeps }) => {
+const ExamFormFields = ({ formData, onFormChange, onSelectChange, academicYearsList, isLoadingDeps }) => {
   const labelTextClasses = "text-black dark:text-white block text-sm font-medium mb-1 text-left";
   const inputTextClasses = "bg-white/50 dark:bg-zinc-800/50 text-black dark:text-white border-zinc-300 dark:border-zinc-700 focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-500 dark:focus:border-sky-500";
 
   const filteredTerms = useMemo(() => {
-    if (!formData.academicYearId || !Array.isArray(academicYears)) return [];
-    const selectedYear = academicYears.find(year => year.id === formData.academicYearId);
+    if (!formData.academicYearId || !Array.isArray(academicYearsList)) return [];
+    const selectedYear = academicYearsList.find(year => year.id === formData.academicYearId);
     return selectedYear && Array.isArray(selectedYear.terms) ? selectedYear.terms : [];
-  }, [formData.academicYearId, academicYears]);
+  }, [formData.academicYearId, academicYearsList]);
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 p-1">
@@ -69,7 +69,7 @@ const ExamFormFields = ({ formData, onFormChange, onSelectChange, academicYears,
         <Select name="academicYearId" value={formData.academicYearId || ''} onValueChange={(value) => onSelectChange('academicYearId', value)} disabled={isLoadingDeps}>
           <SelectTrigger className={`${inputTextClasses} mt-1`}> <SelectValue placeholder="Select academic year" /> </SelectTrigger>
           <SelectContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700">
-            {isLoadingDeps ? <SelectItem value="loading" disabled>Loading...</SelectItem> : academicYears.length === 0 ? <SelectItem value="no-years" disabled>No academic years found</SelectItem> : academicYears.map(year => <SelectItem key={year.id} value={year.id}>{year.name}</SelectItem>)}
+            {isLoadingDeps ? <SelectItem value="loading" disabled>Loading...</SelectItem> : academicYearsList.length === 0 ? <SelectItem value="no-years" disabled>No academic years found</SelectItem> : academicYearsList.map(year => <SelectItem key={year.id} value={year.id}>{year.name}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -88,7 +88,7 @@ const ExamFormFields = ({ formData, onFormChange, onSelectChange, academicYears,
   );
 };
 
-const ExamScheduleFormFields = ({ formData, onFormChange, onSelectChange, examsList, subjectsList, classesList, isLoadingDeps }) => {
+const ExamScheduleFormFields = ({ formData, onFormChange, onSelectChange, examsList, subjectsList, classesList, roomsList, isLoadingDeps }) => {
   const labelTextClasses = "text-black dark:text-white block text-sm font-medium mb-1 text-left";
   const inputTextClasses = "bg-white/50 dark:bg-zinc-800/50 text-black dark:text-white border-zinc-300 dark:border-zinc-700 focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-500 dark:focus:border-sky-500";
   
@@ -152,6 +152,7 @@ const ExamScheduleFormFields = ({ formData, onFormChange, onSelectChange, examsL
   );
 };
 
+
 export default function ManageExaminationsPage() {
   const schoolData = useSchool();
   const { data: session } = useSession();
@@ -164,7 +165,7 @@ export default function ManageExaminationsPage() {
   const [academicYears, setAcademicYears] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [classes, setClasses] = useState([]);
-  const [rooms, setRooms] = useState([]); // ✨ Declared state for rooms
+  const [rooms, setRooms] = useState([]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingDeps, setIsLoadingDeps] = useState(true);
@@ -201,23 +202,17 @@ export default function ManageExaminationsPage() {
         fetch(`/api/schools/${schoolData.id}/academic-years?includeTerms=true`), // API needs to support this
         fetch(`/api/schools/${schoolData.id}/academics/subjects?includeClasses=true`), // API needs to support this
         fetch(`/api/schools/${schoolData.id}/academics/classes`),
-        // fetch(`/api/schools/${schoolData.id}/resources/rooms`), // This API needs to be created
       ]);
-
       const results = await Promise.all([examsRes, schedulesRes, yearsRes, subjectsRes, classesRes].map(r => {
-        if (!r.ok) {
-            return r.json().then(e => Promise.reject(e.error || `A fetch operation failed with status ${r.status}`));
-        }
+        if (!r.ok) { return r.json().then(e => Promise.reject(e.error || `A fetch operation failed with status ${r.status}`)); }
         return r.json();
       }));
-      
       setExams(results[0]?.exams || []);
       setExamSchedules(results[1]?.examSchedules || []);
       setAcademicYears(results[2]?.academicYears || []);
       setSubjects(results[3]?.subjects || []);
       setClasses(results[4]?.classes || []);
-      setRooms([]); // Set to empty array since API is not ready
-
+      setRooms([]); // Placeholder
     } catch (err) {
       const errorMsg = typeof err === 'string' ? err : (err.error || err.message || 'Failed to fetch page data.');
       toast.error("Error Loading Data", { description: errorMsg }); setError(errorMsg);
@@ -248,7 +243,7 @@ export default function ManageExaminationsPage() {
     e.preventDefault(); if (!schoolData?.id) return;
     setIsSubmittingExam(true); setExamFormError('');
     const isEditing = !!editingExam;
-    const { academicYearId, ...payload } = examFormData;
+    const { id, academicYearId, ...payload } = examFormData;
     const url = isEditing ? `/api/schools/${schoolData.id}/academics/exams/${editingExam.id}` : `/api/schools/${schoolData.id}/academics/exams`;
     const method = isEditing ? 'PUT' : 'POST';
     const actionText = isEditing ? 'update' : 'create';
@@ -314,14 +309,23 @@ export default function ManageExaminationsPage() {
     } catch (err) { toast.error(`Deletion Failed: ${err.message}`, { id: toastId }); }
   };
 
+  const allTerms = useMemo(() => academicYears.flatMap(ay => ay.terms || []), [academicYears]);
+  const getTermName = useCallback((id) => allTerms.find(t => t.id === id)?.name || 'N/A', [allTerms]);
+  const getAcademicYearName = useCallback((termId) => {
+    const term = allTerms.find(t => t.id === termId);
+    if (term && term.academicYearId) {
+      return academicYears.find(y => y.id === term.academicYearId)?.name || 'N/A';
+    }
+    return 'N/A';
+  }, [allTerms, academicYears]);
+  const getSubjectName = useCallback((id) => subjects.find(s => s.id === id)?.name || 'N/A', [subjects]);
+  const getClassName = useCallback((id) => classes.find(c => c.id === id)?.name || 'N/A', [classes]);
   const getExamNameAndContext = useCallback((id) => {
     const exam = exams.find(e => e.id === id);
     if (!exam) return 'N/A';
-    return `${exam.name} (${exam.term?.academicYear?.name})`;
-  }, [exams]);
-  const getSubjectName = useCallback((id) => subjects.find(s => s.id === id)?.name || 'N/A', [subjects]);
-  const getClassName = useCallback((id) => classes.find(c => c.id === id)?.name || 'N/A', [classes]);
-  const getRoomName = useCallback((id) => rooms.find(r => r.id === id)?.name || 'N/A', [rooms]); // Correctly uses declared rooms state
+    return `${exam.name} (${getAcademicYearName(exam.termId)})`;
+  }, [exams, getAcademicYearName]);
+  const getRoomName = useCallback((id) => rooms.find(r => r.id === id)?.name || 'N/A', [rooms]);
   const formatScheduleDate = (dateString) => { if (!dateString) return 'N/A'; return new Date(dateString).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); };
 
   return (
@@ -346,7 +350,6 @@ export default function ManageExaminationsPage() {
               </form>
             </DialogContent>
           </Dialog>
-
           <Dialog open={isScheduleDialogOpen} onOpenChange={(open) => { setIsScheduleDialogOpen(open); if (!open) setScheduleFormError(''); }}>
             <DialogTrigger asChild><Button className={outlineButtonClasses} onClick={() => openAddScheduleDialog()}> <PlusCircle className="mr-2 h-4 w-4" /> Add Schedule </Button></DialogTrigger>
             <DialogContent className="sm:max-w-lg md:max-w-2xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
@@ -363,9 +366,7 @@ export default function ManageExaminationsPage() {
           </Dialog>
         </div>
       </div>
-      
       {error && ( <Alert variant="destructive" className="bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300 dark:border-red-700/50"> <AlertTriangle className="h-4 w-4" /> <AlertTitle>Error</AlertTitle> <AlertDescription>{error}</AlertDescription> </Alert> )}
-      
       <div className={`${glassCardClasses} overflow-x-auto mb-8`}>
         <h2 className={`text-xl font-bold ${titleTextClasses} mb-4 flex items-center`}> <CalendarDays className="mr-2 h-6 w-6 opacity-80"/>Defined Exams </h2>
         <Table>
@@ -383,7 +384,6 @@ export default function ManageExaminationsPage() {
           </TableBody>
         </Table>
       </div>
-
       <div className={`${glassCardClasses} overflow-x-auto`}>
         <h2 className={`text-xl font-bold ${titleTextClasses} mb-4 flex items-center`}> <Clock className="mr-2 h-6 w-6 opacity-80"/>Exam Schedules </h2>
         <Table>
