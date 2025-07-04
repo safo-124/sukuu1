@@ -54,21 +54,28 @@ export const updateTermSchema = baseTermSchema.partial().refine(data => {
 
 export const termIdSchema = z.string().min(1);
 
-
 // --- Class Schemas ---
-export const createClassSchema = z.object({
-  name: z.string().min(1).max(255),
-  schoolLevelId: z.string().min(1),
-  academicYearId: z.string().min(1),
-  sections: z.array(z.object({
-    name: z.string().min(1),
-    maxCapacity: z.coerce.number().int().min(0).optional().nullable(),
-    classTeacherId: z.string().optional().nullable(),
-  })).optional(),
+
+const sectionDefinitionSchema = z.object({
+  name: z.string().min(1, {message: "Section name must not be empty."}).max(50).trim(),
 });
 
-export const updateClassSchema = createClassSchema.partial();
-export const classIdSchema = z.string().min(1);
+export const classSchema = z.object({
+  name: z.string().min(1, { message: "Class name is required." }).max(100).trim(),
+  schoolLevelId: z.string().cuid({ message: "A valid School Level must be selected." }),
+  academicYearId: z.string().cuid({ message: "A valid Academic Year must be selected." }),
+  sections: z.array(sectionDefinitionSchema).optional().default([]),
+});
+export const updateClassSchema = classSchema.pick({ name: true, schoolLevelId: true, academicYearId: true }).partial();
+
+// --- Section (for individual management) ---
+export const sectionSchema = z.object({
+  name: z.string().min(1).max(50).trim(),
+  classId: z.string().cuid(),
+  classTeacherId: z.string().cuid().optional().nullable(),
+  maxCapacity: z.coerce.number().int().positive().optional().nullable(),
+});
+export const updateSectionSchema = sectionSchema.partial();
 
 
 // --- School Level Schemas ---
@@ -236,4 +243,34 @@ export const examSchema = z.object({
 });
 
 export const updateExamSchema = examSchema.partial();
+
+const singleGradeEntrySchema = z.object({
+  studentId: z.string().cuid({ message: "Invalid Student ID." }),
+  marksObtained: z.coerce // Coerce form input (string) to number
+    .number({ invalid_type_error: "Marks must be a number." })
+    .min(0, { message: "Marks cannot be negative." })
+    .nullable(), // Allow null for students not yet graded
+});
+
+// Schema for submitting a batch of grades for a specific exam schedule
+export const batchGradeSubmissionSchema = z.object({
+  examScheduleId: z.string().cuid({ message: "Invalid Exam Schedule ID." }),
+  termId: z.string().cuid({ message: "Invalid Term ID." }),
+  academicYearId: z.string().cuid({ message: "Invalid Academic Year ID." }),
+  subjectId: z.string().cuid({ message: "Invalid Subject ID." }),
+  grades: z.array(singleGradeEntrySchema),
+});
+
+// Schema for updating a single grade record
+export const updateGradeSchema = z.object({
+  marksObtained: z.coerce
+    .number({ invalid_type_error: "Marks must be a number." })
+    .min(0, { message: "Marks cannot be negative." })
+    .optional()
+    .nullable(),
+  gradeLetter: z.string().max(5).optional().nullable(),
+  gpa: z.coerce.number().min(0).optional().nullable(),
+  comments: z.string().max(500).optional().nullable(),
+});
+
 

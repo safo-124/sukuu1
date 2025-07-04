@@ -357,6 +357,8 @@ model Section {
   assignments        Assignment[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
+  Grade              Grade[]
+  examSchedules       ExamSchedule[]
 
   @@unique([classId, name], map: "UQ_Section_Class_Name")
   @@index([schoolId])
@@ -688,6 +690,8 @@ model Grade {
   gpa            Float?
   comments       String?
   schoolId       String
+  sectionId      String // The ID of the section taking this specific exam
+  section        Section       @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   school         School        @relation(fields: [schoolId], references: [id], onDelete: Restrict)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
@@ -696,6 +700,7 @@ model Grade {
   assignmentId String? // Foreign key to Assignment
   assignment   Assignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
 
+  @@unique([studentId, examScheduleId, subjectId])
   @@index([studentId, subjectId, academicYearId])
   @@index([schoolId])
   @@index([assignmentId]) // New index
@@ -762,6 +767,8 @@ model ExamSchedule {
   schoolId  String
   school    School   @relation(fields: [schoolId], references: [id], onDelete: Restrict)
   grades    Grade[]
+  sectionId   String
+  section     Section   @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   maxMarks  Float
