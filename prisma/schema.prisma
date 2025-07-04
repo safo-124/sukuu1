@@ -146,7 +146,7 @@ model School {
   timetableEntries        TimetableEntry[]
   feeStructures           FeeStructure[]
   invoices                Invoice[]
-  expenses                Expense[] // UPDATED: Now links to User for paidBy
+  expenses                Expense[]
   expenseCategories       ExpenseCategory[]
   vendors                 Vendor[]
   purchaseOrders          PurchaseOrder[]
@@ -159,7 +159,7 @@ model School {
   leaveApplications       LeaveApplication[]
   payrollRecords          PayrollRecord[]
   terms                   Term[]
-  GradingWeightConfig     GradingWeightConfig[]
+  GradingWeightConfig     GradingWeightConfig[] // UPDATED: Now links to GradingScale
   buildings               Building[]
   rooms                   Room[]
   hostels                 Hostel[]
@@ -197,7 +197,7 @@ model User {
   staffAttendancesTaken   StaffAttendance[] @relation("StaffAttendanceTakenBy")
   studentAttendancesTaken Attendance[]      @relation("TakenBy")
   paymentsProcessed       Payment[]         @relation("ProcessedBy")
-  expensesPaid            Expense[]         @relation("PaidByExpense") // NEW: Inverse relation for Expense.paidById
+  expensesPaid            Expense[]         @relation("PaidByExpense")
 
   @@index([email])
   @@index([schoolId])
@@ -252,6 +252,7 @@ model SchoolLevel {
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
   GradingWeightConfig GradingWeightConfig[]
+  // No direct relation to GradingScale here, it's done via GradingWeightConfig
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -496,9 +497,9 @@ model Staff {
   leaveApplications         LeaveApplication[]
   payrollRecords            PayrollRecord[]
   timetableEntries          TimetableEntry[]
-  hostels                   Hostel[] // New: Hostels where this staff is a warden
-  drivers                   Driver[] // Drivers profile for this staff member
-  maxWeeklyTeachingHours    Float? // NEW: Max hours a teacher can spend in class weekly
+  hostels                   Hostel[]
+  drivers                   Driver[]
+  maxWeeklyTeachingHours    Float?
   createdAt                 DateTime               @default(now())
   updatedAt                 DateTime               @updatedAt
 
@@ -613,6 +614,7 @@ model Assignment {
   schoolId             String
   school               School                @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   submittedAssignments SubmittedAssignment[]
+  Grade                Grade[]
 
   @@index([schoolId, subjectId])
   @@index([sectionId])
@@ -642,14 +644,15 @@ model SubmittedAssignment {
 }
 
 model GradingScale {
-  id           String        @id @default(cuid())
-  name         String
-  description  String?
-  schoolId     String
-  school       School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  gradeDetails GradeDetail[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id                  String                @id @default(cuid())
+  name                String
+  description         String?
+  schoolId            String
+  school              School                @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  gradeDetails        GradeDetail[]
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  GradingWeightConfig GradingWeightConfig[]
 
   @@unique([schoolId, name])
 }
@@ -689,8 +692,13 @@ model Grade {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
+  // NEW: Link to Assignment (if grade is for an assignment)
+  assignmentId String? // Foreign key to Assignment
+  assignment   Assignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+
   @@index([studentId, subjectId, academicYearId])
   @@index([schoolId])
+  @@index([assignmentId]) // New index
 }
 
 model GradingWeightConfig {
@@ -706,6 +714,9 @@ model GradingWeightConfig {
   subjectId      String?
   subject        Subject?     @relation(fields: [subjectId], references: [id], onDelete: SetNull)
 
+  gradingScaleId String? // NEW: Link to the GradingScale used for this configuration
+  gradingScale   GradingScale? @relation(fields: [gradingScaleId], references: [id], onDelete: SetNull)
+
   examWeight       Float
   classworkWeight  Float
   assignmentWeight Float
@@ -719,6 +730,7 @@ model GradingWeightConfig {
   @@index([schoolLevelId])
   @@index([classId])
   @@index([subjectId])
+  @@index([gradingScaleId]) // NEW INDEX
 }
 
 model Exam {
@@ -950,14 +962,14 @@ model Expense {
   vendor      Vendor?         @relation(fields: [vendorId], references: [id], onDelete: SetNull)
   receiptUrl  String?
   paidById    String // User ID of staff who recorded/paid
-  paidBy      User            @relation("PaidByExpense", fields: [paidById], references: [id], onDelete: Restrict) // NEW RELATION
+  paidBy      User            @relation("PaidByExpense", fields: [paidById], references: [id], onDelete: Restrict)
   schoolId    String
   school      School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
   @@index([schoolId, date])
-  @@index([paidById]) // NEW INDEX
+  @@index([paidById])
 }
 
 model LeaveType {

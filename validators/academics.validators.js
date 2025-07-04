@@ -229,3 +229,11 @@ export const createPayrollRecordSchema = z.object(basePayrollRecordShape).refine
     return true;
 });
 
+export const examSchema = z.object({
+  name: z.string().min(3, { message: "Exam name must be at least 3 characters." }).max(100),
+  termId: z.string().cuid({ message: "A valid term must be selected for the exam." }),
+  // You could add other fields here if needed, like start/end dates for the exam period
+});
+
+export const updateExamSchema = examSchema.partial();
+
