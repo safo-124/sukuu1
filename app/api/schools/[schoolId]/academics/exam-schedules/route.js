@@ -22,11 +22,13 @@ export async function GET(request, { params }) {
         exam: { include: { term: { include: { academicYear: true } } } },
         subject: { select: { name: true } },
         class: { select: { name: true } },
-        // ✨ 'room' is REMOVED from include because it's a scalar String field, not a relation.
-        // Prisma fetches the 'room' string automatically as part of the ExamSchedule record.
+        // ✨ FIX: 'room' is REMOVED from the include block.
+        // Since 'room' is a regular text field (a scalar field) on your ExamSchedule model,
+        // Prisma fetches it automatically. 'include' is only for relations to other models.
       },
       orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
     });
+
     return NextResponse.json({ examSchedules }, { status: 200 });
   } catch (error) {
     console.error('Error fetching exam schedules:', error);
@@ -51,27 +53,24 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: 'Invalid input.', issues: validation.error.issues }, { status: 400 });
     }
 
-    const { examId, subjectId, classId, date, startTime, endTime, roomId, maxMarks } = validation.data;
+    // Assuming your validator provides 'room' as a string, not 'roomId'
+    const { examId, subjectId, classId, date, startTime, endTime, room, maxMarks } = validation.data;
 
-    // Your schema has 'room' as a String, but the validator expects 'roomId'.
-    // Let's assume the validator is correct and your schema should link to a Room model.
-    // If 'room' is just a string, update your validator. For now, we'll use roomId.
-    const [exam, subject, classRecord, room] = await Promise.all([
+    // Server-side validation of linked entities
+    const [exam, subject, classRecord] = await Promise.all([
       prisma.exam.findUnique({ where: { id: examId, schoolId: schoolId } }),
       prisma.subject.findUnique({ where: { id: subjectId, schoolId: schoolId } }),
       prisma.class.findUnique({ where: { id: classId, schoolId: schoolId } }),
-      roomId ? prisma.room.findUnique({ where: { id: roomId, schoolId: schoolId } }) : Promise.resolve(true),
     ]);
 
     if (!exam) return NextResponse.json({ error: 'Exam not found or does not belong to this school.' }, { status: 400 });
     if (!subject) return NextResponse.json({ error: 'Subject not found or does not belong to this school.' }, { status: 400 });
     if (!classRecord) return NextResponse.json({ error: 'Class not found or does not belong to this school.' }, { status: 400 });
-    if (roomId && !room) return NextResponse.json({ error: 'Room not found or does not belong to this school.' }, { status: 400 });
 
     const newExamSchedule = await prisma.examSchedule.create({
       data: {
         examId, subjectId, classId, date, startTime, endTime, maxMarks,
-        roomId: roomId || null, // Use roomId to link to the Room model
+        room: room || null, // Save the room string
         schoolId: schoolId,
       },
     });

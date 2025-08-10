@@ -26,23 +26,28 @@ export async function GET(request, { params }) {
             academicYearId: true 
           } 
         },
+        section: { // Also include the section details
+          select: {
+            id: true,
+            name: true
+          }
+        }
       }
     });
 
     if (!examSchedule) {
       return NextResponse.json({ error: 'Exam schedule not found.' }, { status: 404 });
     }
-    if (!examSchedule.class) {
-      return NextResponse.json({ error: 'Exam schedule is not linked to a valid class.' }, { status: 404 });
+    // Use sectionId from the schedule for fetching students
+    if (!examSchedule.sectionId) {
+      return NextResponse.json({ error: 'Exam schedule is not linked to a valid section.' }, { status: 404 });
     }
 
-    // 2. Fetch all students currently enrolled in all sections of that class for the correct academic year
+    // 2. Fetch all students currently enrolled in that specific section for the correct academic year
     const enrollments = await prisma.studentEnrollment.findMany({
         where: {
             schoolId: schoolId,
-            section: {
-                classId: examSchedule.classId,
-            },
+            sectionId: examSchedule.sectionId,
             academicYearId: examSchedule.class.academicYearId,
             isCurrent: true,
         },
@@ -55,12 +60,11 @@ export async function GET(request, { params }) {
                     studentIdNumber: true
                 }
             },
-            section: { // Also get the section name for display
+            section: {
                 select: { name: true }
             }
         },
         orderBy: [
-            { section: { name: 'asc' } },
             { student: { lastName: 'asc' } },
             { student: { firstName: 'asc' } }
         ]

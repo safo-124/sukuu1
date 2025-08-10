@@ -2,17 +2,14 @@ import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { updateExamSchema } from '@/validators/exams.validators'; // Import from new file
+import { updateExamSchema } from '@/validators/exams.validators';
 
-// PUT handler to update an exam
 export async function PUT(request, { params }) {
   const { schoolId, examId } = params;
   const session = await getServerSession(authOptions);
-
   if (!session || session.user?.schoolId !== schoolId || session.user?.role !== 'SCHOOL_ADMIN') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-
   try {
     const body = await request.json();
     const validation = updateExamSchema.safeParse(body);
@@ -31,15 +28,12 @@ export async function PUT(request, { params }) {
   }
 }
 
-// DELETE handler to delete an exam
 export async function DELETE(request, { params }) {
   const { schoolId, examId } = params;
   const session = await getServerSession(authOptions);
-
   if (!session || session.user?.schoolId !== schoolId || session.user?.role !== 'SCHOOL_ADMIN') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-
   try {
     const scheduleCount = await prisma.examSchedule.count({ where: { examId: examId } });
     if (scheduleCount > 0) {

@@ -1,39 +1,29 @@
-// validators/exams.validators.js
 import { z } from 'zod';
 
 // Schema for creating an Exam type (e.g., Mid-Term, Final)
 export const createExamSchema = z.object({
-  name: z.string().min(1, "Exam name is required.").max(255, "Exam name is too long."),
-  termId: z.string().min(1, "Term is required."),
+  name: z.string().min(3, { message: "Exam name is required." }).max(100),
+  termId: z.string().cuid({ message: "A valid term must be selected." }),
 });
 export const updateExamSchema = createExamSchema.partial();
-export const examIdSchema = z.string().min(1, "Exam ID is required.");
+export const examIdSchema = z.string().cuid();
 
-
-// --- Exam Schedule Schemas (Corrected Structure) ---
-
-// Step 1: Define the base object schema without the object-level refine
+// Schema for creating/updating a single Exam Schedule entry
 const baseExamScheduleSchema = z.object({
-  examId: z.string().min(1, "Exam is required."),
-  subjectId: z.string().min(1, "Subject is required."),
-  classId: z.string().cuid({ message: "A valid class must be selected." }), // Added from your schema
-  date: z.string().datetime("Date must be a valid date string (ISO 8601)."),
-  startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Start time must be in HH:MM format (e.g., 09:00)."),
-  endTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "End time must be in HH:MM format (e.g., 10:30)."),
-  roomId: z.string().cuid("Invalid Room ID.").nullable().optional(), // Match your schema
+  examId: z.string().cuid({ message: "A valid exam must be selected." }),
+  subjectId: z.string().cuid({ message: "A valid subject must be selected." }),
+  classId: z.string().cuid({ message: "A valid class must be selected." }),
+  date: z.coerce.date({ required_error: "Exam date is required." }),
+  startTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, { message: "Start time must be in HH:MM format." }),
+  endTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, { message: "End time must be in HH:MM format." }),
+  roomId: z.string().cuid("Invalid Room ID.").optional().nullable(),
   maxMarks: z.coerce.number().min(0, "Max marks cannot be negative."),
 });
 
-// Step 2: Apply the refine to the base schema for the final creation schema
-export const createExamScheduleSchema = baseExamScheduleSchema.refine(data => {
-  const start = new Date(`2000-01-01T${data.startTime}:00`);
-  const end = new Date(`2000-01-01T${data.endTime}:00`);
-  return start < end;
-}, {
+export const createExamScheduleSchema = baseExamScheduleSchema.refine(
+  (data) => data.endTime > data.startTime, {
   message: "End time must be after start time.",
   path: ["endTime"],
 });
-
-// Step 3: Create the update schema by calling .partial() on the BASE schema
 export const updateExamScheduleSchema = baseExamScheduleSchema.partial();
-export const examScheduleIdSchema = z.string().min(1, "Exam Schedule ID is required.");
+export const examScheduleIdSchema = z.string().cuid();

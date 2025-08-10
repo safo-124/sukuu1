@@ -97,6 +97,26 @@ export const createDepartmentSchema = z.object({
 export const updateDepartmentSchema = createDepartmentSchema.partial();
 export const departmentIdSchema = z.string().min(1);
 
+// --- ✨ Subject Schemas (Added) ✨ ---
+export const subjectSchema = z.object({
+  name: z.string().min(2, { message: "Subject name must be at least 2 characters." }).max(100),
+  subjectCode: z.string().max(20).optional().nullable(),
+  description: z.string().max(500).optional().nullable(),
+  departmentId: z.string().cuid({ message: "Invalid Department ID."}).optional().nullable(),
+  teacherId: z.string().cuid({ message: "A teacher must be assigned to this subject." }),
+  schoolLevelIds: z.array(z.string().cuid({ message: "Invalid School Level ID in selection."}))
+                   .min(1, { message: "At least one school level must be selected for this subject." }),
+  weeklyHours: z.coerce.number({ invalid_type_error: "Weekly hours must be a number." }).positive({ message: "Weekly hours must be positive."}).optional().nullable(),
+});
+
+export const updateSubjectSchema = z.object({
+  name: z.string().min(2).max(100).optional(),
+  subjectCode: z.string().max(20).optional().nullable(),
+  description: z.string().max(500).optional().nullable(),
+  departmentId: z.string().cuid().optional().nullable(),
+  weeklyHours: z.coerce.number().positive().optional().nullable(),
+});
+
 
 // --- Staff Attendance Schemas ---
 export const createStaffAttendanceSchema = z.object({
@@ -173,11 +193,7 @@ export const createTimetableEntrySchema = baseTimetableEntrySchema.refine(data =
   path: ["endTime"],
 });
 
-// FIX: updateTimetableEntrySchema is now defined as a partial of baseTimetableEntrySchema,
-// ensuring it's a ZodObject that can be extended in the API routes.
 export const updateTimetableEntrySchema = baseTimetableEntrySchema.partial();
-
-
 export const timetableEntryIdSchema = z.string().min(1);
 
 
@@ -212,7 +228,6 @@ export const generateTimetableSuggestionSchema = z.object({
 });
 
 // --- Payroll Schemas (FIXED) ---
-// Define base shape for PayrollRecord
 const basePayrollRecordShape = {
   staffId: z.string().min(1, "Staff member is required."),
   payPeriodStart: z.string().datetime("Pay period start date must be a valid date string (ISO 8601)."),
@@ -224,40 +239,34 @@ const basePayrollRecordShape = {
   isPaid: z.boolean().default(false),
 };
 
-// Schema for creating PayrollRecord
 export const createPayrollRecordSchema = z.object(basePayrollRecordShape).refine(data => new Date(data.payPeriodStart) < new Date(data.payPeriodEnd), {
     message: "Pay period end date must be after start date.",
     path: ["payPeriodEnd"]
 }).refine(data => {
-    // Net salary calculation is typically backend, but ensure basic components are reasonable
     if (data.basicSalary < (data.deductions || 0)) {
-        // This is a soft constraint, typically handled by calculation, but can be a warning
     }
     return true;
 });
 
+// --- Exam & Grade Schemas ---
 export const examSchema = z.object({
   name: z.string().min(3, { message: "Exam name must be at least 3 characters." }).max(100),
   termId: z.string().cuid({ message: "A valid term must be selected for the exam." }),
-  // You could add other fields here if needed, like start/end dates for the exam period
 });
-
 export const updateExamSchema = examSchema.partial();
 
 const singleGradeEntrySchema = z.object({
   studentId: z.string().cuid({ message: "Invalid Student ID." }),
   marksObtained: z.coerce.number({ invalid_type_error: "Marks must be a number." }).min(0).nullable(),
 });
-
 export const batchGradeSubmissionSchema = z.object({
   examScheduleId: z.string().cuid({ message: "Invalid Exam Schedule ID." }),
   termId: z.string().cuid({ message: "Invalid Term ID." }),
   academicYearId: z.string().cuid({ message: "Invalid Academic Year ID." }),
   subjectId: z.string().cuid({ message: "Invalid Subject ID." }),
-  sectionId: z.string().cuid({ message: "Invalid Section ID." }), // ✨ Added sectionId
+  sectionId: z.string().cuid({ message: "Invalid Section ID." }),
   grades: z.array(singleGradeEntrySchema),
 });
-
 export const updateGradeSchema = z.object({
   marksObtained: z.coerce.number().min(0).optional().nullable(),
   gradeLetter: z.string().max(5).optional().nullable(),
