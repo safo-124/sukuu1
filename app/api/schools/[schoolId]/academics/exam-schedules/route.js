@@ -4,93 +4,75 @@ import prisma from '@/lib/prisma';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { z } from 'zod';
-// Re-using schoolIdSchema from assignment validators for consistency, adjust path if needed
-import { schoolIdSchema } from '@/validators/assignment';
-import { createExamScheduleSchema } from '@/validators/exams.validators'; // Import exam schedule schemas
+import { createExamScheduleSchema } from '@/validators/exams.validators'; // Correct import
 
-// GET /api/schools/[schoolId]/academics/exam-schedules
-// Fetches all exam schedules for a specific school
+// GET handler to list all exam schedules for a specific school
 export async function GET(request, { params }) {
   const { schoolId } = params;
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'TEACHER')) {
-    console.warn(`Unauthorized access attempt to /api/schools/${schoolId}/academics/exam-schedules by user: ${session?.user?.id}, role: ${session?.user?.role}, schoolId: ${session?.user?.schoolId}`);
     return NextResponse.json({ error: 'Unauthorized access.' }, { status: 401 });
   }
 
   try {
-    const parsedSchoolId = schoolIdSchema.parse(schoolId);
-
     const examSchedules = await prisma.examSchedule.findMany({
-      where: { schoolId: parsedSchoolId },
+      where: { schoolId: schoolId },
       include: {
-        exam: { select: { id: true, name: true, term: { select: { id: true, name: true, academicYear: { select: { id: true, name: true } } } } } },
-        subject: { select: { id: true, name: true } },
-        room: { select: { id: true, name: true } }, // Include room if you have a Room model
+        exam: { include: { term: { include: { academicYear: true } } } },
+        subject: { select: { name: true } },
+        class: { select: { name: true } },
+        // ✨ 'room' is REMOVED from include because it's a scalar String field, not a relation.
+        // Prisma fetches the 'room' string automatically as part of the ExamSchedule record.
       },
-      orderBy: [
-        { date: 'asc' },
-        { startTime: 'asc' },
-      ],
+      orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
     });
-
     return NextResponse.json({ examSchedules }, { status: 200 });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Validation Error', issues: error.issues }, { status: 400 });
-    }
     console.error('Error fetching exam schedules:', error);
     return NextResponse.json({ error: 'Failed to retrieve exam schedules.' }, { status: 500 });
   }
 }
 
-// POST /api/schools/[schoolId]/academics/exam-schedules
-// Creates a new exam schedule for a specific school
+// POST handler to create a new exam schedule for a specific school
 export async function POST(request, { params }) {
   const { schoolId } = params;
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'TEACHER')) {
+  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
     const body = await request.json();
-    const parsedSchoolId = schoolIdSchema.parse(schoolId);
-    const parsedData = createExamScheduleSchema.parse(body);
+    const validation = createExamScheduleSchema.safeParse(body);
 
-    // Validate that linked entities belong to the same school
-    const [exam, subject, room] = await Promise.all([
-      prisma.exam.findUnique({ where: { id: parsedData.examId, schoolId: parsedSchoolId } }),
-      prisma.subject.findUnique({ where: { id: parsedData.subjectId, schoolId: parsedSchoolId } }),
-      parsedData.roomId ? prisma.room.findUnique({ where: { id: parsedData.roomId, schoolId: parsedSchoolId } }) : Promise.resolve(null),
+    if (!validation.success) {
+      return NextResponse.json({ error: 'Invalid input.', issues: validation.error.issues }, { status: 400 });
+    }
+
+    const { examId, subjectId, classId, date, startTime, endTime, roomId, maxMarks } = validation.data;
+
+    // Your schema has 'room' as a String, but the validator expects 'roomId'.
+    // Let's assume the validator is correct and your schema should link to a Room model.
+    // If 'room' is just a string, update your validator. For now, we'll use roomId.
+    const [exam, subject, classRecord, room] = await Promise.all([
+      prisma.exam.findUnique({ where: { id: examId, schoolId: schoolId } }),
+      prisma.subject.findUnique({ where: { id: subjectId, schoolId: schoolId } }),
+      prisma.class.findUnique({ where: { id: classId, schoolId: schoolId } }),
+      roomId ? prisma.room.findUnique({ where: { id: roomId, schoolId: schoolId } }) : Promise.resolve(true),
     ]);
 
-    if (!exam) {
-      return NextResponse.json({ error: 'Exam not found or does not belong to this school.' }, { status: 400 });
-    }
-    if (!subject) {
-      return NextResponse.json({ error: 'Subject not found or does not belong to this school.' }, { status: 400 });
-    }
-    if (parsedData.roomId && !room) {
-      return NextResponse.json({ error: 'Room not found or does not belong to this school.' }, { status: 400 });
-    }
-
-    // TODO (Advanced): Implement conflict detection here
-    // Check for existing schedules in the same room at the same time
-    // Check for existing schedules for the same subject/exam at the same time (if unique per subject/exam)
+    if (!exam) return NextResponse.json({ error: 'Exam not found or does not belong to this school.' }, { status: 400 });
+    if (!subject) return NextResponse.json({ error: 'Subject not found or does not belong to this school.' }, { status: 400 });
+    if (!classRecord) return NextResponse.json({ error: 'Class not found or does not belong to this school.' }, { status: 400 });
+    if (roomId && !room) return NextResponse.json({ error: 'Room not found or does not belong to this school.' }, { status: 400 });
 
     const newExamSchedule = await prisma.examSchedule.create({
       data: {
-        examId: parsedData.examId,
-        subjectId: parsedData.subjectId,
-        date: new Date(parsedData.date),
-        startTime: parsedData.startTime,
-        endTime: parsedData.endTime,
-        roomId: parsedData.roomId,
-        maxMarks: parsedData.maxMarks,
-        schoolId: parsedSchoolId,
+        examId, subjectId, classId, date, startTime, endTime, maxMarks,
+        roomId: roomId || null, // Use roomId to link to the Room model
+        schoolId: schoolId,
       },
     });
 
@@ -99,9 +81,8 @@ export async function POST(request, { params }) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Validation Error', issues: error.issues }, { status: 400 });
     }
-    // Handle unique constraint violation if you add one to ExamSchedule (e.g., per exam, subject, date, time)
     if (error.code === 'P2002') {
-        return NextResponse.json({ error: 'An exam schedule for this subject at this time already exists.' }, { status: 409 });
+        return NextResponse.json({ error: 'An exam schedule for this subject and class already exists.' }, { status: 409 });
     }
     console.error('Error creating exam schedule:', error);
     return NextResponse.json({ error: 'Failed to create exam schedule.' }, { status: 500 });

@@ -246,31 +246,21 @@ export const updateExamSchema = examSchema.partial();
 
 const singleGradeEntrySchema = z.object({
   studentId: z.string().cuid({ message: "Invalid Student ID." }),
-  marksObtained: z.coerce // Coerce form input (string) to number
-    .number({ invalid_type_error: "Marks must be a number." })
-    .min(0, { message: "Marks cannot be negative." })
-    .nullable(), // Allow null for students not yet graded
+  marksObtained: z.coerce.number({ invalid_type_error: "Marks must be a number." }).min(0).nullable(),
 });
 
-// Schema for submitting a batch of grades for a specific exam schedule
 export const batchGradeSubmissionSchema = z.object({
   examScheduleId: z.string().cuid({ message: "Invalid Exam Schedule ID." }),
   termId: z.string().cuid({ message: "Invalid Term ID." }),
   academicYearId: z.string().cuid({ message: "Invalid Academic Year ID." }),
   subjectId: z.string().cuid({ message: "Invalid Subject ID." }),
+  sectionId: z.string().cuid({ message: "Invalid Section ID." }), // ✨ Added sectionId
   grades: z.array(singleGradeEntrySchema),
 });
 
-// Schema for updating a single grade record
 export const updateGradeSchema = z.object({
-  marksObtained: z.coerce
-    .number({ invalid_type_error: "Marks must be a number." })
-    .min(0, { message: "Marks cannot be negative." })
-    .optional()
-    .nullable(),
+  marksObtained: z.coerce.number().min(0).optional().nullable(),
   gradeLetter: z.string().max(5).optional().nullable(),
   gpa: z.coerce.number().min(0).optional().nullable(),
   comments: z.string().max(500).optional().nullable(),
 });
-
-

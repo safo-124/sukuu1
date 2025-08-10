@@ -5,29 +5,26 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 
 export async function GET(request, { params }) {
-  const { schoolId, scheduleId } = params;
   const session = await getServerSession(authOptions);
+  const { schoolId, scheduleId } = params;
 
-  // Authorization: Ensure user is an authorized staff member for this school
   if (!session || session.user?.schoolId !== schoolId || !['SCHOOL_ADMIN', 'TEACHER'].includes(session.user?.role)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    // 1. Fetch the exam schedule details and its linked section and class
+    // 1. Fetch the exam schedule and its related class/academic year
     const examSchedule = await prisma.examSchedule.findUnique({
       where: { id: scheduleId, schoolId: schoolId },
       include: {
         exam: { select: { name: true, termId: true } },
         subject: { select: { id: true, name: true } },
-        // This 'include' requires the 'section' relation to be correctly defined
-        // on your ExamSchedule model in your schema.prisma file.
-        section: { 
-          include: { 
-            class: { 
-              select: { name: true, academicYearId: true } 
-            } 
-          }
+        class: { 
+          select: { 
+            id: true, 
+            name: true, 
+            academicYearId: true 
+          } 
         },
       }
     });
@@ -35,18 +32,19 @@ export async function GET(request, { params }) {
     if (!examSchedule) {
       return NextResponse.json({ error: 'Exam schedule not found.' }, { status: 404 });
     }
-    // This check is important after adding the relation to the schema
-    if (!examSchedule.section || !examSchedule.section.class) {
-      return NextResponse.json({ error: 'Exam schedule is not linked to a valid section or class.' }, { status: 404 });
+    if (!examSchedule.class) {
+      return NextResponse.json({ error: 'Exam schedule is not linked to a valid class.' }, { status: 404 });
     }
 
-    // 2. Fetch all students currently enrolled in that specific section for the correct academic year
+    // 2. Fetch all students currently enrolled in all sections of that class for the correct academic year
     const enrollments = await prisma.studentEnrollment.findMany({
         where: {
             schoolId: schoolId,
-            sectionId: examSchedule.sectionId, // Find students by the schedule's sectionId
-            academicYearId: examSchedule.section.class.academicYearId, // Ensure it's the correct year
-            isCurrent: true, 
+            section: {
+                classId: examSchedule.classId,
+            },
+            academicYearId: examSchedule.class.academicYearId,
+            isCurrent: true,
         },
         select: {
             student: {
@@ -56,9 +54,13 @@ export async function GET(request, { params }) {
                     lastName: true,
                     studentIdNumber: true
                 }
+            },
+            section: { // Also get the section name for display
+                select: { name: true }
             }
         },
         orderBy: [
+            { section: { name: 'asc' } },
             { student: { lastName: 'asc' } },
             { student: { firstName: 'asc' } }
         ]
@@ -78,19 +80,18 @@ export async function GET(request, { params }) {
         }
     });
 
-    // 4. Combine student list with their existing grades to create the grade sheet
+    // 4. Combine student list with their section and existing grades
     const gradeEntryList = enrollments.map(enrollment => {
         const student = enrollment.student;
         const existingGrade = existingGrades.find(g => g.studentId === student.id);
         return {
             ...student,
+            sectionName: enrollment.section.name,
             marksObtained: existingGrade?.marksObtained ?? null
         }
     });
 
-    // Return the schedule details along with the student list
     return NextResponse.json({ examSchedule, students: gradeEntryList });
-
   } catch (error) {
     console.error(`API (GET Grade Entry Data) - Error for schedule ${scheduleId}:`, error);
     return NextResponse.json({ error: 'Failed to fetch data for grade entry.' }, { status: 500 });

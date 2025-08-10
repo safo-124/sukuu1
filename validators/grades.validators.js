@@ -30,3 +30,23 @@ export const createGradingWeightConfigSchema = baseGradingWeightConfigSchema.ref
 export const updateGradingWeightConfigSchema = baseGradingWeightConfigSchema.partial();
 
 export const gradingWeightConfigIdSchema = z.string().min(1, "Grading weight config ID is required.");
+const singleGradeEntrySchema = z.object({
+  studentId: z.string().cuid({ message: "Invalid Student ID." }),
+  marksObtained: z.coerce.number({ invalid_type_error: "Marks must be a number." }).min(0).nullable(),
+});
+
+export const batchGradeSubmissionSchema = z.object({
+  examScheduleId: z.string().cuid({ message: "Invalid Exam Schedule ID." }),
+  termId: z.string().cuid({ message: "Invalid Term ID." }),
+  academicYearId: z.string().cuid({ message: "Invalid Academic Year ID." }),
+  subjectId: z.string().cuid({ message: "Invalid Subject ID." }),
+  sectionId: z.string().cuid({ message: "Invalid Section ID." }), // ✨ Added sectionId
+  grades: z.array(singleGradeEntrySchema),
+});
+
+export const updateGradeSchema = z.object({
+  marksObtained: z.coerce.number().min(0).optional().nullable(),
+  gradeLetter: z.string().max(5).optional().nullable(),
+  gpa: z.coerce.number().min(0).optional().nullable(),
+  comments: z.string().max(500).optional().nullable(),
+});
