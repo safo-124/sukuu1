@@ -9,14 +9,14 @@ import bcrypt from "bcryptjs";
 // GET handler to fetch a single teacher's details (Staff record with User info)
 export async function GET(request, { params }) {
   const session = await getServerSession(authOptions);
-  const { schoolId, staffId } = params;
+  const { schoolId, staffId } = await params;
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' /* && other roles */)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    const staffRecord = await prisma.staff.findUnique({
+    const staffRecord = await prisma.staff.findFirst({
       where: { 
         id: staffId,
         schoolId: schoolId,
@@ -49,7 +49,7 @@ export async function GET(request, { params }) {
 // PUT handler to update a teacher's details (User and Staff records)
 export async function PUT(request, { params }) {
   const session = await getServerSession(authOptions);
-  const { schoolId, staffId } = params;
+  const { schoolId, staffId } = await params;
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' /* && other roles */)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -69,8 +69,8 @@ export async function PUT(request, { params }) {
     } = validation.data;
 
     // Fetch the existing staff record to get the linked userId
-    const existingStaff = await prisma.staff.findUnique({
-        where: { id: staffId, schoolId: schoolId },
+  const existingStaff = await prisma.staff.findFirst({
+    where: { id: staffId, schoolId: schoolId },
         include: { user: { select: { id: true, email: true }}} // Include user to check email change
     });
 
@@ -123,13 +123,13 @@ export async function PUT(request, { params }) {
 
 
         if (Object.keys(staffDataToUpdate).length > 0) {
-             await tx.staff.update({
+       await tx.staff.update({
                 where: { id: staffId },
                 data: staffDataToUpdate,
             });
         }
         
-        return tx.staff.findUnique({
+    return tx.staff.findUnique({
             where: { id: staffId },
             include: { user: { select: { id: true, firstName: true, lastName: true, email: true, isActive: true }}}
         });
@@ -158,16 +158,16 @@ export async function PUT(request, { params }) {
 
 // PATCH handler to toggle User's isActive status (for the teacher)
 export async function PATCH(request, { params }) {
-    const session = await getServerSession(authOptions);
-    const { schoolId, staffId } = params;
+  const session = await getServerSession(authOptions);
+  const { schoolId, staffId } = await params;
 
     if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     try {
-        const staffRecord = await prisma.staff.findUnique({
-            where: { id: staffId, schoolId: schoolId },
+    const staffRecord = await prisma.staff.findFirst({
+      where: { id: staffId, schoolId: schoolId },
             include: { user: { select: { id: true, isActive: true, role: true } } }
         });
 
@@ -205,8 +205,8 @@ export async function PATCH(request, { params }) {
 
 // DELETE handler for a teacher (Staff and User record)
 export async function DELETE(request, { params }) {
-    const session = await getServerSession(authOptions);
-    const { schoolId, staffId } = params;
+  const session = await getServerSession(authOptions);
+  const { schoolId, staffId } = await params;
 
     if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -215,8 +215,8 @@ export async function DELETE(request, { params }) {
     try {
         // It's crucial to delete in a transaction to ensure both records are removed or none are.
         // Also, check for dependencies before deleting.
-        const staffToDelete = await prisma.staff.findUnique({
-            where: { id: staffId, schoolId: schoolId },
+    const staffToDelete = await prisma.staff.findFirst({
+      where: { id: staffId, schoolId: schoolId },
             include: { user: { select: { id: true, role: true } } }
         });
 

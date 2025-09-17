@@ -15,7 +15,7 @@ const timeToMinutes = (timeString) => {
 
 // GET handler (no changes needed, but included for completeness)
 export async function GET(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId } = await params;
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || !['SCHOOL_ADMIN', 'TEACHER', 'SECRETARY'].includes(session.user?.role)) {
@@ -51,7 +51,7 @@ export async function GET(request, { params }) {
 
 // POST handler to create a new timetable entry
 export async function POST(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId } = await params;
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {

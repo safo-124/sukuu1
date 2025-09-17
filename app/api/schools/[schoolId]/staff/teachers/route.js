@@ -8,7 +8,7 @@ import bcrypt from "bcryptjs";
 
 // GET handler
 export async function GET(request, { params }) {
-  const { schoolId } = params; // Destructure params early
+  const { schoolId } = await params; // await dynamic params per Next.js 15
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {
@@ -16,15 +16,49 @@ export async function GET(request, { params }) {
   }
 
   try {
-    const teachers = await prisma.staff.findMany({
-      where: { schoolId: schoolId, user: { role: 'TEACHER' } },
-      orderBy: { user: { lastName: 'asc' } },
-      include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true, isActive: true, createdAt: true } },
-        department: { select: { id: true, name: true } }
-      }
-    });
-    return NextResponse.json({ teachers }, { status: 200 });
+    const { searchParams } = new URL(request.url);
+    const search = searchParams.get('search') || '';
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = parseInt(searchParams.get('limit') || '10', 10);
+    const skip = (page - 1) * limit;
+
+    const whereClause = {
+      schoolId,
+      user: { role: 'TEACHER' },
+      ...(search
+        ? {
+            OR: [
+              { user: { firstName: { contains: search, mode: 'insensitive' } } },
+              { user: { lastName: { contains: search, mode: 'insensitive' } } },
+              { staffIdNumber: { contains: search, mode: 'insensitive' } },
+              { jobTitle: { contains: search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+
+    const [teachers, totalTeachers] = await prisma.$transaction([
+      prisma.staff.findMany({
+        where: whereClause,
+        include: {
+          user: { select: { id: true, firstName: true, lastName: true, email: true, isActive: true, createdAt: true } },
+          department: { select: { id: true, name: true } },
+        },
+        orderBy: [
+          { user: { lastName: 'asc' } },
+          { user: { firstName: 'asc' } },
+        ],
+        skip,
+        take: limit,
+      }),
+      prisma.staff.count({ where: whereClause }),
+    ]);
+
+    const totalPages = Math.max(1, Math.ceil(totalTeachers / limit));
+    return NextResponse.json({
+      teachers,
+      pagination: { currentPage: page, totalPages, totalTeachers, limit },
+    }, { status: 200 });
   } catch (error) {
     console.error(`Failed to fetch teachers for school ${schoolId}:`, error);
     return NextResponse.json({ error: 'Failed to fetch teachers.' }, { status: 500 });
@@ -33,7 +67,7 @@ export async function GET(request, { params }) {
 
 // POST handler
 export async function POST(request, { params }) {
-  const { schoolId } = params; // Destructure params early
+  const { schoolId } = await params; // await dynamic params per Next.js 15
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {

@@ -30,7 +30,7 @@ const updateSubjectSchema = z.object({
 
 // GET handler to list all subjects for a specific school
 export async function GET(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId } = await params;
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'TEACHER')) {
@@ -39,20 +39,42 @@ export async function GET(request, { params }) {
 
   try {
     schoolIdSchema.parse(schoolId);
+    const { searchParams } = new URL(request.url);
+    const mine = searchParams.get('mine');
+
+    let whereClause = { schoolId };
+
+    // If teacher or mine=1, restrict to teacher's subjects via StaffSubjectLevel and TimetableEntry
+    if (session.user?.role === 'TEACHER' || mine === '1' || mine === 'true') {
+      const staffId = session.user?.staffProfileId;
+      if (!staffId) {
+        return NextResponse.json({ subjects: [] }, { status: 200 });
+      }
+      // Subjects via StaffSubjectLevel
+      const links = await prisma.staffSubjectLevel.findMany({
+        where: { schoolId, staffId },
+        select: { subjectId: true },
+      });
+      const subjectIdsFromLinks = links.map(l => l.subjectId);
+
+      // Subjects via TimetableEntry (fallback)
+      const timetableSubs = await prisma.timetableEntry.findMany({
+        where: { schoolId, staffId },
+        distinct: ['subjectId'],
+        select: { subjectId: true },
+      });
+      const subjectIdsFromTT = timetableSubs.map(t => t.subjectId);
+
+      const subjectIds = Array.from(new Set([...subjectIdsFromLinks, ...subjectIdsFromTT])).filter(Boolean);
+      whereClause = { ...whereClause, id: { in: subjectIds.length ? subjectIds : ['__none__'] } };
+    }
 
     const subjects = await prisma.subject.findMany({
-      where: { schoolId: schoolId },
+      where: whereClause,
       include: {
         department: { select: { id: true, name: true } },
-        schoolLevelLinks: { // For displaying linked school levels
-          select: { schoolLevel: { select: { id: true, name: true } } },
-        },
-        staffSubjectLevels: { // For displaying initially assigned teacher
-          select: {
-            staff: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
-            schoolLevel: { select: { name: true } }
-          },
-        },
+        schoolLevelLinks: { select: { schoolLevel: { select: { id: true, name: true } } } },
+        staffSubjectLevels: { select: { staff: { select: { id: true, user: { select: { firstName: true, lastName: true } } } }, schoolLevel: { select: { name: true } } } },
       },
       orderBy: { name: 'asc' },
     });
@@ -69,7 +91,7 @@ export async function GET(request, { params }) {
 
 // POST handler to create a new subject
 export async function POST(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId } = await params;
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {

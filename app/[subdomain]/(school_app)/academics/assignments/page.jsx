@@ -142,6 +142,9 @@ export default function ManageAssignmentsPage() {
   const [subjects, setSubjects] = useState([]);
   const [sections, setSections] = useState([]);
   const [teachers, setTeachers] = useState([]);
+  const [taughtSubjects, setTaughtSubjects] = useState([]); // Teacher-specific subjects
+  const [classTeacherSections, setClassTeacherSections] = useState([]); // Sections where teacher is class teacher
+  const [activeSubjectFilter, setActiveSubjectFilter] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingDeps, setIsLoadingDeps] = useState(true);
   const [error, setError] = useState('');
@@ -163,20 +166,24 @@ export default function ManageAssignmentsPage() {
     if (!schoolData?.id) return;
     setIsLoading(true); setError('');
     try {
-      const response = await fetch(`/api/schools/${schoolData.id}/academics/assignments`);
+      // If the logged-in user is a teacher, we fetch only their assignments by default
+      const mine = session?.user?.role === 'TEACHER' ? '1' : '0';
+      const subjectParam = activeSubjectFilter ? `&subjectId=${encodeURIComponent(activeSubjectFilter)}` : '';
+      const response = await fetch(`/api/schools/${schoolData.id}/academics/assignments?mine=${mine}${subjectParam}`);
       if (!response.ok) { const errData = await response.json().catch(() => ({})); throw new Error(errData.error || 'Failed to fetch assignments.'); }
       const data = await response.json();
       setAssignments(data.assignments || []);
     } catch (err) { toast.error("Error fetching assignments", { description: err.message }); setError(err.message);
     } finally { setIsLoading(false); }
-  }, [schoolData?.id]);
+  }, [schoolData?.id, session?.user?.role, activeSubjectFilter]);
 
   const fetchDropdownDependencies = useCallback(async () => {
     if (!schoolData?.id) return;
     setIsLoadingDeps(true);
     try {
+      const mine = session?.user?.role === 'TEACHER' ? '1' : '0';
       const [subjectsRes, sectionsRes, teachersRes] = await Promise.all([
-        fetch(`/api/schools/${schoolData.id}/academics/subjects`),
+        fetch(`/api/schools/${schoolData.id}/academics/subjects?mine=${mine}`),
         fetch(`/api/schools/${schoolData.id}/academics/sections`),
         fetch(`/api/schools/${schoolData.id}/staff/teachers`),
       ]);
@@ -203,14 +210,33 @@ export default function ManageAssignmentsPage() {
     } finally {
       setIsLoadingDeps(false);
     }
-  }, [schoolData?.id]);
+  }, [schoolData?.id, session?.user?.role]);
+
+  // Fetch teacher profile context (taught subjects and class teacher sections)
+  const fetchTeacherContext = useCallback(async () => {
+    if (!schoolData?.id || session?.user?.role !== 'TEACHER') return;
+    try {
+      const res = await fetch(`/api/schools/${schoolData.id}/staff/me`);
+      if (!res.ok) return; // Non-fatal
+      const data = await res.json();
+      setTaughtSubjects(data.taughtSubjects || []);
+      setClassTeacherSections(data.classTeacherSections || []);
+    } catch (e) {
+      console.warn('Failed to load teacher context', e);
+    }
+  }, [schoolData?.id, session?.user?.role]);
 
   useEffect(() => {
     if (schoolData?.id && session) {
       fetchAssignments();
       fetchDropdownDependencies();
+      fetchTeacherContext();
     }
-  }, [schoolData, session, fetchAssignments, fetchDropdownDependencies]);
+  }, [schoolData, session, fetchAssignments, fetchDropdownDependencies, fetchTeacherContext]);
+
+  const onClickSubjectChip = (subjectId) => {
+    setActiveSubjectFilter(prev => (prev === subjectId ? '' : subjectId));
+  };
 
   const handleFormChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   const handleSelectChange = (name, value) => setFormData(prev => ({ ...prev, [name]: value === 'none' ? '' : value }));
@@ -445,6 +471,46 @@ export default function ManageAssignmentsPage() {
         </Dialog>
       </div>
 
+      {session?.user?.role === 'TEACHER' && (
+        <div className={`${glassCardClasses} space-y-4`}>
+          <div>
+            <p className={`text-sm font-semibold ${titleTextClasses} mb-2 flex items-center`}>
+              <BookOpen className="h-4 w-4 mr-2"/> My Subjects
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {(subjects?.length ? subjects : taughtSubjects)?.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => onClickSubjectChip(s.id)}
+                  className={`px-3 py-1 rounded-full border text-sm transition-colors ${activeSubjectFilter === s.id ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-white/60 dark:bg-zinc-800/60 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 hover:bg-white/80 dark:hover:bg-zinc-700/60'}`}
+                  title="Filter assignments by this subject"
+                >
+                  {s.name}
+                </button>
+              ))}
+              {((subjects || []).length === 0 && (taughtSubjects || []).length === 0) && (
+                <span className={`text-sm ${descriptionTextClasses}`}>No subjects assigned.</span>
+              )}
+            </div>
+          </div>
+          <div>
+            <p className={`text-sm font-semibold ${titleTextClasses} mb-2 flex items-center`}>
+              <Users className="h-4 w-4 mr-2"/> Class Teacher Sections
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {classTeacherSections?.map(sec => (
+                <span key={sec.id} className="px-3 py-1 rounded-full bg-white/60 dark:bg-zinc-800/60 border border-zinc-300 dark:border-zinc-700 text-sm text-zinc-800 dark:text-zinc-200">
+                  {sec.class?.name || 'Class'} - {sec.name}
+                </span>
+              ))}
+              {(classTeacherSections || []).length === 0 && (
+                <span className={`text-sm ${descriptionTextClasses}`}>Not a class teacher for any section.</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {error && ( <Alert variant="destructive" className="bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300 dark:border-red-700/50"> <AlertTriangle className="h-4 w-4" /> <AlertTitle>Error</AlertTitle> <AlertDescription>{error}</AlertDescription> </Alert> )}
 
       <div className={`${glassCardClasses} overflow-x-auto`}>
@@ -474,7 +540,11 @@ export default function ManageAssignmentsPage() {
             ) : assignments.length > 0 ? assignments.map((assignment) => (
               <TableRow key={assignment.id} className="border-zinc-200/50 dark:border-zinc-800/50 hover:bg-zinc-500/5 dark:hover:bg-white/5">
                 <TableCell className={`${descriptionTextClasses} font-medium`}>{assignment.title}</TableCell>
-                <TableCell className={`${descriptionTextClasses}`}>{getSubjectName(assignment.subjectId)}</TableCell>
+                <TableCell className={`${descriptionTextClasses}`}>
+                  <button onClick={() => onClickSubjectChip(assignment.subjectId)} className="underline-offset-2 hover:underline">
+                    {getSubjectName(assignment.subjectId)}
+                  </button>
+                </TableCell>
                 <TableCell className={`${descriptionTextClasses} hidden sm:table-cell`}>{formatDueDate(assignment.dueDate)}</TableCell>
                 <TableCell className={`${descriptionTextClasses} hidden md:table-cell`}>{getSectionClassDisplayName(assignment.sectionId, assignment.classId)}</TableCell>
                 <TableCell className={`${descriptionTextClasses} hidden lg:table-cell`}>{getTeacherName(assignment.teacherId)}</TableCell>

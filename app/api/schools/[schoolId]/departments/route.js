@@ -9,7 +9,7 @@ import { schoolIdSchema, createDepartmentSchema } from '@/validators/academics.v
 
 // GET handler to list all departments for a specific school
 export async function GET(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId } = await params;
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'TEACHER')) {
@@ -36,7 +36,7 @@ export async function GET(request, { params }) {
 
 // POST handler to create a new department
 export async function POST(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId } = await params;
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {

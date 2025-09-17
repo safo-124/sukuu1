@@ -1,26 +1,28 @@
 // app/api/schools/[schoolId]/academics/assignments/[assignmentId]/route.js
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import prisma from '@/lib/prisma';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 import { z } from 'zod';
-import { schoolIdSchema, assignmentIdSchema, updateAssignmentSchema } from '@/validators/assignment'; // Adjust path as needed
-
-const prisma = new PrismaClient();
+import { schoolIdSchema, assignmentIdSchema, updateAssignmentSchema } from '@/validators/assignment';
 
 // GET /api/schools/[schoolId]/academics/assignments/[assignmentId]
 // Fetches a single assignment by its ID for a specific school
 export async function GET(request, { params }) {
   try {
-    const { schoolId, assignmentId } = params;
+    const { schoolId, assignmentId } = await params;
+    const session = await getServerSession(authOptions);
 
     // Validate path parameters
     const parsedSchoolId = schoolIdSchema.parse(schoolId);
     const parsedAssignmentId = assignmentIdSchema.parse(assignmentId);
 
-    const assignment = await prisma.assignment.findUnique({
-      where: {
-        id: parsedAssignmentId,
-        schoolId: parsedSchoolId,
-      },
+    if (!session || session.user?.schoolId !== parsedSchoolId || !['SCHOOL_ADMIN', 'TEACHER'].includes(session.user?.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const assignment = await prisma.assignment.findFirst({
+      where: { id: parsedAssignmentId, schoolId: parsedSchoolId },
       include: {
         subject: { select: { id: true, name: true } },
         section: { select: { id: true, name: true, class: { select: { id: true, name: true } } } },
@@ -31,6 +33,11 @@ export async function GET(request, { params }) {
 
     if (!assignment) {
       return NextResponse.json({ error: 'Assignment not found.' }, { status: 404 });
+    }
+
+    // Teachers can only view their own assignments
+    if (session.user?.role === 'TEACHER' && assignment.teacherId !== session.user?.staffProfileId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     return NextResponse.json({ assignment }, { status: 200 });
@@ -47,40 +54,45 @@ export async function GET(request, { params }) {
 // Updates an existing assignment for a specific school
 export async function PUT(request, { params }) {
   try {
-    const { schoolId, assignmentId } = params;
+    const { schoolId, assignmentId } = await params;
+    const session = await getServerSession(authOptions);
     const body = await request.json();
 
     // Validate path parameters
     const parsedSchoolId = schoolIdSchema.parse(schoolId);
     const parsedAssignmentId = assignmentIdSchema.parse(assignmentId);
 
+    if (!session || session.user?.schoolId !== parsedSchoolId || !['SCHOOL_ADMIN', 'TEACHER'].includes(session.user?.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     // Validate request body
     const parsedData = updateAssignmentSchema.parse(body);
 
     // Check if the assignment exists and belongs to the school
-    const existingAssignment = await prisma.assignment.findUnique({
-      where: {
-        id: parsedAssignmentId,
-        schoolId: parsedSchoolId,
-      },
-    });
+    const existingAssignment = await prisma.assignment.findFirst({ where: { id: parsedAssignmentId, schoolId: parsedSchoolId } });
 
     if (!existingAssignment) {
       return NextResponse.json({ error: 'Assignment not found or does not belong to this school.' }, { status: 404 });
     }
 
+    // Teachers can only update their own assignments
+    if (session.user?.role === 'TEACHER' && existingAssignment.teacherId !== session.user?.staffProfileId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     // Perform additional validation for linked entities if they are being updated
     // This is similar to the POST request's checks, but only for fields that are present in parsedData
     if (parsedData.subjectId) {
-      const subject = await prisma.subject.findUnique({ where: { id: parsedData.subjectId, schoolId: parsedSchoolId } });
+      const subject = await prisma.subject.findFirst({ where: { id: parsedData.subjectId, schoolId: parsedSchoolId } });
       if (!subject) return NextResponse.json({ error: 'Subject not found or does not belong to this school.' }, { status: 400 });
     }
     if (parsedData.teacherId) {
-      const teacher = await prisma.staff.findUnique({ where: { id: parsedData.teacherId, schoolId: parsedSchoolId } });
+      const teacher = await prisma.staff.findFirst({ where: { id: parsedData.teacherId, schoolId: parsedSchoolId } });
       if (!teacher) return NextResponse.json({ error: 'Teacher not found or does not belong to this school.' }, { status: 400 });
     }
     if (parsedData.sectionId) {
-      const section = await prisma.section.findUnique({ where: { id: parsedData.sectionId, schoolId: parsedSchoolId } });
+      const section = await prisma.section.findFirst({ where: { id: parsedData.sectionId, schoolId: parsedSchoolId } });
       if (!section) return NextResponse.json({ error: 'Section not found or does not belong to this school.' }, { status: 400 });
       // If both classId and sectionId are provided in update, ensure consistency
       if (parsedData.classId && section.classId !== parsedData.classId) {
@@ -88,7 +100,7 @@ export async function PUT(request, { params }) {
       }
     }
     if (parsedData.classId) {
-        const _class = await prisma.class.findUnique({ where: { id: parsedData.classId, schoolId: parsedSchoolId } });
+        const _class = await prisma.class.findFirst({ where: { id: parsedData.classId, schoolId: parsedSchoolId } });
         if (!_class) return NextResponse.json({ error: 'Class not found or does not belong to this school.' }, { status: 400 });
     }
 
@@ -123,22 +135,27 @@ export async function PUT(request, { params }) {
 // Deletes an assignment for a specific school
 export async function DELETE(request, { params }) {
   try {
-    const { schoolId, assignmentId } = params;
+    const { schoolId, assignmentId } = await params;
+    const session = await getServerSession(authOptions);
 
     // Validate path parameters
     const parsedSchoolId = schoolIdSchema.parse(schoolId);
     const parsedAssignmentId = assignmentIdSchema.parse(assignmentId);
 
+    if (!session || session.user?.schoolId !== parsedSchoolId || !['SCHOOL_ADMIN', 'TEACHER'].includes(session.user?.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     // Check if the assignment exists and belongs to the school
-    const existingAssignment = await prisma.assignment.findUnique({
-      where: {
-        id: parsedAssignmentId,
-        schoolId: parsedSchoolId,
-      },
-    });
+    const existingAssignment = await prisma.assignment.findFirst({ where: { id: parsedAssignmentId, schoolId: parsedSchoolId } });
 
     if (!existingAssignment) {
       return NextResponse.json({ error: 'Assignment not found or does not belong to this school.' }, { status: 404 });
+    }
+
+    // Teachers can only delete their own assignments
+    if (session.user?.role === 'TEACHER' && existingAssignment.teacherId !== session.user?.staffProfileId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     await prisma.assignment.delete({

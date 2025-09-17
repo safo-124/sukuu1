@@ -22,7 +22,7 @@ const calculateDuration = (startTime, endTime) => {
 // GET /api/schools/[schoolId]/academics/timetable/[entryId]
 // Fetches a single timetable entry by ID
 export async function GET(request, { params }) {
-  const { schoolId, entryId } = params;
+  const { schoolId, entryId } = await params;
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'TEACHER' && session.user?.role !== 'SECRETARY')) {
@@ -72,7 +72,7 @@ export async function GET(request, { params }) {
 // PUT /api/schools/[schoolId]/academics/timetable/[entryId]
 // Updates an existing timetable entry
 export async function PUT(request, { params }) {
-  const { schoolId, entryId } = params;
+  const { schoolId, entryId } = await params;
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {
@@ -247,7 +247,7 @@ export async function PUT(request, { params }) {
 // DELETE /api/schools/[schoolId]/academics/timetable/[entryId]
 // Deletes a timetable entry
 export async function DELETE(request, { params }) {
-  const { schoolId, entryId } = params;
+  const { schoolId, entryId } = await params;
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {

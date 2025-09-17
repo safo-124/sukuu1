@@ -28,8 +28,8 @@ export function Header() {
   };
 
   // Tailwind classes for consistent styling
-  const headerBackgroundColor = "bg-white dark:bg-zinc-950"; // Matches sidebar
-  const headerBorderColor = "border-b border-zinc-200 dark:border-zinc-800";
+  const headerBackgroundColor = "bg-white/40 dark:bg-zinc-900/40 backdrop-blur-md"; // glassy
+  const headerBorderColor = "border-b border-white/20 dark:border-white/10";
   const textColorPrimary = "text-black dark:text-white";
   const textColorSecondary = "text-zinc-500 dark:text-zinc-400";
   const iconButtonClasses = "border-zinc-300 text-black hover:bg-zinc-100 dark:border-zinc-700 dark:text-white dark:hover:bg-zinc-800";
@@ -39,7 +39,7 @@ export function Header() {
 
 
   return (
-    <header className={`superadmin-header fixed top-0 z-40 w-full p-3 md:p-4 ${headerBackgroundColor} ${headerBorderColor}`}>
+  <header className={`superadmin-header fixed top-0 z-40 w-full p-3 md:p-4 ${headerBackgroundColor} ${headerBorderColor}`}>
       {/* This inner div handles the alignment with the sidebar */}
       {/* On small screens (sidebar collapsed/hidden), it's full width.
           On sm+ screens, ml-64 pushes it to the right of the sidebar.
@@ -61,7 +61,7 @@ export function Header() {
         </div>
 
         {/* Right-aligned items: Theme Toggle & User Menu */}
-        <div className="flex items-center space-x-3 md:space-x-4">
+  <div className="flex items-center space-x-3 md:space-x-4">
           <Button
             variant="outline"
             size="icon"

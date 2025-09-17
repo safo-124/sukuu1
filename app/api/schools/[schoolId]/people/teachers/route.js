@@ -10,7 +10,7 @@ import { schoolIdSchema, createTeacherSchema } from '@/validators/academics.vali
 // GET /api/schools/[schoolId]/people/teachers
 // Fetches all staff members who are teachers for a specific school
 export async function GET(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId } = await params;
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'HR_MANAGER' && session.user?.role !== 'TEACHER' && session.user?.role !== 'HOSTEL_WARDEN' && session.user?.role !== 'ACCOUNTANT' && session.user?.role !== 'SECRETARY')) {
@@ -91,7 +91,7 @@ export async function GET(request, { params }) {
 // POST /api/schools/[schoolId]/people/teachers
 // Creates a new teacher (User and Staff record)
 export async function POST(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId } = await params;
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'HR_MANAGER')) {

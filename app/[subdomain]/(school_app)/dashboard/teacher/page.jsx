@@ -4,12 +4,17 @@
 import { useSession } from 'next-auth/react';
 import { useSchool } from '../../layout';
 import { BookOpen, Users, ClipboardList, CheckSquare, CalendarDays, BarChart4 } from 'lucide-react';
+import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 
 export default function TeacherDashboardPage() {
   const { data: session } = useSession();
   const schoolData = useSchool();
   const subdomain = schoolData?.subdomain;
+
+  const [stats, setStats] = useState({ subjectsCount: 0, assignmentsCount: 0, todayLessons: [], nextLesson: null });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const titleTextClasses = "text-black dark:text-white";
   const descriptionTextClasses = "text-zinc-600 dark:text-zinc-400";
@@ -26,6 +31,29 @@ export default function TeacherDashboardPage() {
     );
   }
 
+  useEffect(() => {
+    const load = async () => {
+      if (!schoolData?.id) return;
+      setLoading(true); setError('');
+      try {
+        const res = await fetch(`/api/schools/${schoolData.id}/dashboard/teacher`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to load metrics');
+        setStats({
+          subjectsCount: data.subjectsCount || 0,
+          assignmentsCount: data.assignmentsCount || 0,
+          todayLessons: Array.isArray(data.todayLessons) ? data.todayLessons : [],
+          nextLesson: data.nextLesson || null,
+        });
+      } catch (e) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [schoolData?.id]);
+
   return (
     <div className="space-y-8">
       <h1 className={`text-3xl font-bold ${titleTextClasses}`}>
@@ -35,6 +63,40 @@ export default function TeacherDashboardPage() {
         This is your personalized dashboard for {schoolData?.name || 'your school'}.
         Here you can manage your classes, assignments, and student progress.
       </p>
+
+      {/* Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className={`rounded-xl border border-zinc-200/60 dark:border-zinc-700/60 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md p-4`}>
+          <div className="flex items-center justify-between">
+            <span className={`text-sm ${descriptionTextClasses}`}>My Subjects</span>
+            <BookOpen className="h-4 w-4 opacity-70" />
+          </div>
+          <div className={`mt-2 text-3xl font-bold ${titleTextClasses}`}>{loading ? '…' : stats.subjectsCount}</div>
+        </div>
+        <div className={`rounded-xl border border-zinc-200/60 dark:border-zinc-700/60 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md p-4`}>
+          <div className="flex items-center justify-between">
+            <span className={`text-sm ${descriptionTextClasses}`}>Assignments</span>
+            <CheckSquare className="h-4 w-4 opacity-70" />
+          </div>
+          <div className={`mt-2 text-3xl font-bold ${titleTextClasses}`}>{loading ? '…' : stats.assignmentsCount}</div>
+        </div>
+        <div className={`rounded-xl border border-zinc-200/60 dark:border-zinc-700/60 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md p-4`}>
+          <div className="flex items-center justify-between">
+            <span className={`text-sm ${descriptionTextClasses}`}>Today’s Lessons</span>
+            <CalendarDays className="h-4 w-4 opacity-70" />
+          </div>
+          <div className={`mt-2 text-3xl font-bold ${titleTextClasses}`}>{loading ? '…' : stats.todayLessons.length}</div>
+        </div>
+        <div className={`rounded-xl border border-zinc-200/60 dark:border-zinc-700/60 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md p-4`}>
+          <div className="flex items-center justify-between">
+            <span className={`text-sm ${descriptionTextClasses}`}>Next Lesson</span>
+            <BarChart4 className="h-4 w-4 opacity-70" />
+          </div>
+          <div className={`mt-2 text-base ${titleTextClasses}`}>
+            {loading ? '…' : stats.nextLesson ? `${stats.nextLesson.subject?.name || ''} • ${stats.nextLesson.section?.class?.name || ''}-${stats.nextLesson.section?.name || ''} • ${stats.nextLesson.startTime}-${stats.nextLesson.endTime}` : 'No upcoming'}
+          </div>
+        </div>
+      </div>
 
       {/* Quick Actions / Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

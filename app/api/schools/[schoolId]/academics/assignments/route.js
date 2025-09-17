@@ -1,22 +1,49 @@
 // app/api/schools/[schoolId]/academics/assignments/route.js
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import prisma from '@/lib/prisma';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 import { z } from 'zod';
-import { schoolIdSchema, createAssignmentSchema } from '@/validators/assignment'; // Adjust path as needed
-
-const prisma = new PrismaClient();
+import { schoolIdSchema, createAssignmentSchema } from '@/validators/assignment';
 
 // GET /api/schools/[schoolId]/academics/assignments
 // Fetches all assignments for a specific school
 export async function GET(request, { params }) {
   try {
-    const { schoolId } = params;
+    const { schoolId } = await params;
+    const { searchParams } = new URL(request.url);
+
+    const session = await getServerSession(authOptions);
+    if (!session || session.user?.schoolId !== schoolId || !['SCHOOL_ADMIN', 'TEACHER'].includes(session.user?.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
     // Validate schoolId from path parameters
     const parsedSchoolId = schoolIdSchema.parse(schoolId);
 
+    // Optional filters
+    const subjectId = searchParams.get('subjectId') || undefined;
+    const search = searchParams.get('search') || undefined;
+    const status = searchParams.get('status') || undefined; // upcoming | past
+    const mine = searchParams.get('mine');
+
+    const where = {
+      schoolId: parsedSchoolId,
+      ...(subjectId ? { subjectId } : {}),
+      ...(search ? { OR: [
+        { title: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+      ] } : {}),
+      ...(status === 'upcoming' ? { dueDate: { gte: new Date() } } : {}),
+      ...(status === 'past' ? { dueDate: { lt: new Date() } } : {}),
+    };
+    const isTeacher = session.user?.role === 'TEACHER';
+    if (isTeacher || mine === '1' || mine === 'true') {
+      where.teacherId = session.user?.staffProfileId || '__none__';
+    }
+
     const assignments = await prisma.assignment.findMany({
-      where: { schoolId: parsedSchoolId },
+      where,
       include: {
         subject: { select: { id: true, name: true } },
         section: { select: { id: true, name: true, class: { select: { id: true, name: true } } } },
@@ -42,14 +69,18 @@ export async function GET(request, { params }) {
 // Creates a new assignment for a specific school
 export async function POST(request, { params }) {
   try {
-    const { schoolId } = params;
+    const { schoolId } = await params;
+    const session = await getServerSession(authOptions);
+    if (!session || session.user?.schoolId !== schoolId || !['SCHOOL_ADMIN', 'TEACHER'].includes(session.user?.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     const body = await request.json();
 
     // Validate schoolId from path parameters
     const parsedSchoolId = schoolIdSchema.parse(schoolId);
 
-    // Validate request body
-    const parsedData = createAssignmentSchema.parse(body);
+  // Validate request body
+  const parsedData = createAssignmentSchema.parse(body);
 
     // Check if the school exists (optional but good practice)
     const schoolExists = await prisma.school.findUnique({
@@ -59,12 +90,18 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: 'School not found.' }, { status: 404 });
     }
 
+    // Determine teacherId: enforce current teacher if user is TEACHER
+    const teacherIdToUse = session.user?.role === 'TEACHER' ? (session.user?.staffProfileId || '') : parsedData.teacherId;
+    if (!teacherIdToUse) {
+      return NextResponse.json({ error: 'Teacher not resolved.' }, { status: 400 });
+    }
+
     // Additional validation to ensure linked entities belong to the same school
     const [subject, teacher, section, _class] = await Promise.all([
-      prisma.subject.findUnique({ where: { id: parsedData.subjectId, schoolId: parsedSchoolId } }),
-      prisma.staff.findUnique({ where: { id: parsedData.teacherId, schoolId: parsedSchoolId } }),
-      parsedData.sectionId ? prisma.section.findUnique({ where: { id: parsedData.sectionId, schoolId: parsedSchoolId } }) : Promise.resolve(null),
-      parsedData.classId ? prisma.class.findUnique({ where: { id: parsedData.classId, schoolId: parsedSchoolId } }) : Promise.resolve(null),
+      prisma.subject.findFirst({ where: { id: parsedData.subjectId, schoolId: parsedSchoolId } }),
+      prisma.staff.findFirst({ where: { id: teacherIdToUse, schoolId: parsedSchoolId } }),
+      parsedData.sectionId ? prisma.section.findFirst({ where: { id: parsedData.sectionId, schoolId: parsedSchoolId } }) : Promise.resolve(null),
+      parsedData.classId ? prisma.class.findFirst({ where: { id: parsedData.classId, schoolId: parsedSchoolId } }) : Promise.resolve(null),
     ]);
 
     if (!subject) {
@@ -84,7 +121,23 @@ export async function POST(request, { params }) {
     if (parsedData.classId && parsedData.sectionId && section && section.classId !== parsedData.classId) {
       return NextResponse.json({ error: 'Provided section does not belong to the specified class.' }, { status: 400 });
     }
-
+    // If TEACHER: verify assignment to subject/section via StaffSubjectLevel or timetable
+    if (session.user?.role === 'TEACHER') {
+      const teachesSubject = await prisma.staffSubjectLevel.findFirst({
+        where: { staffId: teacherIdToUse, subjectId: subject.id, schoolId: parsedSchoolId },
+      });
+      const teachesByTimetable = await prisma.timetableEntry.findFirst({
+        where: {
+          schoolId: parsedSchoolId,
+          staffId: teacherIdToUse,
+          subjectId: subject.id,
+          ...(parsedData.sectionId ? { sectionId: parsedData.sectionId } : {}),
+        },
+      });
+      if (!teachesSubject && !teachesByTimetable) {
+        return NextResponse.json({ error: 'You are not assigned to teach this subject/section.' }, { status: 403 });
+      }
+    }
 
     const newAssignment = await prisma.assignment.create({
       data: {
@@ -94,7 +147,7 @@ export async function POST(request, { params }) {
         subjectId: parsedData.subjectId,
         sectionId: parsedData.sectionId,
         classId: parsedData.classId,
-        teacherId: parsedData.teacherId,
+        teacherId: teacherIdToUse,
         maxMarks: parsedData.maxMarks,
         attachments: parsedData.attachments,
         schoolId: parsedSchoolId,
