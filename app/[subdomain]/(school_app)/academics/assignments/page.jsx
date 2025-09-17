@@ -182,10 +182,10 @@ export default function ManageAssignmentsPage() {
     setIsLoadingDeps(true);
     try {
       const mine = session?.user?.role === 'TEACHER' ? '1' : '0';
-      const [subjectsRes, sectionsRes, teachersRes] = await Promise.all([
+      // Always fetch subjects/sections; fetch teachers differently based on role to avoid 401s for teachers
+      const [subjectsRes, sectionsRes] = await Promise.all([
         fetch(`/api/schools/${schoolData.id}/academics/subjects?mine=${mine}`),
         fetch(`/api/schools/${schoolData.id}/academics/sections`),
-        fetch(`/api/schools/${schoolData.id}/staff/teachers`),
       ]);
 
       if (!subjectsRes.ok) throw new Error('Failed to fetch subjects.');
@@ -200,9 +200,30 @@ export default function ManageAssignmentsPage() {
       const sectionsData = await sectionsRes.json();
       setSections(sectionsData.sections || []);
 
-      if (!teachersRes.ok) throw new Error('Failed to fetch teachers.');
-      const teachersData = await teachersRes.json();
-      setTeachers(teachersData.teachers?.filter(t => t.user) || []);
+      // Populate teachers list based on role:
+      // - For SCHOOL_ADMIN: fetch full teachers list
+      // - For TEACHER: use current staff profile for display and form prefill
+      if (session?.user?.role === 'SCHOOL_ADMIN') {
+        const teachersRes = await fetch(`/api/schools/${schoolData.id}/staff/teachers`);
+        if (!teachersRes.ok) throw new Error('Failed to fetch teachers.');
+        const teachersData = await teachersRes.json();
+        setTeachers(teachersData.teachers?.filter(t => t.user) || []);
+      } else if (session?.user?.role === 'TEACHER') {
+        try {
+          const meRes = await fetch(`/api/schools/${schoolData.id}/staff/me`);
+          if (meRes.ok) {
+            const meData = await meRes.json();
+            // Shape matches Staff include user from teachers endpoint
+            setTeachers(meData.staff ? [meData.staff] : []);
+          } else {
+            setTeachers([]);
+          }
+        } catch {
+          setTeachers([]);
+        }
+      } else {
+        setTeachers([]);
+      }
 
     } catch (err) {
       toast.error("Error fetching form dependencies", { description: err.message });

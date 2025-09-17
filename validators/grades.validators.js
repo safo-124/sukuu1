@@ -50,3 +50,22 @@ export const updateGradeSchema = z.object({
   gpa: z.coerce.number().min(0).optional().nullable(),
   comments: z.string().max(500).optional().nullable(),
 });
+
+// Additional grade submission schemas for tests and assignments
+export const testGradesSchema = z.object({
+  label: z.string().min(1, 'Test label is required.'),
+  termId: z.string().cuid(),
+  academicYearId: z.string().cuid(),
+  subjectId: z.string().cuid(),
+  sectionId: z.string().cuid(),
+  grades: z.array(z.object({ studentId: z.string().cuid(), marksObtained: z.coerce.number().min(0).nullable() })),
+});
+
+export const assignmentGradesSchema = z.object({
+  assignmentId: z.string().cuid(),
+  termId: z.string().cuid(),
+  academicYearId: z.string().cuid(),
+  subjectId: z.string().cuid(),
+  sectionId: z.string().cuid().nullable().optional(),
+  grades: z.array(z.object({ studentId: z.string().cuid(), marksObtained: z.coerce.number().min(0).nullable() })),
+});
