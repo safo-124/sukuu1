@@ -21,6 +21,7 @@ export default function TeacherGradesPage() {
   const [termYear, setTermYear] = useState({ termId: '', academicYearId: '' });
   const [testLabel, setTestLabel] = useState('');
   const [me, setMe] = useState(null);
+  const [allowedSubjectsForSection, setAllowedSubjectsForSection] = useState(null);
   const isTeacher = session?.user?.role === 'TEACHER';
 
   const loadContext = useCallback(async () => {
@@ -99,6 +100,44 @@ export default function TeacherGradesPage() {
 
   useEffect(() => { loadStudents(); }, [loadStudents]);
 
+  // When section changes, if teacher and not class teacher for that section, filter subjects by timetable entries
+  useEffect(() => {
+    const run = async () => {
+      if (!isTeacher || !school?.id || !selected.sectionId || !me?.staff?.id) {
+        setAllowedSubjectsForSection(null);
+        return;
+      }
+      const isClassTeacherForSelected = (me?.classTeacherSections || []).some(sec => sec.id === selected.sectionId);
+      if (isClassTeacherForSelected) {
+        // As class teacher, do not restrict subjects (they can view students without subject)
+        setAllowedSubjectsForSection(null);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/schools/${school.id}/academics/timetable?sectionId=${selected.sectionId}&staffId=${me.staff.id}`);
+        if (!res.ok) {
+          setAllowedSubjectsForSection([]);
+          return;
+        }
+        const d = await res.json();
+        const entries = d.timetableEntries || [];
+        const map = new Map();
+        entries.forEach(e => { if (e.subject) map.set(e.subject.id, e.subject); });
+        const list = Array.from(map.values());
+        setAllowedSubjectsForSection(list);
+        // Reset invalid selection or auto-pick when only one option
+        if (list.length === 1) {
+          setSelected(s => ({ ...s, subjectId: list[0].id }));
+        } else if (list.length > 1 && !list.some(sj => sj.id === selected.subjectId)) {
+          setSelected(s => ({ ...s, subjectId: '' }));
+        }
+      } catch {
+        setAllowedSubjectsForSection([]);
+      }
+    };
+    run();
+  }, [isTeacher, school?.id, selected.sectionId, me?.staff?.id]);
+
   const onChangeMark = (studentId, value) => setMarks(prev => ({ ...prev, [studentId]: value }));
 
   const submitExamGrades = async () => {
@@ -154,6 +193,10 @@ export default function TeacherGradesPage() {
   };
 
   const availableSections = useMemo(() => sections, [sections]);
+  const availableSubjects = useMemo(() => {
+    if (Array.isArray(allowedSubjectsForSection)) return allowedSubjectsForSection;
+    return subjects;
+  }, [allowedSubjectsForSection, subjects]);
 
   return (
     <div className="space-y-6">
@@ -167,7 +210,7 @@ export default function TeacherGradesPage() {
           <Select value={selected.subjectId} onValueChange={(v) => setSelected(s => ({ ...s, subjectId: v }))}>
             <SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger>
             <SelectContent>
-              {subjects.map(s => (<SelectItem value={s.id} key={s.id}>{s.name}</SelectItem>))}
+              {availableSubjects.map(s => (<SelectItem value={s.id} key={s.id}>{s.name}</SelectItem>))}
             </SelectContent>
           </Select>
         </div>
@@ -200,6 +243,9 @@ export default function TeacherGradesPage() {
       </div>
 
       <div className="overflow-x-auto">
+        {Array.isArray(allowedSubjectsForSection) && allowedSubjectsForSection.length === 0 && isTeacher && !((me?.classTeacherSections || []).some(sec => sec.id === selected.sectionId)) ? (
+          <p className="text-sm text-red-500 mb-2">You do not teach any subject in this section.</p>
+        ) : null}
         <table className="min-w-full text-sm">
           <thead>
             <tr className="text-left border-b">

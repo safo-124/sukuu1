@@ -16,6 +16,9 @@ const baseExamScheduleSchema = z.object({
   date: z.coerce.date({ required_error: "Exam date is required." }),
   startTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, { message: "Start time must be in HH:MM format." }),
   endTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, { message: "End time must be in HH:MM format." }),
+  // Accept a plain room name string to store on ExamSchedule
+  room: z.string().min(1, "Room name cannot be empty.").optional().nullable(),
+  // Backward-compat: accept roomId as well (will be mapped to room name on the server/UI)
   roomId: z.string().cuid("Invalid Room ID.").optional().nullable(),
   maxMarks: z.coerce.number().min(0, "Max marks cannot be negative."),
 });

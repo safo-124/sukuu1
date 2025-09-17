@@ -50,8 +50,25 @@ const ExamScheduleFormFields = ({ formData, onFormChange, onSelectChange, examsL
   const inputTextClasses = "bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 focus:ring-sky-500";
   const filteredSubjects = useMemo(() => {
     if (!formData.classId || !Array.isArray(subjectsList)) return [];
-    return subjectsList.filter(subject => subject.classes?.some(c => c.id === formData.classId));
-  }, [formData.classId, subjectsList]);
+    // Prefer filtering subjects by the selected class's school level,
+    // since subjects are linked to SchoolLevels via SubjectSchoolLevel.
+    const selectedClass = Array.isArray(classesList)
+      ? classesList.find((c) => c.id === formData.classId)
+      : null;
+    const levelId = selectedClass?.schoolLevelId;
+
+    if (levelId) {
+      return subjectsList.filter((subject) =>
+        Array.isArray(subject.schoolLevelLinks) &&
+        subject.schoolLevelLinks.some((link) => link?.schoolLevel?.id === levelId)
+      );
+    }
+
+    // Fallback: if class doesn't have schoolLevelId exposed, try the direct Subject.classes relation if available
+    return subjectsList.filter((subject) =>
+      Array.isArray(subject.classes) && subject.classes.some((c) => c.id === formData.classId)
+    );
+  }, [formData.classId, subjectsList, classesList]);
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 max-h-[70vh] overflow-y-auto p-1 custom-scrollbar">
@@ -148,8 +165,63 @@ export default function ManageExaminationsPage() {
   const handleScheduleFormChange = (e) => setExamScheduleFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   const handleScheduleSelectChange = (name, value) => { const newFormData = {...examScheduleFormData, [name]: value}; if (name === 'classId') newFormData.subjectId = ''; setExamScheduleFormData(newFormData); };
   const openAddScheduleDialog = () => { setEditingSchedule(null); setExamScheduleFormData({ ...initialExamScheduleFormData, examId: selectedExamId }); setScheduleFormError(''); setIsScheduleDialogOpen(true); };
-  const openEditScheduleDialog = (schedule) => { setEditingSchedule(schedule); setExamScheduleFormData({ id: schedule.id, examId: schedule.examId, subjectId: schedule.subjectId, classId: schedule.classId, date: schedule.date ? new Date(schedule.date).toISOString().split('T')[0] : '', startTime: schedule.startTime, endTime: schedule.endTime, roomId: schedule.roomId || '', maxMarks: schedule.maxMarks?.toString() || '' }); setScheduleFormError(''); setIsScheduleDialogOpen(true); };
-  const handleScheduleSubmit = async (e) => { e.preventDefault(); if (!schoolData?.id) return; setIsSubmittingSchedule(true); setScheduleFormError(''); const isEditing = !!editingSchedule; const { id, ...payload } = examScheduleFormData; const url = isEditing ? `/api/schools/${schoolData.id}/academics/exam-schedules/${editingSchedule.id}` : `/api/schools/${schoolData.id}/academics/exam-schedules`; const method = isEditing ? 'PUT' : 'POST'; const actionText = isEditing ? 'update' : 'create'; try { const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); const result = await response.json(); if (!response.ok) { let err = result.error || `Failed to ${actionText} exam schedule.`; if (result.issues) err = result.issues.map(i => `${i.path.join('.') || 'Field'}: ${i.message}`).join('; '); toast.error(`${actionText.charAt(0).toUpperCase() + actionText.slice(1)} Failed`, { description: err }); setScheduleFormError(err); } else { toast.success(`Exam schedule ${actionText}d successfully!`); setIsScheduleDialogOpen(false); fetchAllData(); } } catch (err) { toast.error('An unexpected error occurred.'); setScheduleFormError('An unexpected error occurred.'); } finally { setIsSubmittingSchedule(false); } };
+  const openEditScheduleDialog = (schedule) => {
+    setEditingSchedule(schedule);
+    const matchedRoomId = rooms.find((r) => r.name === schedule.room)?.id || '';
+    setExamScheduleFormData({
+      id: schedule.id,
+      examId: schedule.examId,
+      subjectId: schedule.subjectId,
+      classId: schedule.classId,
+      date: schedule.date ? new Date(schedule.date).toISOString().split('T')[0] : '',
+      startTime: schedule.startTime,
+      endTime: schedule.endTime,
+      roomId: matchedRoomId,
+      maxMarks: schedule.maxMarks?.toString() || ''
+    });
+    setScheduleFormError('');
+    setIsScheduleDialogOpen(true);
+  };
+  const handleScheduleSubmit = async (e) => {
+    e.preventDefault();
+    if (!schoolData?.id) return;
+    setIsSubmittingSchedule(true);
+    setScheduleFormError('');
+    const isEditing = !!editingSchedule;
+    const { id, ...payload } = examScheduleFormData;
+    // Map selected roomId to a plain room name string expected by the API
+    const roomName = payload.roomId ? (rooms.find((r) => r.id === payload.roomId)?.name || null) : null;
+    const payloadToSend = { ...payload, room: roomName };
+    delete payloadToSend.roomId;
+    const url = isEditing
+      ? `/api/schools/${schoolData.id}/academics/exam-schedules/${editingSchedule.id}`
+      : `/api/schools/${schoolData.id}/academics/exam-schedules`;
+    const method = isEditing ? 'PUT' : 'POST';
+    const actionText = isEditing ? 'update' : 'create';
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payloadToSend)
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        let err = result.error || `Failed to ${actionText} exam schedule.`;
+        if (result.issues) err = result.issues.map(i => `${i.path.join('.') || 'Field'}: ${i.message}`).join('; ');
+        toast.error(`${actionText.charAt(0).toUpperCase() + actionText.slice(1)} Failed`, { description: err });
+        setScheduleFormError(err);
+      } else {
+        toast.success(`Exam schedule ${actionText}d successfully!`);
+        setIsScheduleDialogOpen(false);
+        fetchAllData();
+      }
+    } catch (err) {
+      toast.error('An unexpected error occurred.');
+      setScheduleFormError('An unexpected error occurred.');
+    } finally {
+      setIsSubmittingSchedule(false);
+    }
+  };
   const handleDeleteSchedule = async (scheduleId) => { if (!schoolData?.id || !window.confirm(`Are you sure you want to DELETE this exam schedule?`)) return; const toastId = `delete-schedule-${scheduleId}`; toast.loading("Deleting schedule...", { id: toastId }); try { const response = await fetch(`/api/schools/${schoolData.id}/academics/exam-schedules/${scheduleId}`, { method: 'DELETE' }); const result = await response.json(); if (!response.ok) throw new Error(result.error || "Deletion failed."); toast.success(result.message || `Exam schedule deleted.`, { id: toastId }); fetchAllData(); } catch (err) { toast.error(`Deletion Failed: ${err.message}`, { id: toastId }); } };
 
   const filteredSchedules = useMemo(() => { if (!selectedExamId) return []; return examSchedules.filter(s => s.examId === selectedExamId); }, [selectedExamId, examSchedules]);
