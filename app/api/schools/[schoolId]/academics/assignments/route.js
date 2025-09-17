@@ -22,9 +22,10 @@ export async function GET(request, { params }) {
     const parsedSchoolId = schoolIdSchema.parse(schoolId);
 
     // Optional filters
-    const subjectId = searchParams.get('subjectId') || undefined;
+  const subjectId = searchParams.get('subjectId') || undefined;
     const search = searchParams.get('search') || undefined;
-    const status = searchParams.get('status') || undefined; // upcoming | past
+  const status = searchParams.get('status') || undefined; // upcoming | past
+  const sectionId = searchParams.get('sectionId') || undefined;
     const mine = searchParams.get('mine');
 
     const where = {
@@ -37,6 +38,18 @@ export async function GET(request, { params }) {
       ...(status === 'upcoming' ? { dueDate: { gte: new Date() } } : {}),
       ...(status === 'past' ? { dueDate: { lt: new Date() } } : {}),
     };
+    if (sectionId) {
+      const sec = await prisma.section.findFirst({ where: { id: sectionId, schoolId: parsedSchoolId }, select: { classId: true } });
+      if (sec) {
+        where.AND = [
+          ...(where.AND || []),
+          { OR: [ { sectionId }, { classId: sec.classId } ] },
+        ];
+      } else {
+        // invalid section for this school => return empty
+        return NextResponse.json({ assignments: [] }, { status: 200 });
+      }
+    }
     const isTeacher = session.user?.role === 'TEACHER';
     if (isTeacher || mine === '1' || mine === 'true') {
       where.teacherId = session.user?.staffProfileId || '__none__';

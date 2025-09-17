@@ -131,6 +131,14 @@ export default function ManageStudentsPage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  // If a TEACHER lands here (admin page) redirect them to their scoped students page
+  if (typeof window !== 'undefined' && session?.user?.role === 'TEACHER') {
+    const sub = schoolData?.subdomain || pathname.split('/')[1];
+    // Prevent infinite loop by ensuring we're not already on teacher path
+    if (!pathname.includes('/teacher/people/students')) {
+      router.replace(`/${sub}/teacher/people/students`);
+    }
+  }
 
   const [students, setStudents] = useState([]);
   const [pagination, setPagination] = useState({ currentPage: 1, totalPages: 1, totalStudents: 0, limit: 10 });

@@ -16,7 +16,8 @@ export async function POST(request, { params }) {
 
   try {
     const body = await request.json();
-    const parsed = batchGradeSubmissionSchema.safeParse(body);
+  const debug = body?.debug === 1 || body?.debug === true || body?.debug === '1';
+  const parsed = batchGradeSubmissionSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: 'Validation Error', issues: parsed.error.issues }, { status: 400 });
     }
@@ -43,12 +44,27 @@ export async function POST(request, { params }) {
     if (session.user?.role === 'TEACHER') {
       const staffId = session.user?.staffProfileId;
       let authorized = false;
-      if (section.classTeacherId && section.classTeacherId === staffId) authorized = true;
+      const reasons = [];
+
+      // Class teacher
+      if (section.classTeacherId && section.classTeacherId === staffId) { authorized = true; reasons.push('class-teacher'); }
+
+      // Timetable entry for exact section + subject
       if (!authorized) {
         const tt = await prisma.timetableEntry.findFirst({ where: { schoolId, sectionId, subjectId, staffId } });
-        if (tt) authorized = true;
+        if (tt) { authorized = true; reasons.push('timetable-entry'); }
       }
-      if (!authorized) return NextResponse.json({ error: 'Not allowed to grade this exam for this section.' }, { status: 403 });
+
+      // StaffSubjectLevel assignment (subject taught at level/class); allow if matches class or generic (classId null)
+      if (!authorized) {
+        const staffSubjectLevel = await prisma.staffSubjectLevel.findFirst({ where: { schoolId, staffId, subjectId, OR: [{ classId: section.classId }, { classId: null }] } });
+        if (staffSubjectLevel) { authorized = true; reasons.push('staff-subject-level'); }
+      }
+
+      if (!authorized) {
+        return NextResponse.json({ error: 'Not allowed to grade this exam for this section.', ...(debug ? { debug: { staffId, sectionId, subjectId, reasonsTried: reasons } } : {}) }, { status: 403 });
+      }
+      if (debug) console.log('EXAM_GRADES_DEBUG authorized', { staffId, sectionId, subjectId, reasons });
     }
 
     // Upsert grades in a transaction

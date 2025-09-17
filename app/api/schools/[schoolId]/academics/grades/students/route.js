@@ -18,8 +18,9 @@ export async function GET(request, { params }) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const sectionId = searchParams.get('sectionId');
-    const subjectId = searchParams.get('subjectId');
+  const sectionId = searchParams.get('sectionId');
+  const subjectId = searchParams.get('subjectId');
+  const debug = searchParams.get('debug') === '1';
     if (!sectionId) {
       return NextResponse.json({ error: 'sectionId is required.' }, { status: 400 });
     }
@@ -32,15 +33,36 @@ export async function GET(request, { params }) {
     if (session.user?.role === 'TEACHER') {
       const staffId = session.user?.staffProfileId;
       let authorized = false;
-      // Class teacher for this section
-      if (section.classTeacherId && section.classTeacherId === staffId) authorized = true;
-      // Teaches this subject in this section via timetable
+      const authReasons = [];
+
+      // 1. Class teacher for this section
+      if (section.classTeacherId && section.classTeacherId === staffId) {
+        authorized = true; authReasons.push('class-teacher');
+      }
+
+      // 2. Timetable entry for this exact section+subject
       if (!authorized && subjectId) {
         const tt = await prisma.timetableEntry.findFirst({ where: { schoolId, sectionId, subjectId, staffId } });
-        if (tt) authorized = true;
+        if (tt) { authorized = true; authReasons.push('timetable-match'); }
       }
+
+      // 3. Staff teaches subject at this class / level via StaffSubjectLevel (subject + staff + school)
+      if (!authorized && subjectId) {
+        const classId = section.classId;
+        const staffSubjectLevel = await prisma.staffSubjectLevel.findFirst({ where: { schoolId, staffId, subjectId, OR: [{ classId }, { classId: null }] } });
+        if (staffSubjectLevel) { authorized = true; authReasons.push('staff-subject-level'); }
+      }
+
       if (!authorized) {
-        return NextResponse.json({ error: 'Not allowed to view students for this section/subject.' }, { status: 403 });
+        const message = subjectId
+          ? 'Not allowed: teacher does not teach this subject for this section.'
+          : 'Not allowed: only class teacher can load section students without specifying a subject.';
+        return NextResponse.json({ error: message, ...(debug ? { debug: { staffId, sectionId, subjectId, reasonsTried: authReasons } } : {}) }, { status: 403 });
+      }
+      if (debug) {
+        // Provide debug info on success
+        // (Will still proceed to return students normally below)
+        console.log('STUDENTS_API_DEBUG authorized', { staffId, sectionId, subjectId, reasons: authReasons });
       }
     }
 

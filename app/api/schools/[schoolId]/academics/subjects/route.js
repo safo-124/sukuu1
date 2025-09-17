@@ -69,17 +69,38 @@ export async function GET(request, { params }) {
       whereClause = { ...whereClause, id: { in: subjectIds.length ? subjectIds : ['__none__'] } };
     }
 
-    const subjects = await prisma.subject.findMany({
+    const isTeacherView = (session.user?.role === 'TEACHER') || mine === '1' || mine === 'true';
+
+    const subjectsRaw = await prisma.subject.findMany({
       where: whereClause,
       include: {
         department: { select: { id: true, name: true } },
         schoolLevelLinks: { select: { schoolLevel: { select: { id: true, name: true } } } },
-        staffSubjectLevels: { select: { staff: { select: { id: true, user: { select: { firstName: true, lastName: true } } } }, schoolLevel: { select: { name: true } } } },
+        staffSubjectLevels: {
+          where: isTeacherView ? { staffId: session.user?.staffProfileId } : undefined,
+          select: {
+            staffId: true,
+            schoolLevel: { select: { id: true, name: true } },
+          }
+        },
       },
       orderBy: { name: 'asc' },
     });
 
-    return NextResponse.json({ subjects }, { status: 200 });
+    // If teacher view, return simplified structure
+    if (isTeacherView) {
+      const simplified = subjectsRaw.map(s => ({
+        id: s.id,
+        name: s.name,
+        subjectCode: s.subjectCode || null,
+        weeklyHours: s.weeklyHours || null,
+        // Prefer levels from staffSubjectLevels (what the teacher actually teaches at) fallback to all linked levels
+        schoolLevels: (s.staffSubjectLevels?.length ? s.staffSubjectLevels.map(l => ({ id: l.schoolLevel.id, name: l.schoolLevel.name })) : s.schoolLevelLinks.map(l => ({ id: l.schoolLevel.id, name: l.schoolLevel.name })))
+      }));
+      return NextResponse.json({ subjects: simplified }, { status: 200 });
+    }
+
+    return NextResponse.json({ subjects: subjectsRaw }, { status: 200 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Validation Error', issues: error.issues }, { status: 400 });
