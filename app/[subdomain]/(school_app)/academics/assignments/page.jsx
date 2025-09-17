@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { FilePlus2, Edit3, Trash2, CalendarDays, Loader2, AlertTriangle, BookOpen, Layers, Users, GraduationCap, CheckSquare, Paperclip, XCircle } from 'lucide-react'; // Added Paperclip, XCircle
+import { FilePlus2, Edit3, Trash2, CalendarDays, Loader2, AlertTriangle, BookOpen, Layers, Users, GraduationCap, CheckSquare, Paperclip, XCircle, Copy, Clock } from 'lucide-react'; // Added actions
 
 const initialAssignmentFormData = {
   id: null,
@@ -155,6 +155,8 @@ export default function ManageAssignmentsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [selectedFiles, setSelectedFiles] = useState([]); // New state for files to upload
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all'); // all | upcoming | past
 
   const titleTextClasses = "text-black dark:text-white";
   const descriptionTextClasses = "text-zinc-600 dark:text-zinc-400";
@@ -169,13 +171,15 @@ export default function ManageAssignmentsPage() {
       // If the logged-in user is a teacher, we fetch only their assignments by default
       const mine = session?.user?.role === 'TEACHER' ? '1' : '0';
       const subjectParam = activeSubjectFilter ? `&subjectId=${encodeURIComponent(activeSubjectFilter)}` : '';
-      const response = await fetch(`/api/schools/${schoolData.id}/academics/assignments?mine=${mine}${subjectParam}`);
+      const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
+      const statusParam = statusFilter !== 'all' ? `&status=${encodeURIComponent(statusFilter)}` : '';
+      const response = await fetch(`/api/schools/${schoolData.id}/academics/assignments?mine=${mine}${subjectParam}${searchParam}${statusParam}`);
       if (!response.ok) { const errData = await response.json().catch(() => ({})); throw new Error(errData.error || 'Failed to fetch assignments.'); }
       const data = await response.json();
       setAssignments(data.assignments || []);
     } catch (err) { toast.error("Error fetching assignments", { description: err.message }); setError(err.message);
     } finally { setIsLoading(false); }
-  }, [schoolData?.id, session?.user?.role, activeSubjectFilter]);
+  }, [schoolData?.id, session?.user?.role, activeSubjectFilter, search, statusFilter]);
 
   const fetchDropdownDependencies = useCallback(async () => {
     if (!schoolData?.id) return;
@@ -492,6 +496,18 @@ export default function ManageAssignmentsPage() {
         </Dialog>
       </div>
 
+      <div className="flex flex-col md:flex-row gap-3 md:items-center">
+        <Input placeholder="Search assignments..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-40"><SelectValue placeholder="Status" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="upcoming">Upcoming</SelectItem>
+            <SelectItem value="past">Past</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       {session?.user?.role === 'TEACHER' && (
         <div className={`${glassCardClasses} space-y-4`}>
           <div>
@@ -541,6 +557,7 @@ export default function ManageAssignmentsPage() {
               <TableHead className={`${titleTextClasses} font-semibold`}>Title</TableHead>
               <TableHead className={`${titleTextClasses} font-semibold`}>Subject</TableHead>
               <TableHead className={`${titleTextClasses} font-semibold hidden sm:table-cell`}>Due Date</TableHead>
+              <TableHead className={`${titleTextClasses} font-semibold hidden lg:table-cell`}>Submissions</TableHead>
               <TableHead className={`${titleTextClasses} font-semibold hidden md:table-cell`}>Target</TableHead>
               <TableHead className={`${titleTextClasses} font-semibold hidden lg:table-cell`}>Teacher</TableHead>
               <TableHead className={`${titleTextClasses} font-semibold text-right`}>Actions</TableHead>
@@ -560,18 +577,41 @@ export default function ManageAssignmentsPage() {
               ))
             ) : assignments.length > 0 ? assignments.map((assignment) => (
               <TableRow key={assignment.id} className="border-zinc-200/50 dark:border-zinc-800/50 hover:bg-zinc-500/5 dark:hover:bg-white/5">
-                <TableCell className={`${descriptionTextClasses} font-medium`}>{assignment.title}</TableCell>
+                <TableCell className={`${descriptionTextClasses} font-medium flex items-center gap-2`}>
+                  <span>{assignment.title}</span>
+                  {Array.isArray(assignment.attachments) && assignment.attachments.length > 0 && (
+                    <span title={`${assignment.attachments.length} attachment(s)`} className="inline-flex items-center text-zinc-500 dark:text-zinc-400">
+                      <Paperclip className="h-3.5 w-3.5" />
+                    </span>
+                  )}
+                </TableCell>
                 <TableCell className={`${descriptionTextClasses}`}>
                   <button onClick={() => onClickSubjectChip(assignment.subjectId)} className="underline-offset-2 hover:underline">
                     {getSubjectName(assignment.subjectId)}
                   </button>
                 </TableCell>
                 <TableCell className={`${descriptionTextClasses} hidden sm:table-cell`}>{formatDueDate(assignment.dueDate)}</TableCell>
+                <TableCell className={`${descriptionTextClasses} hidden lg:table-cell`}>{assignment._count?.submittedAssignments ?? 0}</TableCell>
                 <TableCell className={`${descriptionTextClasses} hidden md:table-cell`}>{getSectionClassDisplayName(assignment.sectionId, assignment.classId)}</TableCell>
                 <TableCell className={`${descriptionTextClasses} hidden lg:table-cell`}>{getTeacherName(assignment.teacherId)}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1 md:gap-2">
                     <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} onClick={() => openEditDialog(assignment)} title="Edit Assignment"> <Edit3 className="h-4 w-4" /> </Button>
+                    <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} onClick={async () => {
+                      const res = await fetch(`/api/schools/${schoolData.id}/academics/assignments/${assignment.id}/duplicate`, { method: 'POST' });
+                      const j = await res.json();
+                      if (!res.ok) return toast.error(j.error || 'Duplicate failed');
+                      toast.success('Assignment duplicated');
+                      fetchAssignments();
+                    }} title="Duplicate Assignment"> <Copy className="h-4 w-4" /> </Button>
+                    <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} onClick={async () => {
+                      const days = 3; // quick extend by 3 days; could add a mini-dialog later
+                      const res = await fetch(`/api/schools/${schoolData.id}/academics/assignments/${assignment.id}/extend-due-date`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ days }) });
+                      const j = await res.json();
+                      if (!res.ok) return toast.error(j.error || 'Extend failed');
+                      toast.success('Due date extended');
+                      fetchAssignments();
+                    }} title="Extend due date by 3 days"> <Clock className="h-4 w-4" /> </Button>
                     <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8 border-red-300 text-red-600 hover:bg-red-100 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/50`} onClick={() => handleDelete(assignment.id, assignment.title)} title="Delete Assignment"> <Trash2 className="h-4 w-4" /> </Button>
                   </div>
                 </TableCell>

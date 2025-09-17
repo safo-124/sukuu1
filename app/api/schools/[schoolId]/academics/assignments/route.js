@@ -49,6 +49,7 @@ export async function GET(request, { params }) {
         section: { select: { id: true, name: true, class: { select: { id: true, name: true } } } },
         class: { select: { id: true, name: true } }, // Include if assignments can be directly linked to a class
         teacher: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
+        _count: { select: { submittedAssignments: true } },
       },
       orderBy: {
         dueDate: 'desc', // Order by due date, most recent first
