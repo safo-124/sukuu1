@@ -110,10 +110,21 @@ export async function PUT(request, { params }) {
       updateData.dueDate = new Date(updateData.dueDate);
     }
     if (updateData.maxMarks !== undefined) {
-      updateData.maxMarks = updateData.maxMarks !== null ? parseFloat(updateData.maxMarks) : null;
+      if (updateData.maxMarks === null) {
+        updateData.maxMarks = null;
+      } else {
+        const n = typeof updateData.maxMarks === 'number' ? updateData.maxMarks : parseFloat(updateData.maxMarks);
+        updateData.maxMarks = Number.isFinite(n) ? n : null;
+      }
     }
-    if (updateData.attachments !== undefined && updateData.attachments.length === 0) {
-      updateData.attachments = null; // Store as null if empty array is sent
+    if (updateData.attachments !== undefined) {
+      if (Array.isArray(updateData.attachments) && updateData.attachments.length === 0) {
+        updateData.attachments = null; // Store as null if empty array is sent
+      }
+      // If a non-array non-null sneaks through, normalize to null
+      if (updateData.attachments !== null && !Array.isArray(updateData.attachments)) {
+        updateData.attachments = null;
+      }
     }
 
     const updatedAssignment = await prisma.assignment.update({
@@ -126,7 +137,14 @@ export async function PUT(request, { params }) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Validation Error', issues: error.issues }, { status: 400 });
     }
-    console.error('Error updating assignment:', error);
+    console.error('Error updating assignment:', {
+      message: error?.message,
+      name: error?.name,
+      code: error?.code,
+      clientVersion: error?.clientVersion,
+      meta: error?.meta,
+      stack: error?.stack,
+    });
     return NextResponse.json({ error: 'Failed to update assignment.' }, { status: 500 });
   }
 }

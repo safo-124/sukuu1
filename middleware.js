@@ -53,11 +53,8 @@ export async function middleware(request) {
 
       const teacherAllowedPrefixes = [
         '/dashboard/teacher',
-        '/academics/assignments',
-        '/academics/grades',
-        '/academics/timetable',
-        '/academics/examinations',
-        '/academics/subjects',
+        // Teacher academics live under /teacher/academics/*
+        '/teacher/academics',
         '/people/students',
         '/people/teachers',
         '/attendance/students',
@@ -92,6 +89,11 @@ export async function middleware(request) {
         if (role === 'TEACHER') {
           if (lowerTenantPath === '/dashboard') {
             url.pathname = buildTenantPath('/dashboard/teacher');
+            return NextResponse.redirect(url);
+          }
+          // Redirect legacy /academics/* to /teacher/academics/* for teachers
+          if (lowerTenantPath.startsWith('/academics/')) {
+            url.pathname = buildTenantPath('/teacher' + lowerTenantPath);
             return NextResponse.redirect(url);
           }
           const isAllowed = startsWithAny(lowerTenantPath, teacherAllowedPrefixes);
@@ -148,11 +150,7 @@ export async function middleware(request) {
       // Teacher allowed prefixes (tenant-relative – no subdomain prefix here)
       const teacherAllowedPrefixes = [
         '/dashboard/teacher',
-        '/academics/assignments',
-        '/academics/grades',
-        '/academics/timetable',
-        '/academics/examinations',
-        '/academics/subjects',
+        '/teacher/academics',
         '/people/students',
         '/people/teachers',
         '/attendance/students',
@@ -198,6 +196,11 @@ export async function middleware(request) {
             url.pathname = '/dashboard/teacher';
             return NextResponse.redirect(url);
           }
+          // Redirect legacy /academics/* to /teacher/academics/*
+          if (lowerPath.startsWith('/academics/')) {
+            url.pathname = '/teacher' + lowerPath;
+            return NextResponse.redirect(url);
+          }
           // Enforce allowlist for teachers to avoid admin-only sections
           const isAllowed = startsWithAny(lowerPath, teacherAllowedPrefixes);
           if (!isAllowed) {
@@ -205,6 +208,11 @@ export async function middleware(request) {
             return NextResponse.redirect(url);
           }
         } else {
+          // Non-teachers going to teacher-only academics should go to admin academics
+          if (lowerPath.startsWith('/teacher/academics')) {
+            url.pathname = lowerPath.replace('/teacher/academics', '/academics');
+            return NextResponse.redirect(url);
+          }
           // Non-teachers: redirect away from teacher-only pages
           if (isTeacherDashboard) {
             url.pathname = '/dashboard';

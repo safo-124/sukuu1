@@ -30,18 +30,49 @@ export async function GET(request, { params }) {
     const whereClause = { schoolId: schoolId };
     if (sectionIdFilter) whereClause.sectionId = sectionIdFilter;
     if (staffIdFilter) whereClause.staffId = staffIdFilter;
-    // Add other filters as needed
 
-    const timetableEntries = await prisma.timetableEntry.findMany({
+    let timetableEntries = await prisma.timetableEntry.findMany({
       where: whereClause,
       include: {
-        section: { select: { id: true, name: true, class: { select: { id: true, name: true } } } },
+        section: { select: { id: true, name: true, class: { select: { id: true, name: true, schoolLevelId: true } } } },
         subject: { select: { id: true, name: true } },
         staff: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
         room: { select: { id: true, name: true } },
       },
       orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
     });
+
+    // Fallback: if querying for a specific staff+section and no entries, infer subjects from StaffSubjectLevel
+    if (Array.isArray(timetableEntries) && timetableEntries.length === 0 && sectionIdFilter && staffIdFilter) {
+      const section = await prisma.section.findFirst({ where: { id: sectionIdFilter, schoolId }, select: { class: { select: { id: true, schoolLevelId: true, name: true } }, id: true, name: true } });
+      if (section) {
+        const fallbacks = await prisma.staffSubjectLevel.findMany({
+          where: {
+            schoolId,
+            staffId: staffIdFilter,
+            OR: [
+              { classId: section.class?.id ?? '__none__' },
+              { schoolLevelId: section.class?.schoolLevelId ?? '__none__' },
+            ],
+          },
+          include: { subject: { select: { id: true, name: true } } },
+        });
+        // Map to pseudo timetable entries with subject info
+        timetableEntries = fallbacks
+          .filter(f => f.subject)
+          .map(f => ({
+            id: `fallback-${f.id}`,
+            section: { id: section.id, name: section.name, class: { id: section.class?.id, name: section.class?.name } },
+            subject: f.subject,
+            staff: { id: staffIdFilter, user: { firstName: '', lastName: '' } },
+            room: null,
+            dayOfWeek: 0,
+            startTime: '00:00',
+            endTime: '00:00',
+          }));
+      }
+    }
+
     return NextResponse.json({ timetableEntries }, { status: 200 });
   } catch (error) {
     console.error(`API (GET TimetableEntries) - Error for school ${schoolId}:`, error);

@@ -8,6 +8,7 @@ export const baseGradingWeightConfigSchema = z.object({
   schoolLevelId: z.string().nullable().optional(),
   classId: z.string().nullable().optional(),
   subjectId: z.string().nullable().optional(),
+  gradingScaleId: z.string().nullable().optional(),
   examWeight: z.coerce.number().min(0).max(100, "Exam weight must be between 0 and 100."),
   classworkWeight: z.coerce.number().min(0).max(100, "Classwork weight must be between 0 and 100."),
   assignmentWeight: z.coerce.number().min(0).max(100, "Assignment weight must be between 0 and 100."),

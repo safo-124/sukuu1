@@ -1,7 +1,7 @@
 // app/[subdomain]/(school_app)/academics/grades/page.jsx
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSchool } from '../../layout';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
@@ -20,9 +20,17 @@ export default function TeacherGradesPage() {
   const [marks, setMarks] = useState({});
   const [termYear, setTermYear] = useState({ termId: '', academicYearId: '' });
   const [testLabel, setTestLabel] = useState('');
+  const [assignmentId, setAssignmentId] = useState('');
   const [me, setMe] = useState(null);
   const [allowedSubjectsForSection, setAllowedSubjectsForSection] = useState(null);
   const isTeacher = session?.user?.role === 'TEACHER';
+  // Spreadsheet-like entry helpers
+  const [saving, setSaving] = useState('idle'); // idle | saving | saved | error
+  const [saveMessage, setSaveMessage] = useState('');
+  const dirtyIdsRef = useRef(new Set());
+  const inputRefs = useRef({});
+  const autosaveTimer = useRef(null);
+  const [pendingQueue, setPendingQueue] = useState([]);
 
   const loadContext = useCallback(async () => {
     if (!school?.id || !session) return;
@@ -138,7 +146,189 @@ export default function TeacherGradesPage() {
     run();
   }, [isTeacher, school?.id, selected.sectionId, me?.staff?.id]);
 
-  const onChangeMark = (studentId, value) => setMarks(prev => ({ ...prev, [studentId]: value }));
+  // Determine active mode for autosave precedence
+  const activeMode = useMemo(() => {
+    if (selected.examScheduleId && selected.sectionId) return 'exam';
+    if (assignmentId && selected.subjectId && selected.sectionId) return 'assignment';
+    if (testLabel && selected.subjectId && selected.sectionId) return 'test';
+    return null;
+  }, [selected.examScheduleId, selected.sectionId, assignmentId, selected.subjectId, testLabel]);
+
+  // Change handler with dirty tracking
+  const onChangeMark = (studentId, value) => {
+    setMarks(prev => ({ ...prev, [studentId]: value }));
+    dirtyIdsRef.current.add(studentId);
+    setSaving('idle');
+  };
+
+  // Clipboard paste handler (supports id\tvalue or sequential values)
+  const handlePaste = (e) => {
+    const text = e.clipboardData?.getData('text');
+    if (!text) return;
+    e.preventDefault();
+    const lines = text.split(/\r?\n/).filter(Boolean);
+    const hasTabs = lines.some(l => l.includes('\t'));
+    setMarks(prev => {
+      const next = { ...prev };
+      if (hasTabs) {
+        lines.forEach(line => {
+          const [id, val] = line.split('\t');
+          const v = val?.trim();
+          if (id && students.some(s => s.id === id)) {
+            next[id] = v ?? '';
+            dirtyIdsRef.current.add(id);
+          }
+        });
+      } else {
+        students.forEach((s, idx) => {
+          if (idx < lines.length) {
+            const v = lines[idx]?.trim();
+            next[s.id] = v ?? '';
+            dirtyIdsRef.current.add(s.id);
+          }
+        });
+      }
+      return next;
+    });
+  };
+
+  // Keyboard navigation between inputs
+  const handleKeyDown = (e, studentIndex) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const next = students[studentIndex + 1];
+      if (next && inputRefs.current[next.id]) inputRefs.current[next.id].focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prev = students[studentIndex - 1];
+      if (prev && inputRefs.current[prev.id]) inputRefs.current[prev.id].focus();
+    }
+  };
+
+  // Offline queue management
+  const loadQueue = () => {
+    try {
+      const raw = localStorage.getItem('pendingGradeSaves') || '[]';
+      setPendingQueue(JSON.parse(raw));
+    } catch { setPendingQueue([]); }
+  };
+  const pushQueue = (item) => {
+    try {
+      const raw = localStorage.getItem('pendingGradeSaves') || '[]';
+      const list = JSON.parse(raw);
+      list.push(item);
+      localStorage.setItem('pendingGradeSaves', JSON.stringify(list));
+      setPendingQueue(list);
+    } catch {}
+  };
+  const flushQueue = async () => {
+    loadQueue();
+    if (!pendingQueue.length) return;
+    const rest = [];
+    for (const it of pendingQueue) {
+      try {
+        const res = await fetch(it.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(it.payload) });
+        if (!res.ok) throw new Error('Failed');
+      } catch {
+        rest.push(it);
+      }
+    }
+    localStorage.setItem('pendingGradeSaves', JSON.stringify(rest));
+    setPendingQueue(rest);
+    if (rest.length === 0) toast.success('All pending grade saves synced');
+  };
+  useEffect(() => { loadQueue(); }, []);
+  useEffect(() => {
+    const onOnline = () => flushQueue();
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, [pendingQueue]);
+
+  // Build payload for autosave
+  const toNum = (v) => {
+    if (v === '' || v === null || v === undefined) return null;
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const buildPayload = () => {
+    const dirtyIds = Array.from(dirtyIdsRef.current);
+    if (!dirtyIds.length) return null;
+    const gradesArr = dirtyIds.map(id => ({ studentId: id, marksObtained: toNum(marks[id]) }));
+    if (activeMode === 'exam') {
+      const es = examSchedules.find(e => e.id === selected.examScheduleId);
+      if (!es || !selected.sectionId) return null;
+      return {
+        url: `/api/schools/${school.id}/academics/grades/exams`,
+        payload: {
+          examScheduleId: selected.examScheduleId,
+          termId: es.termId || termYear.termId,
+          academicYearId: es.academicYearId || termYear.academicYearId,
+          subjectId: es.subjectId || selected.subjectId,
+          sectionId: selected.sectionId,
+          grades: gradesArr,
+        }
+      };
+    }
+    if (activeMode === 'assignment') {
+      if (!assignmentId || !selected.subjectId || !selected.sectionId) return null;
+      return {
+        url: `/api/schools/${school.id}/academics/grades/assignments`,
+        payload: {
+          assignmentId,
+          termId: termYear.termId,
+          academicYearId: termYear.academicYearId,
+          subjectId: selected.subjectId,
+          sectionId: selected.sectionId,
+          grades: gradesArr,
+        }
+      };
+    }
+    if (activeMode === 'test') {
+      if (!testLabel || !selected.subjectId || !selected.sectionId) return null;
+      return {
+        url: `/api/schools/${school.id}/academics/grades/tests`,
+        payload: {
+          label: testLabel,
+          termId: termYear.termId,
+          academicYearId: termYear.academicYearId,
+          subjectId: selected.subjectId,
+          sectionId: selected.sectionId,
+          grades: gradesArr,
+        }
+      };
+    }
+    return null;
+  };
+
+  // Debounced autosave when marks change and a target is selected
+  useEffect(() => {
+    if (!activeMode) return;
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = setTimeout(async () => {
+      const job = buildPayload();
+      if (!job) return;
+      setSaving('saving'); setSaveMessage('Saving changes...');
+      try {
+        const res = await fetch(job.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(job.payload) });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || 'Failed to save');
+        }
+        const savedIds = new Set(job.payload.grades.map(g => g.studentId));
+        dirtyIdsRef.current.forEach(id => { if (savedIds.has(id)) dirtyIdsRef.current.delete(id); });
+        setSaving('saved'); setSaveMessage('All changes saved');
+      } catch (err) {
+        if (err?.message?.includes('Failed to fetch') || err?.name === 'TypeError') {
+          pushQueue({ url: job.url, payload: job.payload, ts: Date.now() });
+          setSaving('error'); setSaveMessage('Offline: changes queued');
+        } else {
+          setSaving('error'); setSaveMessage(err.message || 'Failed to save');
+        }
+      }
+    }, 800);
+    return () => clearTimeout(autosaveTimer.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [marks, activeMode, selected.examScheduleId, assignmentId, testLabel, selected.subjectId, selected.sectionId, termYear.termId, termYear.academicYearId]);
 
   const submitExamGrades = async () => {
     if (!school?.id || !selected.examScheduleId || !selected.sectionId) return;
@@ -157,7 +347,6 @@ export default function TeacherGradesPage() {
     toast.success('Exam grades saved');
   };
 
-  const [assignmentId, setAssignmentId] = useState('');
   const submitAssignmentGrades = async () => {
     if (!school?.id || !assignmentId || !selected.sectionId || !selected.subjectId) return;
     const payload = {
@@ -246,7 +435,17 @@ export default function TeacherGradesPage() {
         {Array.isArray(allowedSubjectsForSection) && allowedSubjectsForSection.length === 0 && isTeacher && !((me?.classTeacherSections || []).some(sec => sec.id === selected.sectionId)) ? (
           <p className="text-sm text-red-500 mb-2">You do not teach any subject in this section.</p>
         ) : null}
-        <table className="min-w-full text-sm">
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-xs text-muted-foreground">
+            {activeMode ? (
+              saving === 'saving' ? 'Saving…' : saving === 'saved' ? 'All changes saved' : saving === 'error' ? saveMessage : ''
+            ) : 'Select an exam, assignment, or test to enable autosave.'}
+          </div>
+          {pendingQueue.length > 0 && (
+            <Button variant="outline" size="sm" onClick={flushQueue}>Retry pending saves ({pendingQueue.length})</Button>
+          )}
+        </div>
+        <table className="min-w-full text-sm" onPaste={handlePaste}>
           <thead>
             <tr className="text-left border-b">
               <th className="py-2 pr-4">Student</th>
@@ -254,10 +453,19 @@ export default function TeacherGradesPage() {
             </tr>
           </thead>
           <tbody>
-            {students.map(st => (
+            {students.map((st, idx) => (
               <tr key={st.id} className="border-b hover:bg-zinc-50 dark:hover:bg-zinc-900">
                 <td className="py-2 pr-4">{st.lastName}, {st.firstName}</td>
-                <td className="py-2"><Input type="number" value={marks[st.id] ?? ''} onChange={(e) => onChangeMark(st.id, e.target.value)} placeholder="e.g., 78" /></td>
+                <td className="py-2">
+                  <Input
+                    ref={(el) => { if (el) inputRefs.current[st.id] = el; }}
+                    type="number"
+                    value={marks[st.id] ?? ''}
+                    onChange={(e) => onChangeMark(st.id, e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(e, idx)}
+                    placeholder="e.g., 78"
+                  />
+                </td>
               </tr>
             ))}
           </tbody>

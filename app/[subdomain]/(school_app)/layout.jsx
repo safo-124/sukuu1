@@ -196,11 +196,11 @@ function SchoolSidebar({ schoolSubdomain, schoolName, schoolLogoUrl, isOpen, onC
           {
             title: 'Academics',
             items: [
-              { href: `/${schoolSubdomain}/academics/assignments`, label: 'Assignments', icon: CheckSquare },
-              { href: `/${schoolSubdomain}/academics/grades`, label: 'Grades', icon: Percent },
-              { href: `/${schoolSubdomain}/academics/timetable`, label: 'My Timetable', icon: CalendarDays },
-              { href: `/${schoolSubdomain}/academics/examinations`, label: 'Examinations', icon: GraduationCap },
-              { href: `/${schoolSubdomain}/academics/subjects`, label: 'My Subjects', icon: BookOpen },
+              { href: `/${schoolSubdomain}/teacher/academics/assignments`, label: 'Assignments', icon: CheckSquare },
+              { href: `/${schoolSubdomain}/teacher/academics/grades`, label: 'Grades', icon: Percent },
+              { href: `/${schoolSubdomain}/teacher/academics/timetable`, label: 'My Timetable', icon: CalendarDays },
+              { href: `/${schoolSubdomain}/teacher/academics/examinations`, label: 'Examinations', icon: GraduationCap },
+              { href: `/${schoolSubdomain}/teacher/academics/subjects`, label: 'My Subjects', icon: BookOpen },
             ]
           },
           {

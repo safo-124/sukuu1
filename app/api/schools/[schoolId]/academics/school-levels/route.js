@@ -1,6 +1,26 @@
 // app/api/schools/[schoolId]/academics/school-levels/route.js
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
+
+export async function GET(request, { params }) {
+  const { schoolId } = await params;
+  const session = await getServerSession(authOptions);
+  if (!session || session.user?.schoolId !== schoolId || !['SCHOOL_ADMIN','TEACHER','SECRETARY','ACCOUNTANT'].includes(session.user?.role)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  try {
+    const levels = await prisma.schoolLevel.findMany({ where: { schoolId }, orderBy: { name: 'asc' } });
+    return NextResponse.json({ schoolLevels: levels }, { status: 200 });
+  } catch (e) {
+    console.error('GET school levels error:', e);
+    return NextResponse.json({ error: 'Failed to fetch school levels.' }, { status: 500 });
+  }
+}
+// app/api/schools/[schoolId]/academics/school-levels/route.js
+import { NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { z } from 'zod'; // Ensure Zod is imported
