@@ -8,7 +8,7 @@ import { authOptions } from "@/lib/auth";
 
 // GET handler
 export async function GET(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId } = await params;
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {
@@ -78,7 +78,7 @@ export async function GET(request, { params }) {
 
 // POST handler
 export async function POST(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId } = await params;
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {

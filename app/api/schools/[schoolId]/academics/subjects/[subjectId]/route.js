@@ -8,7 +8,7 @@ import { authOptions } from "@/lib/auth";
 
 // GET handler to fetch a single subject's details
 export async function GET(request, { params }) {
-  const { schoolId, subjectId } = params;
+  const { schoolId, subjectId } = await params;
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {
@@ -47,7 +47,7 @@ export async function GET(request, { params }) {
 
 // PUT handler to update a subject's details
 export async function PUT(request, { params }) {
-  const { schoolId, subjectId } = params;
+  const { schoolId, subjectId } = await params;
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {
@@ -119,7 +119,7 @@ export async function PUT(request, { params }) {
 
 // DELETE handler to delete a subject
 export async function DELETE(request, { params }) {
-  const { schoolId, subjectId } = params;
+  const { schoolId, subjectId } = await params;
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {

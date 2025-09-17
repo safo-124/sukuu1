@@ -25,8 +25,18 @@ export async function GET(request, { params }) {
     const now = new Date();
     const timeString = now.toTimeString().slice(0,5); // HH:MM
 
-    const [subjectsCount, assignmentsCount, todayLessons, nextLesson] = await Promise.all([
-      prisma.subject.count({ where: { schoolId, teacherId: staff.id } }),
+    // Determine how many distinct subjects this teacher teaches using StaffSubjectLevel and TimetableEntry fallback
+    const [subjectsViaLinks, subjectsViaTT, assignmentsCount, todayLessons, nextLesson] = await Promise.all([
+      prisma.staffSubjectLevel.findMany({
+        where: { schoolId, staffId: staff.id },
+        distinct: ['subjectId'],
+        select: { subjectId: true },
+      }),
+      prisma.timetableEntry.findMany({
+        where: { schoolId, staffId: staff.id },
+        distinct: ['subjectId'],
+        select: { subjectId: true },
+      }),
       prisma.assignment.count({ where: { schoolId, teacherId: staff.id } }),
       prisma.timetableEntry.findMany({
         where: {
@@ -61,6 +71,12 @@ export async function GET(request, { params }) {
         ],
       }),
     ]);
+
+    const subjectIds = Array.from(new Set([
+      ...subjectsViaLinks.map(s => s.subjectId),
+      ...subjectsViaTT.map(s => s.subjectId),
+    ].filter(Boolean)));
+    const subjectsCount = subjectIds.length;
 
     return NextResponse.json({
       subjectsCount,

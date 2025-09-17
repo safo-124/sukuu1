@@ -9,7 +9,7 @@ import { schoolIdSchema, createRoomSchema } from '@/validators/resources.validat
 // GET /api/schools/[schoolId]/resources/rooms
 // Fetches all rooms for a specific school
 export async function GET(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId } = await params;
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'LIBRARIAN' && session.user?.role !== 'TRANSPORT_MANAGER' && session.user?.role !== 'HOSTEL_WARDEN' && session.user?.role !== 'TEACHER')) {
@@ -65,7 +65,7 @@ export async function GET(request, { params }) {
 // POST /api/schools/[schoolId]/resources/rooms
 // Creates a new room for a specific school
 export async function POST(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId } = await params;
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'LIBRARIAN' && session.user?.role !== 'HOSTEL_WARDEN')) {

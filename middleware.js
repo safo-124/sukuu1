@@ -1,5 +1,6 @@
 // middleware.js
 import { NextResponse } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 
 export async function middleware(request) {
   const url = request.nextUrl.clone();
@@ -24,8 +25,100 @@ export async function middleware(request) {
   // or a common www prefix (less relevant for localhost but good for production).
   const isMainDomainRequest = hostname === mainDomain || hostname === `www.${mainDomain}`;
 
+  // Reserved root-level path segments that are NOT tenant subdomains
+  const reservedRootSegments = new Set([
+    '', 'api', '_next', 'static', 'favicon.ico', 'assets', 'images', 'fonts'
+  ]);
+
+  // If on main domain, detect path-based tenant: /{subdomain}/...
+  let pathSubdomain = null;
   if (isMainDomainRequest) {
-    // Allow Next.js to handle routing for the main domain.
+    const parts = pathname.split('/').filter(Boolean);
+    if (parts.length > 0 && !reservedRootSegments.has(parts[0])) {
+      pathSubdomain = parts[0];
+    }
+  }
+
+  // If on main domain and path-based tenant detected, enforce role-based routing for tenant paths
+  if (isMainDomainRequest && pathSubdomain) {
+    try {
+      const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+      const tenant = pathSubdomain;
+      const tenantRelativePath = '/' + pathname.split('/').filter(Boolean).slice(1).join('/'); // strip the first segment (tenant)
+      const lowerTenantPath = tenantRelativePath.toLowerCase() || '/';
+
+      const isLoginPath = lowerTenantPath === '/login' || lowerTenantPath === '/teacher-login';
+      const isTeacherLogin = lowerTenantPath === '/teacher-login';
+      const isTeacherDashboard = lowerTenantPath.startsWith('/dashboard/teacher');
+
+      const teacherAllowedPrefixes = [
+        '/dashboard/teacher',
+        '/academics/assignments',
+        '/academics/grades',
+        '/academics/timetable',
+        '/academics/examinations',
+        '/academics/subjects',
+        '/people/students',
+        '/people/teachers',
+        '/attendance/students',
+        '/attendance/staff',
+        '/communication/announcements',
+        '/hr/payroll',
+        '/teacher-login',
+      ];
+      const startsWithAny = (p, arr) => arr.some(a => p === a || p.startsWith(a + '/'));
+
+      const buildTenantPath = (p) => `/${tenant}${p}`;
+
+      if (!token) {
+        if (isLoginPath) {
+          // allow
+        } else if (isTeacherDashboard) {
+          url.pathname = buildTenantPath('/teacher-login');
+          return NextResponse.redirect(url);
+        }
+      } else {
+        const tokenSub = (token.schoolSubdomain || token.subdomain || '').toLowerCase();
+        if (tokenSub && tokenSub !== tenant.toLowerCase()) {
+          url.pathname = buildTenantPath(token.role === 'TEACHER' ? '/teacher-login' : '/login');
+          url.searchParams.set('error', 'UnauthorizedSchool');
+          return NextResponse.redirect(url);
+        }
+        const role = token.role;
+        if (isLoginPath) {
+          url.pathname = buildTenantPath(role === 'TEACHER' ? '/dashboard/teacher' : '/dashboard');
+          return NextResponse.redirect(url);
+        }
+        if (role === 'TEACHER') {
+          if (lowerTenantPath === '/dashboard') {
+            url.pathname = buildTenantPath('/dashboard/teacher');
+            return NextResponse.redirect(url);
+          }
+          const isAllowed = startsWithAny(lowerTenantPath, teacherAllowedPrefixes);
+          if (!isAllowed) {
+            url.pathname = buildTenantPath('/dashboard/teacher');
+            return NextResponse.redirect(url);
+          }
+        } else {
+          if (isTeacherDashboard) {
+            url.pathname = buildTenantPath('/dashboard');
+            return NextResponse.redirect(url);
+          }
+          if (isTeacherLogin) {
+            url.pathname = buildTenantPath('/login');
+            return NextResponse.redirect(url);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Middleware path-tenant token handling error:', e);
+    }
+    // For path-based tenants, do not rewrite; continue to route as-is
+    return NextResponse.next();
+  }
+
+  if (isMainDomainRequest) {
+    // Allow Next.js to handle routing for the main domain when no tenant path is detected.
     // This serves Super Admin pages (e.g., /dashboard, /schools from app/(superadmin)/*)
     // and any marketing/root pages.
     return NextResponse.next();
@@ -39,6 +132,94 @@ export async function middleware(request) {
   } else if (hostname.endsWith(`.${mainDomain}`)) { // For production/staging
     // e.g., 'myschool' from 'myschool.sukuu.com'
     subdomain = hostname.replace(`.${mainDomain}`, '');
+  }
+
+  // Server-side role enforcement for subdomain tenant routing
+  // We do this BEFORE rewriting the pathname so redirects go to clean, tenant-relative paths
+  if (subdomain && subdomain !== 'www') {
+    try {
+      const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+
+      const lowerPath = pathname.toLowerCase();
+      const isLoginPath = lowerPath === '/login' || lowerPath === '/teacher-login';
+      const isTeacherLogin = lowerPath === '/teacher-login';
+      const isTeacherDashboard = lowerPath.startsWith('/dashboard/teacher');
+
+      // Teacher allowed prefixes (tenant-relative – no subdomain prefix here)
+      const teacherAllowedPrefixes = [
+        '/dashboard/teacher',
+        '/academics/assignments',
+        '/academics/grades',
+        '/academics/timetable',
+        '/academics/examinations',
+        '/academics/subjects',
+        '/people/students',
+        '/people/teachers',
+        '/attendance/students',
+        '/attendance/staff',
+        '/communication/announcements',
+        '/hr/payroll',
+        '/teacher-login',
+      ];
+
+      const startsWithAny = (p, arr) => arr.some(a => p === a || p.startsWith(a + '/'));
+
+      // If unauthenticated and requesting protected areas, route to role-appropriate login
+      if (!token) {
+        // Allow reaching the login pages unauthenticated
+        if (isLoginPath) {
+          // Continue to rewrite at the end
+        } else if (isTeacherDashboard) {
+          // Teacher dashboard requires teacher login
+          url.pathname = '/teacher-login';
+          return NextResponse.redirect(url);
+        }
+        // Otherwise, let it fall through; client-side layout will handle most cases
+      } else {
+        // If token exists but belongs to a different school subdomain, force logout flow
+        const tokenSubdomain = (token.schoolSubdomain || token.subdomain || '').toLowerCase();
+        if (tokenSubdomain && tokenSubdomain !== subdomain.toLowerCase()) {
+          url.pathname = token.role === 'TEACHER' ? '/teacher-login' : '/login';
+          url.searchParams.set('error', 'UnauthorizedSchool');
+          return NextResponse.redirect(url);
+        }
+
+        const role = token.role;
+
+        // If authenticated users land on login pages, send them to their dashboards
+        if (isLoginPath) {
+          url.pathname = role === 'TEACHER' ? '/dashboard/teacher' : '/dashboard';
+          return NextResponse.redirect(url);
+        }
+
+        if (role === 'TEACHER') {
+          // Teachers redirected away from generic admin dashboard
+          if (lowerPath === '/dashboard') {
+            url.pathname = '/dashboard/teacher';
+            return NextResponse.redirect(url);
+          }
+          // Enforce allowlist for teachers to avoid admin-only sections
+          const isAllowed = startsWithAny(lowerPath, teacherAllowedPrefixes);
+          if (!isAllowed) {
+            url.pathname = '/dashboard/teacher';
+            return NextResponse.redirect(url);
+          }
+        } else {
+          // Non-teachers: redirect away from teacher-only pages
+          if (isTeacherDashboard) {
+            url.pathname = '/dashboard';
+            return NextResponse.redirect(url);
+          }
+          if (isTeacherLogin) {
+            url.pathname = '/login';
+            return NextResponse.redirect(url);
+          }
+        }
+      }
+    } catch (err) {
+      // In case of any token decode errors, proceed to rewrite (defense in depth still on client side)
+      console.warn('Middleware token handling error:', err);
+    }
   }
 
   if (subdomain && subdomain !== 'www') {

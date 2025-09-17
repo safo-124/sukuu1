@@ -22,7 +22,7 @@ const minutesToTime = (totalMinutes) => {
 // POST /api/schools/[schoolId]/academics/timetable/suggest
 // Suggests an available time slot for a given criteria
 export async function POST(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId } = await params;
   const session = await getServerSession(authOptions);
 
   // Only School Admin can generate suggestions

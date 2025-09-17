@@ -9,7 +9,7 @@ import { schoolIdSchema, createAcademicYearSchema } from '@/validators/academics
 // GET /api/schools/[schoolId]/academic-years
 // Fetches all academic years for a specific school
 export async function GET(request, { params }) {
-  const { schoolId } = params; // This is the line generating the Next.js warning
+  const { schoolId } = await params; // This is the line generating the Next.js warning
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'TEACHER')) {
@@ -53,7 +53,7 @@ export async function GET(request, { params }) {
 // POST /api/schools/[schoolId]/academic-years
 // Creates a new academic year for a specific school
 export async function POST(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId } = await params;
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) { // Only admin can create academic years

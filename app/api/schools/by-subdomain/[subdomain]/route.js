@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
 export async function GET(request, { params }) {
-    const { subdomain } = params;
+    const { subdomain } = await params;
     if (!subdomain) {
         return NextResponse.json({ error: 'Subdomain is required' }, { status: 400 });
     }

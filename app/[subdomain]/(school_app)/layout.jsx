@@ -66,7 +66,16 @@ function SchoolHeader({ schoolName, schoolLogoUrl, onToggleSidebar, userSession 
           <Moon className="absolute h-[1.1rem] w-[1.1rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
         </Button>
         {userSession?.user && (
-            <Button variant="outline" size="sm" onClick={() => signOut({ callbackUrl: `/${params.subdomain}/login` })} className={`${outlineButtonClasses} px-2 sm:px-3`}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const role = userSession?.user?.role;
+                const to = role === 'TEACHER' ? `/${params.subdomain}/teacher-login` : `/${params.subdomain}/login`;
+                signOut({ callbackUrl: to });
+              }}
+              className={`${outlineButtonClasses} px-2 sm:px-3`}
+            >
               <LogOut className="mr-0 sm:mr-2 h-4 w-4" /> <span className="hidden sm:inline">Logout</span>
             </Button>
         )}
@@ -430,7 +439,7 @@ export default function SchoolAppLayout({ children }) {
       return;
     }
 
-    if (sessionStatus === 'authenticated') {
+  if (sessionStatus === 'authenticated') {
       // User is authenticated, now check authorization for the specific school and role
       if (!schoolData || session.user?.schoolId !== schoolData.id || session.user?.schoolSubdomain !== subdomain) {
         setAuthError("Access denied. You are not authorized for this school or your session is invalid.");
@@ -445,18 +454,29 @@ export default function SchoolAppLayout({ children }) {
       const currentPath = window.location.pathname;
 
       if (userRole === 'TEACHER') {
-        // If a teacher is on the generic dashboard or admin login page, redirect to teacher dashboard
+        // Redirect teacher from generic dashboard or admin login page
         if (currentPath === `/${subdomain}/dashboard` || currentPath === schoolAdminLoginPath) {
           router.push(`/${subdomain}/dashboard/teacher`);
           return;
         }
-        // If a teacher tries to access an admin-only path
-        const adminOnlyPaths = ['/settings', '/finance', '/people/teachers', '/hr/payroll']; // Added HR payroll to admin-only paths for teachers
-        if (adminOnlyPaths.some(path => currentPath.includes(path)) && !currentPath.includes('/dashboard/teacher')) {
-          setAuthError("Access denied. Teachers do not have access to this section.");
-          signOut({ redirect: false }).then(() => {
-            router.push(`${teacherLoginPath}?error=UnauthorizedRole`);
-          });
+        // Teacher allowlist to avoid hitting admin pages that may error
+        const teacherAllowedPrefixes = [
+          `/${subdomain}/dashboard/teacher`,
+          `/${subdomain}/academics/assignments`,
+          `/${subdomain}/academics/grades`,
+          `/${subdomain}/academics/timetable`,
+          `/${subdomain}/academics/examinations`,
+          `/${subdomain}/academics/subjects`,
+          `/${subdomain}/people/students`,
+          `/${subdomain}/people/teachers`,
+          `/${subdomain}/attendance/students`,
+          `/${subdomain}/attendance/staff`,
+          `/${subdomain}/communication/announcements`,
+          `/${subdomain}/hr/payroll`,
+        ];
+        const isAllowed = teacherAllowedPrefixes.some(p => currentPath === p || currentPath.startsWith(p + '/'));
+        if (!isAllowed) {
+          router.push(`/${subdomain}/dashboard/teacher`);
           return;
         }
       } else { // All other roles (admins, etc.)

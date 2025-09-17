@@ -6,7 +6,7 @@ import { authOptions } from "@/lib/auth"; // Adjust path as needed
 
 export async function GET(request, { params }) {
   const session = await getServerSession(authOptions);
-  const { schoolId } = params;
+  const { schoolId } = await params;
 
   if (!session || session.user?.schoolId !== schoolId || 
       (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'ACCOUNTANT' /* && other relevant roles */)) {
