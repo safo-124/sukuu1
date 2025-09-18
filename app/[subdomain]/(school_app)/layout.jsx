@@ -279,6 +279,22 @@ export default function SchoolAppLayout({ children }) {
     }
   }, [subdomain, fetchSchoolData]);
 
+  // Persist school context globally once loaded
+  useEffect(() => {
+    if (schoolData?.id) {
+      try {
+        if (typeof window !== 'undefined') {
+          window.__SCHOOL_ID__ = schoolData.id;
+          window.__SCHOOL_SUBDOMAIN__ = schoolData.subdomain;
+          localStorage.setItem('schoolId', schoolData.id);
+          localStorage.setItem('schoolSubdomain', schoolData.subdomain || subdomain || '');
+        }
+      } catch (e) {
+        console.warn('Failed to persist school context', e);
+      }
+    }
+  }, [schoolData, subdomain]);
+
   useEffect(() => {
     if (isLoadingSchoolData || sessionStatus === 'loading') return;
 

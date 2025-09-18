@@ -167,6 +167,8 @@ export const createAccountantSchema = z.object({
   password: z.string().min(8),
   phoneNumber: z.string().nullable().optional(),
   profilePictureUrl: z.string().url().nullable().optional(),
+  phoneNumber: z.string().nullable().optional(),
+  profilePictureUrl: z.string().url().nullable().optional(),
   staffIdNumber: z.string().min(1).max(50),
   jobTitle: z.string().min(1).max(100).default("Accountant"),
   qualification: z.string().nullable().optional(),

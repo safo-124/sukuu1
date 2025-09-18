@@ -4,56 +4,47 @@ import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { createAccountantSchema } from "@/validators/academics.validators";
 
-// Helper: ensure user is authenticated and has access to the school
-async function authorize(request, params) {
+async function authorize(schoolId) {
   const session = await getServerSession(authOptions);
-  if (!session || !session.user) {
-    return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  }
-
-  // Superadmin can access any school.
-  if (session.user.role === "SUPERADMIN") {
-    return { session };
-  }
-
-  const schoolId = (await params).schoolId;
-  if (!schoolId) {
-    return { error: NextResponse.json({ error: "School ID missing" }, { status: 400 }) };
-  }
-
-  // If user is staff of this school allow.
-  if (session.user.schoolId === schoolId) {
-    return { session };
-  }
-
+  if (!session || !session.user) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  if (session.user.role === "SUPER_ADMIN") return { session };
+  if (!schoolId || typeof schoolId !== 'string') return { error: NextResponse.json({ error: "Invalid or missing school ID" }, { status: 400 }) };
+  if (session.user.schoolId === schoolId) return { session };
   return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
 }
 
-export async function GET(request, paramsPromise) {
+export async function GET(request, { params }) {
   try {
-    const { error } = await authorize(request, paramsPromise);
+    const { schoolId } = params;
+    const { error } = await authorize(schoolId);
     if (error) return error;
 
-    const schoolId = (await paramsPromise).schoolId;
-
-    const accountants = await prisma.staff.findMany({
-      where: { schoolId, role: "ACCOUNTANT" },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phoneNumber: true,
-        profilePictureUrl: true,
-        staffIdNumber: true,
-        jobTitle: true,
-        qualification: true,
-        departmentId: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+    const staffRows = await prisma.staff.findMany({
+      where: { schoolId, user: { role: 'ACCOUNTANT' } },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, email: true, phoneNumber: true, profilePictureUrl: true, role: true } },
+        department: { select: { id: true, name: true } }
+      }
     });
+
+    const accountants = staffRows.map(s => ({
+      id: s.id,
+      userId: s.userId,
+      firstName: s.user.firstName,
+      lastName: s.user.lastName,
+      email: s.user.email,
+      phoneNumber: s.user.phoneNumber,
+      profilePictureUrl: s.user.profilePictureUrl,
+      role: s.user.role,
+      staffIdNumber: s.staffIdNumber,
+      jobTitle: s.jobTitle,
+      qualification: s.qualification,
+      departmentId: s.departmentId,
+      department: s.department ? { id: s.department.id, name: s.department.name } : null,
+      createdAt: s.createdAt,
+      updatedAt: s.updatedAt,
+    }));
 
     return NextResponse.json({ data: accountants });
   } catch (err) {
@@ -62,69 +53,86 @@ export async function GET(request, paramsPromise) {
   }
 }
 
-export async function POST(request, paramsPromise) {
+export async function POST(request, { params }) {
   try {
-    const { session, error } = await authorize(request, paramsPromise);
+    const { schoolId } = params;
+    const { session, error } = await authorize(schoolId);
     if (error) return error;
-
-    const schoolId = (await paramsPromise).schoolId;
     const json = await request.json();
     const parsed = createAccountantSchema.safeParse(json);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
     }
 
-    // Ensure email uniqueness within school staff
-    const existing = await prisma.staff.findFirst({
-      where: { email: parsed.data.email, schoolId },
-      select: { id: true },
-    });
-    if (existing) {
-      return NextResponse.json({ error: "Email already in use" }, { status: 409 });
-    }
+    const { firstName, lastName, email, password, phoneNumber, profilePictureUrl, staffIdNumber, jobTitle, qualification, departmentId } = parsed.data;
 
-    // Create staff record; password hashing delegated to middleware/hook if exists, else hash here.
-    // For now, perform simple hashing if bcrypt available else store as-is (NOT RECOMMENDED for production)
-    let passwordHash = parsed.data.password;
-    try {
-      const bcrypt = await import("bcryptjs").catch(() => null);
-      if (bcrypt && bcrypt.hashSync) {
-        passwordHash = bcrypt.hashSync(parsed.data.password, 10);
-      }
-    } catch (_) {}
+    const result = await prisma.$transaction(async (tx) => {
+      // Email uniqueness within same school (User table)
+      const existingUser = await tx.user.findFirst({ where: { email, schoolId } });
+      if (existingUser) throw new Error('Email already in use');
 
-    const staff = await prisma.staff.create({
-      data: {
-        schoolId,
-        role: "ACCOUNTANT",
-        firstName: parsed.data.firstName,
-        lastName: parsed.data.lastName,
-        email: parsed.data.email,
-        password: passwordHash,
-        phoneNumber: parsed.data.phoneNumber || null,
-        profilePictureUrl: parsed.data.profilePictureUrl || null,
-        staffIdNumber: parsed.data.staffIdNumber,
-        jobTitle: parsed.data.jobTitle || "Accountant",
-        qualification: parsed.data.qualification || null,
-        departmentId: parsed.data.departmentId || null,
-      },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phoneNumber: true,
-        staffIdNumber: true,
-        jobTitle: true,
-        qualification: true,
-        departmentId: true,
-        createdAt: true,
-      },
+      // Staff ID uniqueness (composite unique)
+      const existingStaffId = await tx.staff.findUnique({ where: { schoolId_staffIdNumber: { schoolId, staffIdNumber } } });
+      if (existingStaffId) throw new Error('Staff ID number already exists');
+
+      let hashed = password;
+      try {
+        const bcrypt = await import('bcryptjs').catch(() => null);
+        if (bcrypt?.hashSync) hashed = bcrypt.hashSync(password, 10);
+      } catch (_) {}
+
+      const user = await tx.user.create({
+        data: {
+          email,
+          hashedPassword: hashed,
+          firstName,
+            lastName,
+            phoneNumber: phoneNumber || null,
+            profilePictureUrl: profilePictureUrl || null,
+            role: 'ACCOUNTANT',
+            schoolId,
+        },
+        select: { id: true, firstName: true, lastName: true, email: true, phoneNumber: true, profilePictureUrl: true, role: true }
+      });
+
+      const staff = await tx.staff.create({
+        data: {
+          userId: user.id,
+          schoolId,
+          staffIdNumber,
+          jobTitle: jobTitle || 'Accountant',
+          qualification: qualification || null,
+          departmentId: departmentId || null,
+        },
+        select: { id: true, staffIdNumber: true, jobTitle: true, qualification: true, departmentId: true, createdAt: true }
+      });
+
+      return { user, staff };
     });
 
-    return NextResponse.json({ data: staff }, { status: 201 });
+    const response = {
+      id: result.staff.id,
+      userId: result.user.id,
+      firstName: result.user.firstName,
+      lastName: result.user.lastName,
+      email: result.user.email,
+      phoneNumber: result.user.phoneNumber,
+      profilePictureUrl: result.user.profilePictureUrl,
+      role: result.user.role,
+      staffIdNumber: result.staff.staffIdNumber,
+      jobTitle: result.staff.jobTitle,
+      qualification: result.staff.qualification,
+      departmentId: result.staff.departmentId,
+      createdAt: result.staff.createdAt,
+    };
+
+    return NextResponse.json({ data: response }, { status: 201 });
   } catch (err) {
     console.error("POST /accountants error", err);
-    return NextResponse.json({ error: "Failed to create accountant" }, { status: 500 });
+    const msg = err?.message === 'Email already in use' || err?.message === 'Staff ID number already exists'
+      ? err.message
+      : 'Failed to create accountant';
+    const status = msg === err?.message ? 409 : 500;
+    return NextResponse.json({ error: msg }, { status });
   }
 }

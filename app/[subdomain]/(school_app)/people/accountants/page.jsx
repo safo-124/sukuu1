@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { useParams, useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,8 @@ import { toast } from "sonner";
 export default function AccountantsPage() {
   const params = useParams();
   const subdomain = params?.subdomain;
+  const router = useRouter();
+  const { data: session } = useSession();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -34,7 +37,7 @@ export default function AccountantsPage() {
       setLoading(true);
       setError(null);
       try {
-        const schoolId = window.__SCHOOL_ID__ || localStorage.getItem("schoolId");
+  const schoolId = window.__SCHOOL_ID__ || localStorage.getItem("schoolId") || session?.user?.schoolId;
         if (!schoolId) {
           setError("School context missing");
           return;
@@ -161,9 +164,22 @@ export default function AccountantsPage() {
       {!loading && !error && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map(acc => (
-            <Card key={acc.id} className="p-4 space-y-2">
-              <div className="font-medium">{acc.firstName} {acc.lastName}</div>
-              <div className="text-sm text-muted-foreground break-all">{acc.email}</div>
+            <Card
+              key={acc.id}
+              className="p-4 space-y-2 cursor-pointer transition hover:shadow-sm"
+              onClick={() => router.push(`/${subdomain}/people/accountants/${acc.id}`)}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="font-medium">{acc.firstName} {acc.lastName}</div>
+                  <div className="text-sm text-muted-foreground break-all">{acc.email}</div>
+                </div>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={(e) => { e.stopPropagation(); router.push(`/${subdomain}/people/accountants/${acc.id}`); }}
+                >View</Button>
+              </div>
               <div className="text-xs text-muted-foreground">ID: {acc.staffIdNumber}</div>
               <div className="text-xs">{acc.jobTitle}</div>
             </Card>
