@@ -112,76 +112,132 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: 'Invalid input.', issues: validation.error.issues }, { status: 400 });
     }
 
-    const { invoiceId, amount, paymentDate, paymentMethod, referenceId, notes } = validation.data;
+    const { invoiceId, studentId, amount, paymentDate, paymentMethod, referenceId, notes } = validation.data;
 
-    const newPayment = await prisma.$transaction(async (tx) => {
-      // 1. Verify invoice exists and belongs to the school
-      const invoice = await tx.invoice.findUnique({
-        where: { id: invoiceId, schoolId: schoolId },
-      });
-      if (!invoice) {
-        throw new Error('Invoice not found or does not belong to this school.');
-      }
+    const result = await prisma.$transaction(async (tx) => {
+      // Helper: update invoice status based on paid vs total
+      const recalcStatus = (inv, newPaid) => {
+        if (inv.status === 'VOID' || inv.status === 'CANCELLED') return inv.status; // don't mutate
+        if (newPaid >= inv.totalAmount - 0.0001) return 'PAID';
+        if (newPaid > 0) return 'PARTIALLY_PAID';
+        // keep OVERDUE if it was overdue, else fallback
+        if (inv.status === 'OVERDUE') return 'OVERDUE';
+        return inv.status === 'SENT' ? 'SENT' : 'DRAFT';
+      };
 
-      // If invoice is VOID or CANCELLED, prevent payments
-      if (invoice.status === 'VOID' || invoice.status === 'CANCELLED') {
-        throw new Error(`Cannot record payment for an invoice with status ${invoice.status}.`);
-      }
-
-      // 2. Create the Payment record
+      // 1. Create Payment shell (invoiceId may be null if student allocation mode)
       const createdPayment = await tx.payment.create({
         data: {
-          invoiceId,
+          invoiceId: invoiceId || null,
           amount,
           paymentDate: new Date(paymentDate),
-          paymentMethod,
+            paymentMethod,
           referenceId: referenceId || null,
           notes: notes || null,
-          processedById: session.user.id, // Record who processed this payment
-          schoolId: schoolId,
+          processedById: session.user.id,
+          schoolId,
         },
       });
 
-      // 3. Update the associated Invoice's paidAmount and status
-      const updatedPaidAmount = invoice.paidAmount + amount;
-      let newInvoiceStatus = invoice.status;
+      let remaining = amount;
+      const allocations = [];
+      let targetInvoices = [];
 
-      if (updatedPaidAmount >= invoice.totalAmount) {
-        newInvoiceStatus = 'PAID';
-      } else if (updatedPaidAmount > 0) {
-        newInvoiceStatus = 'PARTIALLY_PAID';
+      if (invoiceId) {
+        // Single-invoice mode
+        const invoice = await tx.invoice.findFirst({ where: { id: invoiceId, schoolId } });
+        if (!invoice) throw new Error('Invoice not found or does not belong to this school.');
+        if (invoice.status === 'VOID' || invoice.status === 'CANCELLED') {
+          throw new Error(`Cannot record payment for an invoice with status ${invoice.status}.`);
+        }
+        targetInvoices = [invoice];
       } else {
-        // If somehow amount is 0 or less, revert to SENT/DRAFT or maintain original status
-        newInvoiceStatus = invoice.status === 'OVERDUE' ? 'OVERDUE' : (invoice.status === 'SENT' ? 'SENT' : 'DRAFT');
+        // Auto allocation by student oldest -> newest dueDate then issueDate
+        const student = await tx.student.findFirst({ where: { id: studentId, schoolId } });
+        if (!student) throw new Error('Student not found or does not belong to this school.');
+        targetInvoices = await tx.invoice.findMany({
+          where: {
+            schoolId,
+            studentId,
+            status: { in: ['SENT', 'PARTIALLY_PAID', 'OVERDUE', 'DRAFT'] },
+          },
+          orderBy: [
+            { dueDate: 'asc' },
+            { issueDate: 'asc' },
+          ],
+        });
+        if (!targetInvoices.length) throw new Error('No outstanding invoices to allocate for this student.');
       }
 
-      await tx.invoice.update({
-        where: { id: invoiceId },
-        data: {
-          paidAmount: updatedPaidAmount,
-          status: newInvoiceStatus,
-          // You might also add lastPaymentDate: new Date()
-        },
-      });
+      for (const inv of targetInvoices) {
+        if (remaining <= 0) break;
+        if (inv.status === 'VOID' || inv.status === 'CANCELLED') continue; // skip invalid
+        const outstanding = inv.totalAmount - inv.paidAmount;
+        if (outstanding <= 0) continue;
+        const allocate = Math.min(outstanding, remaining);
+        remaining -= allocate;
 
-      return createdPayment;
-    });
+        // Create allocation record
+        const alloc = await tx.paymentAllocation.create({
+          data: {
+            paymentId: createdPayment.id,
+            invoiceId: inv.id,
+            amount: allocate,
+            schoolId,
+          },
+        });
+        allocations.push(alloc);
 
-    // Fetch the new payment with its relations for comprehensive response
-    const fetchedNewPayment = await prisma.payment.findUnique({
-        where: { id: newPayment.id },
-        include: {
-            invoice: {
-                select: {
-                    id: true, invoiceNumber: true, totalAmount: true, paidAmount: true, status: true,
-                    student: { select: { id: true, firstName: true, lastName: true, studentIdNumber: true } }
-                }
-            },
-            processedBy: { select: { id: true, firstName: true, lastName: true } }
+        const newPaidAmount = inv.paidAmount + allocate;
+        let newStatus = recalcStatus(inv, newPaidAmount);
+        // Overdue check: if not paid and past due date
+        if (newStatus !== 'PAID' && inv.status !== 'VOID' && inv.status !== 'CANCELLED') {
+          const now = new Date();
+            try {
+              const due = new Date(inv.dueDate);
+              if (!isNaN(due.getTime()) && due < now) {
+                newStatus = 'OVERDUE';
+              }
+            } catch (_) { /* ignore invalid date */ }
         }
+
+        await tx.invoice.update({
+          where: { id: inv.id },
+          data: { paidAmount: newPaidAmount, status: newStatus },
+        });
+      }
+
+      // Guard: if single-invoice mode ensure entire amount actually applied
+      if (invoiceId) {
+        if (!allocations.length) throw new Error('Payment could not be allocated to the invoice.');
+      } else {
+        // Student mode: at least one allocation must have happened
+        if (!allocations.length) throw new Error('Payment could not be allocated to any invoice.');
+      }
+
+      // If any remainder that couldn't allocate due to fully paid invoices
+      if (remaining > 0.0001) {
+        // Business choice: either error or leave unallocated. We'll error to force correct amounts.
+        throw new Error('Payment amount exceeds outstanding balance of target invoices. Adjust amount.');
+      }
+
+      return { createdPayment, allocationsCount: allocations.length };
     });
 
-    return NextResponse.json({ payment: fetchedNewPayment, message: 'Payment recorded successfully.' }, { status: 201 });
+    const fetched = await prisma.payment.findUnique({
+      where: { id: result.createdPayment.id },
+      include: {
+        allocations: {
+          include: {
+            invoice: { select: { id: true, invoiceNumber: true, totalAmount: true, paidAmount: true, status: true, studentId: true } }
+          }
+        },
+        invoice: { select: { id: true, invoiceNumber: true } },
+        processedBy: { select: { id: true, firstName: true, lastName: true } },
+      }
+    });
+
+    return NextResponse.json({ payment: fetched, message: 'Payment recorded & allocated successfully.' }, { status: 201 });
   } catch (error) {
     console.error(`API (POST Payment) - Detailed error for school ${schoolId}:`, {
       message: error.message,
@@ -196,7 +252,7 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: 'Validation Error', issues: error.issues }, { status: 400 });
     }
     // Handle specific errors thrown manually
-    if (error.message.includes('Invoice not found') || error.message.includes('Cannot record payment')) {
+  if (error.message.includes('Invoice not found') || error.message.includes('Cannot record payment') || error.message.includes('Payment could not be allocated') || error.message.includes('exceeds outstanding')) {
         return NextResponse.json({ error: error.message }, { status: 400 });
     }
     // Handle foreign key constraint errors

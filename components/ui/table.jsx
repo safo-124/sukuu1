@@ -56,16 +56,25 @@ function TableFooter({
 
 function TableRow({
   className,
+  children,
   ...props
 }) {
+  // Filter out pure whitespace string nodes to prevent React/Next hydration warnings:
+  // "In HTML, whitespace text nodes cannot be a child of <tr>"
+  const cleanedChildren = React.Children.toArray(children).filter(child => {
+    return !(typeof child === 'string' && child.trim() === '');
+  });
   return (
-    (<tr
+    <tr
       data-slot="table-row"
       className={cn(
         "hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors",
         className
       )}
-      {...props} />)
+      {...props}
+    >
+      {cleanedChildren}
+    </tr>
   );
 }
 

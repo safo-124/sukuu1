@@ -87,6 +87,26 @@ enum PurchaseOrderStatus {
 }
 
 // --------------------
+// FINANCE RE-DESIGN ENUMS (Phase 1)
+// --------------------
+
+enum DiscountScope {
+  STUDENT
+  INVOICE
+  LINE
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+enum ScholarshipType {
+  PERCENTAGE
+  FIXED
+}
+
+// --------------------
 // CORE TENANCY & USERS
 // --------------------
 
@@ -154,6 +174,12 @@ model School {
   inventoryItems          InventoryItem[]
   invoiceItems            InvoiceItem[]
   payments                Payment[]
+  // Finance redesign relations (Phase 1 additions)
+  feeStructureComponents  FeeStructureComponent[]
+  studentFeeAssignments   StudentFeeAssignment[]
+  discounts               Discount[]
+  scholarships            Scholarship[]
+  paymentAllocations      PaymentAllocation[]
   purchaseOrderItems      PurchaseOrderItem[]
   leaveTypes              LeaveType[]
   leaveApplications       LeaveApplication[]
@@ -248,6 +274,7 @@ model SchoolLevel {
   staffSubjectLevels    StaffSubjectLevel[]    @relation("LevelSubjectsTaught")
   subjectLinks          SubjectSchoolLevel[]
   feeStructures         FeeStructure[]         @relation("LevelFeeStructures")
+  studentFeeAssignments StudentFeeAssignment[]
 
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
@@ -272,6 +299,8 @@ model AcademicYear {
   grades              Grade[]
   feeStructures       FeeStructure[]        @relation("YearFeeStructures")
   classes             Class[]
+  studentFeeAssignments StudentFeeAssignment[]
+  scholarships         Scholarship[]
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
   GradingWeightConfig GradingWeightConfig[]
@@ -330,6 +359,7 @@ model Class {
   staffSubjectLevels  StaffSubjectLevel[]
   assignments         Assignment[]          @relation("ClassAssignments")
   feeStructures       FeeStructure[]        @relation("ClassFeeStructures")
+  studentFeeAssignments StudentFeeAssignment[]
   createdAt           DateTime              @default(now())
   examSchedules       ExamSchedule[]
   updatedAt           DateTime              @updatedAt
@@ -440,6 +470,9 @@ model Student {
   grades               Grade[]
   submittedAssignments SubmittedAssignment[]
   invoices             Invoice[]
+  studentFeeAssignments StudentFeeAssignment[]
+  discounts            Discount[]
+  scholarships         Scholarship[]
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
 
@@ -878,6 +911,8 @@ model FeeStructure {
   schoolId       String
   school         School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   invoiceItems   InvoiceItem[]
+  components     FeeStructureComponent[]
+  studentFeeAssignments StudentFeeAssignment[]
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -903,6 +938,8 @@ model Invoice {
   school        School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   items         InvoiceItem[]
   payments      Payment[]
+  discounts     Discount[]
+  allocations   PaymentAllocation[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -921,8 +958,12 @@ model InvoiceItem {
   totalPrice      Float
   inventoryItemId String?
   inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+  // Finance redesign: link back to a specific component if applicable
+  feeStructureComponentId String?
+  feeStructureComponent   FeeStructureComponent? @relation(fields: [feeStructureComponentId], references: [id], onDelete: SetNull)
   schoolId        String
   school          School         @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  discounts       Discount[]
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
@@ -931,8 +972,9 @@ model InvoiceItem {
 
 model Payment {
   id            String        @id @default(cuid())
-  invoiceId     String
-  invoice       Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  // Legacy single-invoice field retained temporarily for backward compatibility (will be nullable later)
+  invoiceId     String?
+  invoice       Invoice?      @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
   paymentDate   DateTime      @default(now())
   amount        Float
   paymentMethod PaymentMethod
@@ -942,11 +984,120 @@ model Payment {
   processedBy   User?         @relation("ProcessedBy", fields: [processedById], references: [id], onDelete: SetNull)
   schoolId      String
   school        School        @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  allocations   PaymentAllocation[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
   @@index([schoolId, invoiceId])
   @@index([processedById])
+}
+
+// --------------------
+// FINANCE REDESIGN MODELS (Phase 1)
+// --------------------
+
+model FeeStructureComponent {
+  id             String       @id @default(cuid())
+  feeStructureId String
+  feeStructure   FeeStructure @relation(fields: [feeStructureId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  amount         Float        // Component portion; feeStructure.amount may be legacy (can be derived sum)
+  order          Int          @default(0)
+  schoolId       String
+  school         School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  invoiceItems   InvoiceItem[]
+
+  @@index([schoolId])
+  @@index([feeStructureId])
+}
+
+model StudentFeeAssignment {
+  id               String       @id @default(cuid())
+  studentId        String
+  student          Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  feeStructureId   String
+  feeStructure     FeeStructure @relation(fields: [feeStructureId], references: [id], onDelete: Cascade)
+  academicYearId   String
+  academicYear     AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  schoolLevelId    String?
+  schoolLevel      SchoolLevel? @relation(fields: [schoolLevelId], references: [id], onDelete: SetNull)
+  classId          String?
+  class            Class?       @relation(fields: [classId], references: [id], onDelete: SetNull)
+  effectiveFrom    DateTime?    // Optional start (for recurring logic)
+  effectiveTo      DateTime?    // Optional end
+  isActive         Boolean      @default(true)
+  schoolId         String
+  school           School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@unique([studentId, feeStructureId, academicYearId], map: "UQ_Student_FeeStructure_Year")
+  @@index([schoolId])
+  @@index([academicYearId])
+  @@index([classId])
+}
+
+model Discount {
+  id             String        @id @default(cuid())
+  scope          DiscountScope
+  type           DiscountType
+  percentage     Float?        // If type = PERCENTAGE
+  amount         Float?        // If type = FIXED
+  reason         String?
+  studentId      String?       // scope STUDENT
+  student        Student?      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  invoiceId      String?       // scope INVOICE
+  invoice        Invoice?      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceItemId  String?       // scope LINE (InvoiceItem)
+  invoiceItem    InvoiceItem?  @relation(fields: [invoiceItemId], references: [id], onDelete: Cascade)
+  schoolId       String
+  school         School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([schoolId])
+  @@index([studentId])
+  @@index([invoiceId])
+  @@index([invoiceItemId])
+}
+
+model Scholarship {
+  id             String        @id @default(cuid())
+  studentId      String
+  student        Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  academicYearId String
+  academicYear   AcademicYear  @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  type           ScholarshipType
+  percentage     Float?        // if PERCENTAGE
+  amount         Float?        // if FIXED per invoice OR per component (applied logic layer)
+  notes          String?
+  isActive       Boolean       @default(true)
+  schoolId       String
+  school         School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([studentId, academicYearId], map: "UQ_Scholarship_Student_Year")
+  @@index([schoolId])
+}
+
+model PaymentAllocation {
+  id         String   @id @default(cuid())
+  paymentId  String
+  payment    Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  invoiceId  String
+  invoice    Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount     Float
+  createdAt  DateTime @default(now())
+  schoolId   String
+  school     School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@index([invoiceId])
+  @@index([paymentId])
 }
 
 model ExpenseCategory {

@@ -4,8 +4,8 @@ import prisma from '@/lib/prisma';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { z } from 'zod';
-import { schoolIdSchema } from '@/validators/academics.validators'; // For schoolIdSchema
-import { createFeeStructureSchema } from '@/validators/finance.validators'; // Import from new finance validators
+import { schoolIdSchema } from '@/validators/academics.validators'; // schoolIdSchema reuse
+import { createFeeStructureSchema } from '@/validators/finance.validators'; // finance validators
 
 // GET /api/schools/[schoolId]/finance/fee-structures
 // Fetches all fee structures for a specific school
@@ -21,6 +21,7 @@ export async function GET(request, { params }) {
   const academicYearIdFilter = searchParams.get('academicYearId');
   const classIdFilter = searchParams.get('classId');
   const schoolLevelIdFilter = searchParams.get('schoolLevelId');
+  const includeComponents = searchParams.get('includeComponents') === '1';
 
   try {
     schoolIdSchema.parse(schoolId);
@@ -35,13 +36,13 @@ export async function GET(request, { params }) {
     const feeStructures = await prisma.feeStructure.findMany({
       where: whereClause,
       include: {
-        academicYear: { select: { id: true, name: true } },
+        academicYear: { select: { id: true, name: true, startDate: true } },
         class: { select: { id: true, name: true } },
-        schoolLevel: { select: { id: true, name: true } }, // Include schoolLevel
+        schoolLevel: { select: { id: true, name: true } },
+        ...(includeComponents && { components: { orderBy: { order: 'asc' } } })
       },
       orderBy: [
         { academicYear: { startDate: 'desc' } },
-        { class: { name: 'asc' } },
         { name: 'asc' },
       ],
     });
@@ -84,7 +85,7 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: 'Invalid input.', issues: validation.error.issues }, { status: 400 });
     }
 
-    const { name, description, amount, frequency, academicYearId, classId, schoolLevelId } = validation.data;
+  const { name, description, amount, frequency, academicYearId, classId, schoolLevelId, components } = validation.data;
 
     // Validate linked entities belong to the school
     const [academicYear, _class, _schoolLevel] = await Promise.all([
@@ -98,20 +99,42 @@ export async function POST(request, { params }) {
     if (schoolLevelId && !_schoolLevel) return NextResponse.json({ error: 'School Level not found or does not belong to this school.' }, { status: 400 });
 
 
+    let finalAmount = amount;
+    if (components && components.length) {
+      const sum = components.reduce((acc, c) => acc + c.amount, 0);
+      if (amount == null) {
+        finalAmount = sum;
+      } else if (Math.abs(sum - amount) > 0.0001) {
+        return NextResponse.json({ error: 'Amount mismatch', details: `Sum of components (${sum}) does not match amount (${amount}). Omit amount to auto-calculate or correct the values.` }, { status: 400 });
+      }
+    }
+
     const newFeeStructure = await prisma.feeStructure.create({
       data: {
         name,
         description: description || null,
-        amount,
+        amount: finalAmount,
         frequency,
         academicYearId,
         classId: classId || null,
         schoolLevelId: schoolLevelId || null,
         schoolId: schoolId,
+        ...(components && components.length ? {
+          components: {
+            create: components.map((c, idx) => ({
+              name: c.name,
+              description: c.description || null,
+              amount: c.amount,
+              order: c.order ?? idx,
+              schoolId
+            }))
+          }
+        } : {})
       },
+      include: { components: true }
     });
 
-    return NextResponse.json({ feeStructure: newFeeStructure, message: 'Fee structure created successfully.' }, { status: 201 });
+  return NextResponse.json({ feeStructure: newFeeStructure, message: 'Fee structure created successfully.' }, { status: 201 });
   } catch (error) {
     console.error(`API (POST FeeStructure) - Detailed error for school ${schoolId}:`, {
       message: error.message,

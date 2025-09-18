@@ -27,7 +27,9 @@ export async function middleware(request) {
 
   // Reserved root-level path segments that are NOT tenant subdomains
   const reservedRootSegments = new Set([
-    '', 'api', '_next', 'static', 'favicon.ico', 'assets', 'images', 'fonts'
+    '', 'api', '_next', 'static', 'favicon.ico', 'assets', 'images', 'fonts',
+    // Auth-related root paths must NOT be misinterpreted as tenant subdomains
+    'login', 'teacher-login', 'auth'
   ]);
 
   // If on main domain, detect path-based tenant: /{subdomain}/...
@@ -77,9 +79,22 @@ export async function middleware(request) {
       } else {
         const tokenSub = (token.schoolSubdomain || token.subdomain || '').toLowerCase();
         if (tokenSub && tokenSub !== tenant.toLowerCase()) {
-          url.pathname = buildTenantPath(token.role === 'TEACHER' ? '/teacher-login' : '/login');
-          url.searchParams.set('error', 'UnauthorizedSchool');
-          return NextResponse.redirect(url);
+          const alreadyError = url.searchParams.get('error') === 'UnauthorizedSchool';
+          const isLoginLike = (lowerTenantPath === '/login' || lowerTenantPath === '/teacher-login');
+          // If currently on ANY login variant, just append error param once and allow pass-through (no redirect)
+          if (isLoginLike) {
+            if (!alreadyError) {
+              url.searchParams.set('error', 'UnauthorizedSchool');
+              return NextResponse.redirect(url);
+            }
+            // Allow staying on the same login page
+          } else if (!alreadyError) {
+            // Not on login page yet: send to login with error param
+            url.pathname = buildTenantPath(token.role === 'TEACHER' ? '/teacher-login' : '/login');
+            url.searchParams.set('error', 'UnauthorizedSchool');
+            return NextResponse.redirect(url);
+          }
+          // If alreadyError and not on login, we intentionally do NOT bounce again to avoid loops; allow next handler to maybe redirect based on role logic.
         }
         const role = token.role;
         if (isLoginPath) {
@@ -177,9 +192,20 @@ export async function middleware(request) {
         // If token exists but belongs to a different school subdomain, force logout flow
         const tokenSubdomain = (token.schoolSubdomain || token.subdomain || '').toLowerCase();
         if (tokenSubdomain && tokenSubdomain !== subdomain.toLowerCase()) {
-          url.pathname = token.role === 'TEACHER' ? '/teacher-login' : '/login';
-          url.searchParams.set('error', 'UnauthorizedSchool');
-          return NextResponse.redirect(url);
+          const alreadyError = url.searchParams.get('error') === 'UnauthorizedSchool';
+          const isLoginLike = (lowerPath === '/login' || lowerPath === '/teacher-login');
+          if (isLoginLike) {
+            if (!alreadyError) {
+              url.searchParams.set('error', 'UnauthorizedSchool');
+              return NextResponse.redirect(url);
+            }
+            // Allow remaining on login page without further redirects.
+          } else if (!alreadyError) {
+            url.pathname = token.role === 'TEACHER' ? '/teacher-login' : '/login';
+            url.searchParams.set('error', 'UnauthorizedSchool');
+            return NextResponse.redirect(url);
+          }
+          // If alreadyError and not on login, do not force another redirect; avoid loop.
         }
 
         const role = token.role;

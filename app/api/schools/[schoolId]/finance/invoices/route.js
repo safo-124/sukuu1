@@ -17,7 +17,7 @@ const generateInvoiceNumber = () => {
 };
 
 // GET /api/schools/[schoolId]/finance/invoices
-// Fetches all invoices for a specific school
+// Fetches invoices for a specific school with advanced filtering, search, pagination & meta stats
 export async function GET(request, { params }) {
   const { schoolId } = params;
   const session = await getServerSession(authOptions);
@@ -29,11 +29,20 @@ export async function GET(request, { params }) {
 
   const { searchParams } = new URL(request.url);
   const studentIdFilter = searchParams.get('studentId');
-  const statusFilter = searchParams.get('status');
+  const statusFilter = searchParams.get('status'); // single status for now
   const issueDateFrom = searchParams.get('issueDateFrom');
   const issueDateTo = searchParams.get('issueDateTo');
   const dueDateFrom = searchParams.get('dueDateFrom');
   const dueDateTo = searchParams.get('dueDateTo');
+  const search = searchParams.get('search'); // matches invoiceNumber OR student name/id number
+  const includeItems = searchParams.get('includeItems') !== '0'; // default include
+  const pageParam = parseInt(searchParams.get('page') || '1', 10);
+  const pageSizeParam = parseInt(searchParams.get('pageSize') || '25', 10);
+  const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
+  const pageSize = Number.isFinite(pageSizeParam) && pageSizeParam > 0 && pageSizeParam <= 200 ? pageSizeParam : 25;
+  const sortBy = (searchParams.get('sortBy') || 'issueDate'); // allowed: issueDate,dueDate,totalAmount,invoiceNumber,status
+  const sortDirRaw = (searchParams.get('sortDir') || 'desc').toLowerCase();
+  const sortDir = sortDirRaw === 'asc' ? 'asc' : 'desc';
 
   try {
     schoolIdSchema.parse(schoolId);
@@ -43,9 +52,18 @@ export async function GET(request, { params }) {
       ...(studentIdFilter && { studentId: studentIdFilter }),
       ...(statusFilter && { status: statusFilter }),
       ...(issueDateFrom && { issueDate: { gte: new Date(issueDateFrom) } }),
-      ...(issueDateTo && { issueDate: { lte: new Date(issueDateTo) } }),
+      ...(issueDateTo && { issueDate: { ...(issueDateFrom ? {} : {}), lte: new Date(issueDateTo) } }),
       ...(dueDateFrom && { dueDate: { gte: new Date(dueDateFrom) } }),
-      ...(dueDateTo && { dueDate: { lte: new Date(dueDateTo) } }),
+      ...(dueDateTo && { dueDate: { ...(dueDateFrom ? {} : {}), lte: new Date(dueDateTo) } }),
+      ...(search && {
+        OR: [
+          { invoiceNumber: { contains: search, mode: 'insensitive' } },
+          { student: { firstName: { contains: search, mode: 'insensitive' } } },
+          { student: { lastName: { contains: search, mode: 'insensitive' } } },
+          { student: { studentIdNumber: { contains: search, mode: 'insensitive' } } },
+          { notes: { contains: search, mode: 'insensitive' } },
+        ]
+      })
     };
 
     // If parent is fetching, they should only see their children's invoices
@@ -64,23 +82,57 @@ export async function GET(request, { params }) {
     }
 
 
-    const invoices = await prisma.invoice.findMany({
-      where: whereClause,
-      include: {
-        student: {
-          select: { id: true, firstName: true, lastName: true, studentIdNumber: true }
-        },
-        items: { // Include items for display
-          select: { id: true, description: true, quantity: true, unitPrice: true, totalPrice: true }
-        },
-        _count: {
-          select: { payments: true } // Count associated payments
-        }
-      },
-      orderBy: { issueDate: 'desc' },
-    });
+    // Sorting logic
+    const allowedSort = new Set(['issueDate','dueDate','totalAmount','invoiceNumber','status']);
+    const orderBy = allowedSort.has(sortBy) ? { [sortBy]: sortDir } : { issueDate: 'desc' };
 
-    return NextResponse.json({ invoices }, { status: 200 });
+    const skip = (page - 1) * pageSize;
+
+    const [invoices, totalCount, sums, statusGroups] = await Promise.all([
+      prisma.invoice.findMany({
+        where: whereClause,
+        include: {
+          student: { select: { id: true, firstName: true, lastName: true, studentIdNumber: true } },
+          ...(includeItems ? { items: { select: { id: true, description: true, quantity: true, unitPrice: true, totalPrice: true } } } : {}),
+          _count: { select: { payments: true } }
+        },
+        orderBy,
+        skip,
+        take: pageSize,
+      }),
+      prisma.invoice.count({ where: whereClause }),
+      prisma.invoice.aggregate({
+        where: whereClause,
+        _sum: { totalAmount: true, paidAmount: true }
+      }),
+      prisma.invoice.groupBy({
+        by: ['status'],
+        where: whereClause,
+        _count: { status: true }
+      })
+    ]);
+
+    const totalPages = Math.ceil(totalCount / pageSize) || 1;
+    const totalBilled = sums._sum.totalAmount || 0;
+    const totalPaid = sums._sum.paidAmount || 0;
+    const outstanding = totalBilled - totalPaid;
+    const statusCounts = statusGroups.reduce((acc, g) => { acc[g.status] = g._count.status; return acc; }, {});
+
+    return NextResponse.json({
+      invoices,
+      meta: {
+        page,
+        pageSize,
+        totalCount,
+        totalPages,
+        totalBilled,
+        totalPaid,
+        outstanding,
+        statusCounts,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      }
+    }, { status: 200 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Validation Error', issues: error.issues }, { status: 400 });
