@@ -7,7 +7,8 @@ import { authOptions } from "@/lib/auth";
 import { z } from 'zod';
 
 // GET handler to list all classes for a specific school
-export async function GET(request, { params }) {
+export async function GET(request, ctx) {
+  const params = await Promise.resolve(ctx?.params || {});
   const { schoolId } = params;
   const session = await getServerSession(authOptions);
 
@@ -93,7 +94,8 @@ export async function GET(request, { params }) {
 }
 
 // POST handler to create a new class and optionally its sections
-export async function POST(request, { params }) {
+export async function POST(request, ctx) {
+  const params = await Promise.resolve(ctx?.params || {});
   const { schoolId } = params;
   const session = await getServerSession(authOptions);
 

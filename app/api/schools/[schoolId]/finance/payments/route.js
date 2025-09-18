@@ -9,8 +9,8 @@ import { createPaymentSchema } from '@/validators/finance.validators'; // Import
 
 // GET /api/schools/[schoolId]/finance/payments
 // Fetches all payments for a specific school
-export async function GET(request, { params }) {
-  const { schoolId } = params;
+export async function GET(request, context) {
+  const { schoolId } = await context.params; // awaited params pattern
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'ACCOUNTANT' && session.user?.role !== 'SECRETARY' && session.user?.role !== 'PARENT')) {
@@ -19,6 +19,7 @@ export async function GET(request, { params }) {
   }
 
   const { searchParams } = new URL(request.url);
+  const debug = searchParams.get('debug') === '1';
   const invoiceIdFilter = searchParams.get('invoiceId');
   const studentIdFilter = searchParams.get('studentId'); // Filter by student associated with invoice
   const paymentMethodFilter = searchParams.get('paymentMethod');
@@ -73,28 +74,28 @@ export async function GET(request, { params }) {
       },
       orderBy: { paymentDate: 'desc' },
     });
-
-    return NextResponse.json({ payments }, { status: 200 });
+    return NextResponse.json({ payments, ...(debug ? { debugInfo: { whereClause, count: payments.length, role: session.user?.role } } : {}) }, { status: 200 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Validation Error', issues: error.issues }, { status: 400 });
     }
     console.error(`API (GET Payments) - Error for school ${schoolId}:`, {
-      message: error.message,
-      name: error.name,
-      code: error.code,
-      clientVersion: error.clientVersion,
-      meta: error.meta,
-      stack: error.stack,
+      message: error?.message,
+      name: error?.name,
+      code: error?.code,
+      clientVersion: error?.clientVersion,
+      meta: error?.meta,
+      stack: error?.stack,
+      raw: error
     });
-    return NextResponse.json({ error: 'Failed to retrieve payments.', details: error.message || 'An unexpected server error occurred.' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to retrieve payments.', details: error?.message || 'An unexpected server error occurred.' }, { status: 500 });
   }
 }
 
 // POST /api/schools/[schoolId]/finance/payments
 // Creates a new payment record and updates the associated invoice
-export async function POST(request, { params }) {
-  const { schoolId } = params;
+export async function POST(request, context) {
+  const { schoolId } = await context.params; // awaited params pattern
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'ACCOUNTANT' && session.user?.role !== 'SECRETARY')) {

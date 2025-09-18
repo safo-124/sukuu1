@@ -1,280 +1,119 @@
 // app/api/schools/[schoolId]/finance/invoices/route.js
+// Restored invoices route with basic listing, pagination, and optional scholarship enrichment.
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
 import { z } from 'zod';
-import { schoolIdSchema } from '@/validators/academics.validators'; // For schoolIdSchema
-import { createInvoiceSchema } from '@/validators/finance.validators'; // Import createInvoiceSchema
+import { schoolIdSchema } from '@/validators/academics.validators';
+import { invoiceQuerySchema } from '@/validators/finance.validators';
 
-// Helper to generate a simple invoice number (e.g., INV-YYYYMMDD-HHMMSS-RANDOM)
-const generateInvoiceNumber = () => {
-    const now = new Date();
-    const datePart = now.toISOString().slice(0, 10).replace(/-/g, ''); // YYYYMMDD
-    const timePart = now.toTimeString().slice(0, 8).replace(/:/g, ''); // HHMMSS
-    const randomPart = Math.floor(Math.random() * 9000) + 1000; // 4-digit random number
-    return `INV-${datePart}-${timePart}-${randomPart}`;
-};
+export const dynamic = 'force-dynamic';
 
-// GET /api/schools/[schoolId]/finance/invoices
-// Fetches invoices for a specific school with advanced filtering, search, pagination & meta stats
-export async function GET(request, { params }) {
-  const { schoolId } = params;
+export async function GET(request, ctx) {
+  const params = await ctx?.params;
+  const schoolId = params?.schoolId;
   const session = await getServerSession(authOptions);
-
-  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'ACCOUNTANT' && session.user?.role !== 'SECRETARY' && session.user?.role !== 'PARENT')) {
-    // Parent role might need to view their child's invoices
+  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'ACCOUNTANT' && session.user?.role !== 'SECRETARY' && session.user?.role !== 'TEACHER')) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { searchParams } = new URL(request.url);
-  const studentIdFilter = searchParams.get('studentId');
-  const statusFilter = searchParams.get('status'); // single status for now
-  const issueDateFrom = searchParams.get('issueDateFrom');
-  const issueDateTo = searchParams.get('issueDateTo');
-  const dueDateFrom = searchParams.get('dueDateFrom');
-  const dueDateTo = searchParams.get('dueDateTo');
-  const search = searchParams.get('search'); // matches invoiceNumber OR student name/id number
-  const includeItems = searchParams.get('includeItems') !== '0'; // default include
-  const pageParam = parseInt(searchParams.get('page') || '1', 10);
-  const pageSizeParam = parseInt(searchParams.get('pageSize') || '25', 10);
-  const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
-  const pageSize = Number.isFinite(pageSizeParam) && pageSizeParam > 0 && pageSizeParam <= 200 ? pageSizeParam : 25;
-  const sortBy = (searchParams.get('sortBy') || 'issueDate'); // allowed: issueDate,dueDate,totalAmount,invoiceNumber,status
-  const sortDirRaw = (searchParams.get('sortDir') || 'desc').toLowerCase();
-  const sortDir = sortDirRaw === 'asc' ? 'asc' : 'desc';
-
   try {
     schoolIdSchema.parse(schoolId);
+    const { searchParams } = new URL(request.url);
+    const includeItems = searchParams.get('includeItems') === 'true';
+    const includeScholarship = searchParams.get('includeScholarship') === 'true';
 
-    const whereClause = {
-      schoolId: schoolId,
-      ...(studentIdFilter && { studentId: studentIdFilter }),
-      ...(statusFilter && { status: statusFilter }),
-      ...(issueDateFrom && { issueDate: { gte: new Date(issueDateFrom) } }),
-      ...(issueDateTo && { issueDate: { ...(issueDateFrom ? {} : {}), lte: new Date(issueDateTo) } }),
-      ...(dueDateFrom && { dueDate: { gte: new Date(dueDateFrom) } }),
-      ...(dueDateTo && { dueDate: { ...(dueDateFrom ? {} : {}), lte: new Date(dueDateTo) } }),
-      ...(search && {
-        OR: [
-          { invoiceNumber: { contains: search, mode: 'insensitive' } },
-          { student: { firstName: { contains: search, mode: 'insensitive' } } },
-          { student: { lastName: { contains: search, mode: 'insensitive' } } },
-          { student: { studentIdNumber: { contains: search, mode: 'insensitive' } } },
-          { notes: { contains: search, mode: 'insensitive' } },
-        ]
-      })
+    // Build query params object for validation
+    const qpRaw = Object.fromEntries(searchParams.entries());
+    const validation = invoiceQuerySchema.safeParse(qpRaw);
+    if (!validation.success) {
+      return NextResponse.json({ error: 'Invalid query params', issues: validation.error.issues }, { status: 400 });
+    }
+    const qp = validation.data;
+
+    const where = {
+      schoolId,
+      ...(qp.studentId ? { studentId: qp.studentId } : {}),
+      ...(qp.status ? { status: qp.status } : {}),
+      ...(qp.search ? { OR: [
+        { invoiceNumber: { contains: qp.search, mode: 'insensitive' } },
+        { student: { firstName: { contains: qp.search, mode: 'insensitive' } } },
+        { student: { lastName: { contains: qp.search, mode: 'insensitive' } } },
+      ] } : {}),
+      ...(qp.issueDateFrom || qp.issueDateTo ? { issueDate: {
+        ...(qp.issueDateFrom ? { gte: new Date(qp.issueDateFrom) } : {}),
+        ...(qp.issueDateTo ? { lte: new Date(qp.issueDateTo) } : {}),
+      }} : {}),
+      ...(qp.dueDateFrom || qp.dueDateTo ? { dueDate: {
+        ...(qp.dueDateFrom ? { gte: new Date(qp.dueDateFrom) } : {}),
+        ...(qp.dueDateTo ? { lte: new Date(qp.dueDateTo) } : {}),
+      }} : {}),
     };
 
-    // If parent is fetching, they should only see their children's invoices
-    if (session.user?.role === 'PARENT' && session.user?.parentProfileId) {
-        // Find students associated with this parent
-        const children = await prisma.parentStudent.findMany({
-            where: { parentId: session.user.parentProfileId },
-            select: { studentId: true }
-        });
-        const childStudentIds = children.map(c => c.studentId);
-        
-        if (childStudentIds.length === 0) {
-            return NextResponse.json({ invoices: [] }, { status: 200 }); // Parent has no children, return empty
-        }
-        whereClause.studentId = { in: childStudentIds };
-    }
-
-
-    // Sorting logic
-    const allowedSort = new Set(['issueDate','dueDate','totalAmount','invoiceNumber','status']);
-    const orderBy = allowedSort.has(sortBy) ? { [sortBy]: sortDir } : { issueDate: 'desc' };
-
+    const page = qp.page;
+    const pageSize = qp.pageSize;
     const skip = (page - 1) * pageSize;
 
-    const [invoices, totalCount, sums, statusGroups] = await Promise.all([
+    const [rows, totalCount, scholarshipMap] = await prisma.$transaction([
       prisma.invoice.findMany({
-        where: whereClause,
-        include: {
-          student: { select: { id: true, firstName: true, lastName: true, studentIdNumber: true } },
-          ...(includeItems ? { items: { select: { id: true, description: true, quantity: true, unitPrice: true, totalPrice: true } } } : {}),
-          _count: { select: { payments: true } }
-        },
-        orderBy,
+        where,
         skip,
         take: pageSize,
+        orderBy: { [qp.sortBy]: qp.sortDir },
+        include: {
+          student: { select: { id: true, firstName: true, lastName: true, studentIdNumber: true } },
+          ...(includeItems ? { items: true } : {}),
+        }
       }),
-      prisma.invoice.count({ where: whereClause }),
-      prisma.invoice.aggregate({
-        where: whereClause,
-        _sum: { totalAmount: true, paidAmount: true }
-      }),
-      prisma.invoice.groupBy({
-        by: ['status'],
-        where: whereClause,
-        _count: { status: true }
-      })
+      prisma.invoice.count({ where }),
+      // Preload scholarships for involved students (only if flag set)
+      includeScholarship ? prisma.scholarship.findMany({
+        where: {
+          schoolId,
+          studentId: { in: await prisma.invoice.findMany({ where, select: { studentId: true }, distinct: ['studentId'] }).then(r => r.map(x => x.studentId)) },
+          isActive: true,
+        },
+        select: { id: true, studentId: true, type: true, percentage: true, amount: true }
+      }) : Promise.resolve([])
     ]);
 
-    const totalPages = Math.ceil(totalCount / pageSize) || 1;
-    const totalBilled = sums._sum.totalAmount || 0;
-    const totalPaid = sums._sum.paidAmount || 0;
-    const outstanding = totalBilled - totalPaid;
-    const statusCounts = statusGroups.reduce((acc, g) => { acc[g.status] = g._count.status; return acc; }, {});
-
-    return NextResponse.json({
-      invoices,
-      meta: {
-        page,
-        pageSize,
-        totalCount,
-        totalPages,
-        totalBilled,
-        totalPaid,
-        outstanding,
-        statusCounts,
-        hasNextPage: page < totalPages,
-        hasPrevPage: page > 1,
-      }
-    }, { status: 200 });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Validation Error', issues: error.issues }, { status: 400 });
-    }
-    console.error(`API (GET Invoices) - Error for school ${schoolId}:`, {
-      message: error.message,
-      name: error.name,
-      code: error.code,
-      clientVersion: error.clientVersion,
-      meta: error.meta,
-      stack: error.stack,
-    });
-    return NextResponse.json({ error: 'Failed to retrieve invoices.', details: error.message || 'An unexpected server error occurred.' }, { status: 500 });
-  }
-}
-
-// POST /api/schools/[schoolId]/finance/invoices
-// Creates a new invoice with an optional initial item
-export async function POST(request, { params }) {
-  const { schoolId } = params;
-  const session = await getServerSession(authOptions);
-
-  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'ACCOUNTANT' && session.user?.role !== 'SECRETARY')) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  try {
-    const body = await request.json();
-    schoolIdSchema.parse(schoolId);
-
-    const validation = createInvoiceSchema.safeParse(body);
-
-    if (!validation.success) {
-      console.error("API (POST Invoice) - Validation failed:", JSON.stringify(validation.error.issues, null, 2));
-      return NextResponse.json({ error: 'Invalid input.', issues: validation.error.issues }, { status: 400 });
+    let scholarshipIndex = {};
+    if (includeScholarship) {
+      scholarshipMap.forEach(s => { scholarshipIndex[s.studentId] = s; });
     }
 
-    const { studentId, issueDate, dueDate, notes, initialItem } = validation.data;
-
-    const newInvoice = await prisma.$transaction(async (tx) => {
-      // 1. Validate Student
-      const student = await tx.student.findUnique({
-        where: { id: studentId, schoolId: schoolId },
-      });
-      if (!student) {
-        throw new Error('Student not found or does not belong to this school.');
-      }
-
-      let totalAmount = 0;
-      let invoiceItemsData = [];
-
-      // If an initial item is provided
-      if (initialItem) {
-        let itemTotalPrice = initialItem.quantity * initialItem.unitPrice;
-
-        if (initialItem.feeStructureId) {
-          const feeStructure = await tx.feeStructure.findUnique({
-            where: { id: initialItem.feeStructureId, schoolId: schoolId },
-          });
-          // For simplicity, we can assume if feeStructureId is provided,
-          // description, quantity, unitPrice might come from it, or are provided as overrides.
-          // Current validator expects them directly.
-          if (!feeStructure) {
-            throw new Error('Fee structure not found or does not belong to this school for the initial item.');
-          }
-          itemTotalPrice = feeStructure.amount * initialItem.quantity; // If fee structure dictates price
+    const invoices = rows.map(inv => {
+      if (!includeScholarship) return inv;
+      const sch = scholarshipIndex[inv.studentId];
+      if (!sch) return inv;
+      // Compute an estimated scholarship value (client may recompute precisely); for PERCENTAGE apply to totalAmount if present
+      const estScholarship = sch.type === 'PERCENTAGE' && inv.totalAmount != null
+        ? (inv.totalAmount * (sch.percentage ?? 0) / 100)
+        : (sch.type === 'FIXED' ? sch.amount : null);
+      return {
+        ...inv,
+        scholarship: {
+          id: sch.id,
+            type: sch.type,
+            percentage: sch.percentage,
+            amount: sch.amount,
+            estimatedValue: estScholarship,
         }
-        totalAmount += itemTotalPrice;
-
-        invoiceItemsData.push({
-          description: initialItem.description,
-          quantity: initialItem.quantity,
-          unitPrice: initialItem.unitPrice,
-          totalPrice: itemTotalPrice,
-          feeStructureId: initialItem.feeStructureId || null,
-          schoolId: schoolId,
-        });
-      }
-
-      // 2. Create the Invoice
-      const createdInvoice = await tx.invoice.create({
-        data: {
-          invoiceNumber: generateInvoiceNumber(), // Auto-generate
-          studentId: studentId,
-          issueDate: new Date(issueDate),
-          dueDate: new Date(dueDate),
-          totalAmount: totalAmount, // Calculated based on initial item(s)
-          paidAmount: 0, // Starts at 0
-          status: 'DRAFT', // Starts as DRAFT
-          notes: notes || null,
-          schoolId: schoolId,
-          items: {
-            createMany: {
-              data: invoiceItemsData,
-            }
-          }
-        },
-      });
-      return createdInvoice;
+      };
     });
 
-    // Fetch the created invoice with relations for a comprehensive response
-    const fetchedInvoice = await prisma.invoice.findUnique({
-      where: { id: newInvoice.id },
-      include: {
-        student: { select: { id: true, firstName: true, lastName: true, studentIdNumber: true } },
-        items: true,
-        _count: { select: { payments: true } }
-      },
-    });
-
-    return NextResponse.json({ invoice: fetchedInvoice, message: 'Invoice created successfully.' }, { status: 201 });
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    return NextResponse.json({ invoices, meta: { page, pageSize, totalCount, totalPages } }, { status: 200 });
   } catch (error) {
-    console.error(`API (POST Invoice) - Detailed error for school ${schoolId}:`, {
-      message: error.message,
-      name: error.name,
-      code: error.code,
-      clientVersion: error.clientVersion,
-      meta: error.meta,
-      stack: error.stack,
-    });
-
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Validation Error', issues: error.issues }, { status: 400 });
-    }
-    // Handle specific errors thrown manually
-    if (error.message.includes('Student not found') || error.message.includes('Fee structure not found')) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-    // Handle unique constraint violation (P2002) for invoiceNumber (or other unique fields)
-    if (error.code === 'P2002') {
-      const targetField = error.meta?.target ? (Array.isArray(error.meta.target) ? error.meta.target.join(', ') : error.meta.target) : 'unknown field(s)';
-      if (targetField.includes('invoiceNumber')) {
-        return NextResponse.json({ error: 'Failed to generate a unique invoice number or invoice number already exists. Please try again.' }, { status: 409 });
-      }
-      return NextResponse.json({ error: `A unique constraint was violated. Conflict on: ${targetField}.` }, { status: 409 });
-    }
-    // Handle foreign key constraint error (P2003)
-    if (error.code === 'P2003') {
-        const field = error.meta?.field_name || 'a related record';
-        return NextResponse.json({ error: `Invalid ${field} provided. Ensure it exists and belongs to this school.` }, { status: 400 });
-    }
-    return NextResponse.json({ error: 'Failed to create invoice.', details: error.message || 'An unexpected server error occurred.' }, { status: 500 });
+    const isZod = error instanceof z.ZodError;
+    console.error('API (GET Invoices) Error', { message: error.message, issues: isZod ? error.issues : undefined, stack: error.stack });
+    if (isZod) return NextResponse.json({ error: 'Validation Error', issues: error.issues }, { status: 400 });
+    return NextResponse.json({ error: 'Failed to fetch invoices.' }, { status: 500 });
   }
 }
+
+export async function POST() {
+  return NextResponse.json({ error: 'Invoice creation not implemented in restored route.' }, { status: 503 });
+}
+

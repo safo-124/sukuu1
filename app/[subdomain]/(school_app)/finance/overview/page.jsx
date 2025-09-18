@@ -273,7 +273,7 @@ export default function FinanceOverviewPage() {
                     {(stats.recentExpenses||[]).map(exp => (
                       <TableRow key={exp.id} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/40">
                         <TableCell className="text-xs font-medium truncate max-w-[180px]">{exp.description || '—'}</TableCell>
-                        <TableCell className="text-xs">{exp.dateIncurred ? new Date(exp.dateIncurred).toLocaleDateString() : '—'}</TableCell>
+                        <TableCell className="text-xs">{exp.date ? new Date(exp.date).toLocaleDateString() : '—'}</TableCell>
                         <TableCell className="text-xs text-right tabular-nums">{formatMoney(exp.amount)}</TableCell>
                       </TableRow>
                     ))}

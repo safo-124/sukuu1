@@ -9,8 +9,8 @@ import { updatePaymentSchema, paymentIdSchema, invoiceIdSchema } from '@/validat
 
 // GET /api/schools/[schoolId]/finance/payments/[paymentId]
 // Fetches a single payment by ID
-export async function GET(request, { params }) {
-  const { schoolId, paymentId } = params;
+export async function GET(request, context) {
+  const { schoolId, paymentId } = await context.params; // awaited params pattern
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'ACCOUNTANT' && session.user?.role !== 'SECRETARY' && session.user?.role !== 'PARENT')) {
@@ -67,8 +67,8 @@ export async function GET(request, { params }) {
 
 // PUT /api/schools/[schoolId]/finance/payments/[paymentId]
 // Updates an existing payment record and adjusts the associated invoice's paidAmount and status
-export async function PUT(request, { params }) {
-  const { schoolId, paymentId } = params;
+export async function PUT(request, context) {
+  const { schoolId, paymentId } = await context.params; // awaited params pattern
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'ACCOUNTANT' && session.user?.role !== 'SECRETARY')) {
@@ -185,8 +185,8 @@ export async function PUT(request, { params }) {
 
 // DELETE /api/schools/[schoolId]/finance/payments/[paymentId]/route.js
 // Deletes a payment record and adjusts the associated invoice's paidAmount and status
-export async function DELETE(request, { params }) {
-  const { schoolId, paymentId } = params;
+export async function DELETE(request, context) {
+  const { schoolId, paymentId } = await context.params; // awaited params pattern
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'ACCOUNTANT' && session.user?.role !== 'SECRETARY')) {

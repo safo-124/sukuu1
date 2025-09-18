@@ -5,7 +5,9 @@ import { z } from 'zod';
 export const schoolIdSchema = z.string().min(1, "School ID is required.");
 
 // --- Fee Structure Schemas ---
-export const createFeeStructureSchema = z.object({
+// Split out a base schema so partial() always operates on a ZodObject directly (helps avoid
+// rare undefined issues if there are circular import attempts elsewhere in the future).
+const baseFeeStructureShape = {
   name: z.string().min(1, "Fee structure name is required.").max(255, "Name is too long."),
   description: z.string().nullable().optional(),
   amount: z.coerce.number().min(0, "Amount cannot be negative."),
@@ -21,13 +23,14 @@ export const createFeeStructureSchema = z.object({
     description: z.string().nullable().optional(),
     order: z.coerce.number().int().min(0).optional(),
   })).optional(),
-}).refine(data => {
-  if (data.classId && data.schoolLevelId) return false;
+};
+
+export const createFeeStructureSchema = z.object(baseFeeStructureShape).refine(d => {
+  if (d.classId && d.schoolLevelId) return false;
   return true;
 }, { message: "Provide either classId or schoolLevelId, not both.", path: ["classId"] });
 
-export const updateFeeStructureSchema = createFeeStructureSchema.partial().extend({
-  // Optional components update with mode
+export const updateFeeStructureSchema = z.object(baseFeeStructureShape).partial().extend({
   components: z.array(z.object({
     id: z.string().optional(), // present if updating existing component
     name: z.string().min(1, "Component name required."),
@@ -36,8 +39,8 @@ export const updateFeeStructureSchema = createFeeStructureSchema.partial().exten
     order: z.coerce.number().int().min(0).optional(),
   })).optional(),
   componentUpdateMode: z.enum(["REPLACE", "APPEND", "SYNC"]).optional(),
-}).refine(data => {
-  if (data.classId && data.schoolLevelId) return false;
+}).refine(d => {
+  if (d.classId && d.schoolLevelId) return false;
   return true;
 }, { message: "Provide either classId or schoolLevelId, not both.", path: ["classId"] });
 export const feeStructureIdSchema = z.string().min(1, "Fee Structure ID is required.");
@@ -124,28 +127,24 @@ export const updateInvoiceItemSchema = z.object(baseInvoiceItemShape).partial().
 export const invoiceItemIdSchema = z.string().min(1, "Invoice Item ID is required.");
 
 // --- Payment Schemas (NEW) ---
-// Payment creation supports EITHER a single invoiceId OR a studentId for auto-allocation across outstanding invoices.
-export const createPaymentSchema = z.object({
+// Split base to allow safe partial() without re-running refine chain on a derived schema instance.
+const basePaymentShape = {
   invoiceId: z.string().min(1, "Invoice ID is required.").optional(),
   studentId: z.string().min(1, "Student ID is required for allocation.").optional(),
   amount: z.coerce.number().min(0.01, "Payment amount must be positive."),
-  paymentDate: z.string().datetime("Payment date must be a valid date and time string (ISO 8601)." ).optional().default(new Date().toISOString()),
-  paymentMethod: z.enum(["CASH", "BANK_TRANSFER", "CREDIT_CARD", "MOBILE_MONEY", "ONLINE_GATEWAY", "OTHER"], {
-    errorMap: () => ({ message: "Invalid payment method." })
-  }),
+  paymentDate: z.string().datetime("Payment date must be a valid date and time string (ISO 8601).").optional().default(new Date().toISOString()),
+  paymentMethod: z.enum(["CASH", "BANK_TRANSFER", "CREDIT_CARD", "MOBILE_MONEY", "ONLINE_GATEWAY", "OTHER"], { errorMap: () => ({ message: "Invalid payment method." }) }),
   referenceId: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
-})
-  .refine(d => !!d.invoiceId || !!d.studentId, {
-    message: "Provide either invoiceId or studentId.",
-    path: ["invoiceId"],
-  })
-  .refine(d => !(d.invoiceId && d.studentId), {
-    message: "Provide only one of invoiceId or studentId, not both.",
-    path: ["studentId"],
-  });
+};
 
-export const updatePaymentSchema = createPaymentSchema.partial();
+export const createPaymentSchema = z.object(basePaymentShape)
+  .refine(d => !!d.invoiceId || !!d.studentId, { message: "Provide either invoiceId or studentId.", path: ["invoiceId"] })
+  .refine(d => !(d.invoiceId && d.studentId), { message: "Provide only one of invoiceId or studentId, not both.", path: ["studentId"] });
+
+// For update: amount may become optional, so we partial the base shape then re-apply relation refinements.
+export const updatePaymentSchema = z.object(basePaymentShape).partial()
+  .refine(d => (d.invoiceId || d.studentId) ? !(d.invoiceId && d.studentId) : true, { message: "Provide only one of invoiceId or studentId.", path: ["studentId"] });
 export const paymentIdSchema = z.string().min(1, "Payment ID is required.");
 
 // --- Expense Category Schemas (NEW) ---
@@ -312,3 +311,36 @@ export const bulkPaymentsSchema = z.object({
 
 // Utility: ensure invoice number pattern (if user supplies manually in future routes)
 export const invoiceNumberSchema = z.string().regex(/^INV-[A-Z0-9\-]{6,}$/i, 'Invalid invoice number format.');
+
+// --- Scholarship Schemas (NEW) ---
+// Accept either PERCENTAGE with percentage value, or FIXED with amount value.
+export const createScholarshipSchema = z.object({
+  studentId: z.string().min(1, 'Student ID is required.'),
+  academicYearId: z.string().min(1, 'Academic Year ID is required.'),
+  type: z.enum(['PERCENTAGE','FIXED'], { errorMap: () => ({ message: 'Invalid scholarship type.' }) }),
+  percentage: z.coerce.number().min(0).max(100).optional(),
+  amount: z.coerce.number().min(0).optional(),
+  notes: z.string().max(1000).nullable().optional(),
+  isActive: z.boolean().optional(),
+}).superRefine((d, ctx) => {
+  if (d.type === 'PERCENTAGE') {
+    if (d.percentage == null) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['percentage'], message: 'Percentage value required for percentage scholarship.' });
+    if (d.amount != null) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['amount'], message: 'Do not supply amount for percentage scholarship.' });
+  } else if (d.type === 'FIXED') {
+    if (d.amount == null) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['amount'], message: 'Amount required for fixed scholarship.' });
+    if (d.percentage != null) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['percentage'], message: 'Do not supply percentage for fixed scholarship.' });
+  }
+});
+
+export const updateScholarshipSchema = createScholarshipSchema.partial().superRefine((d, ctx) => {
+  // If type provided ensure corresponding value coherence; if switching type must supply the new value
+  if (d.type === 'PERCENTAGE') {
+    if (d.percentage == null) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['percentage'], message: 'Percentage required when type is PERCENTAGE.' });
+    if (d.amount != null) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['amount'], message: 'Remove amount when type is PERCENTAGE.' });
+  } else if (d.type === 'FIXED') {
+    if (d.amount == null) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['amount'], message: 'Amount required when type is FIXED.' });
+    if (d.percentage != null) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['percentage'], message: 'Remove percentage when type is FIXED.' });
+  }
+});
+
+export const scholarshipIdParamSchema = z.string().min(1, 'Scholarship ID is required.');

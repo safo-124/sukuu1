@@ -159,6 +159,35 @@ export const updateTeacherSchema = z.object({
 
 export const teacherIdSchema = z.string().min(1);
 
+// --- Accountant Schemas (NEW) ---
+export const createAccountantSchema = z.object({
+  firstName: z.string().min(1).max(100),
+  lastName: z.string().min(1).max(100),
+  email: z.string().email().min(1),
+  password: z.string().min(8),
+  phoneNumber: z.string().nullable().optional(),
+  profilePictureUrl: z.string().url().nullable().optional(),
+  staffIdNumber: z.string().min(1).max(50),
+  jobTitle: z.string().min(1).max(100).default("Accountant"),
+  qualification: z.string().nullable().optional(),
+  departmentId: z.string().nullable().optional(),
+});
+
+export const updateAccountantSchema = z.object({
+  firstName: z.string().min(1).max(100).optional(),
+  lastName: z.string().min(1).max(100).optional(),
+  email: z.string().email().min(1).optional(),
+  password: z.string().min(8).optional(),
+  phoneNumber: z.string().nullable().optional(),
+  profilePictureUrl: z.string().url().nullable().optional(),
+  staffIdNumber: z.string().min(1).max(50).optional(),
+  jobTitle: z.string().min(1).max(100).optional(),
+  qualification: z.string().nullable().optional(),
+  departmentId: z.string().nullable().optional(),
+}).partial();
+
+export const accountantIdSchema = z.string().min(1);
+
 
 // --- Student Attendance Schemas ---
 export const createStudentAttendanceSchema = z.object({

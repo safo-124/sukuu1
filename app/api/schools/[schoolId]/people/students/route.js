@@ -1,6 +1,7 @@
 // app/api/schools/[schoolId]/people/students/route.js
 import prisma from '@/lib/prisma';
-import { createStudentSchema } from '@/validators/academics.validators'; 
+// Import from the dedicated student validators file rather than academics (fixes missing export error)
+import { createStudentSchema } from '@/validators/student.validators'; 
 import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
@@ -9,8 +10,9 @@ import { schoolIdSchema } from '@/validators/academics.validators'; // Ensure sc
 import bcrypt from 'bcryptjs';
 
 // GET handler
-export async function GET(request, { params }) {
-  const { schoolId } = params;
+export async function GET(request, ctx) {
+  const params = await ctx?.params; // ensure awaited pattern for Next.js dynamic route
+  const schoolId = params?.schoolId;
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'TEACHER' && session.user?.role !== 'SECRETARY' && session.user?.role !== 'ACCOUNTANT' && session.user?.role !== 'PARENT')) {
@@ -97,24 +99,25 @@ export async function GET(request, { params }) {
     }, { status: 200 });
 
   } catch (error) {
-    if (error instanceof z.ZodError) {
+    const isZod = error instanceof z.ZodError;
+    console.error(`API (GET Students) - Error for school ${schoolId}`, {
+      at: 'people/students GET',
+      zod: isZod,
+      issues: isZod ? error.issues : undefined,
+      message: error.message,
+      stack: error.stack
+    });
+    if (isZod) {
       return NextResponse.json({ error: 'Validation Error', issues: error.issues }, { status: 400 });
     }
-    console.error(`API (GET Students) - Detailed error for school ${schoolId}:`, {
-      message: error.message,
-      name: error.name,
-      code: error.code,
-      clientVersion: error.clientVersion,
-      meta: error.meta,
-      stack: error.stack,
-    });
     return NextResponse.json({ error: 'Failed to fetch students.' }, { status: 500 });
   }
 }
 
 // POST handler
-export async function POST(request, { params }) {
-  const { schoolId } = params;
+export async function POST(request, ctx) {
+  const params = await ctx?.params; // ensure awaited pattern
+  const schoolId = params?.schoolId;
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {
@@ -124,6 +127,11 @@ export async function POST(request, { params }) {
   try {
     const body = await request.json();
     schoolIdSchema.parse(schoolId);
+
+    if (!createStudentSchema || typeof createStudentSchema.safeParse !== 'function') {
+      console.error('API (POST Student) - createStudentSchema missing or invalid');
+      return NextResponse.json({ error: 'Server misconfiguration: student schema unavailable.' }, { status: 500 });
+    }
 
     const validation = createStudentSchema.safeParse(body);
 

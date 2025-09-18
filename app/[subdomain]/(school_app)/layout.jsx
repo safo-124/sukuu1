@@ -112,6 +112,7 @@ function getNavigationSections(schoolSubdomain, role) {
     const peopleItems = [
       { href: `/${schoolSubdomain}/people/students`, label: 'Manage Students', icon: Users },
       { href: `/${schoolSubdomain}/people/teachers`, label: 'Manage Teachers', icon: UserCog },
+      { href: `/${schoolSubdomain}/people/accountants`, label: 'Manage Accountants', icon: DollarSign },
     ];
     const attendanceItems = [
       { href: `/${schoolSubdomain}/attendance/students`, label: 'Student Attendance', icon: CheckSquare },

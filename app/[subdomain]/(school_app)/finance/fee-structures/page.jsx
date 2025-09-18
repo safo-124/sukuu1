@@ -23,6 +23,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   FilePlus2, Edit3, Trash2, DollarSign, Loader2, AlertTriangle, PlusCircle, CalendarDays, BookOpen, Layers, Briefcase, FileText, Filter
 } from 'lucide-react'; // Added Filter icon
+import { Switch } from '@/components/ui/switch';
+import { Select as MiniSelect, SelectContent as MiniSelectContent, SelectItem as MiniSelectItem, SelectTrigger as MiniSelectTrigger, SelectValue as MiniSelectValue } from '@/components/ui/select';
 
 // Initial form data for Fee Structure
 const initialFeeStructureFormData = {
@@ -144,6 +146,10 @@ export default function ManageFeeStructuresPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
 
+  // NEW STATES: For component inclusion toggle and frequency filter
+  const [includeComponents, setIncludeComponents] = useState(false);
+  const [frequencyFilter, setFrequencyFilter] = useState('');
+
   // Tailwind class constants
   const titleTextClasses = "text-black dark:text-white";
   const descriptionTextClasses = "text-zinc-600 dark:text-zinc-400";
@@ -161,15 +167,16 @@ export default function ManageFeeStructuresPage() {
       const queryParams = new URLSearchParams();
       if (filterAcademicYearId) queryParams.append('academicYearId', filterAcademicYearId);
       if (filterClassId) queryParams.append('classId', filterClassId);
-      if (filterSchoolLevelId) queryParams.append('schoolLevelId', filterSchoolLevelId); // NEW query param for filter
-
+      if (filterSchoolLevelId) queryParams.append('schoolLevelId', filterSchoolLevelId);
+      if (frequencyFilter) queryParams.append('frequency', frequencyFilter);
+      if (includeComponents) queryParams.append('includeComponents','1');
       const response = await fetch(`/api/schools/${schoolData.id}/finance/fee-structures?${queryParams.toString()}`);
       if (!response.ok) { const errData = await response.json().catch(() => ({})); throw new Error(errData.error || 'Failed to fetch fee structures.'); }
       const data = await response.json();
       setFeeStructures(data.feeStructures || []);
     } catch (err) { toast.error("Error fetching fee structures", { description: err.message }); setError(err.message);
     } finally { setIsLoading(false); }
-  }, [schoolData?.id, filterAcademicYearId, filterClassId, filterSchoolLevelId]);
+  }, [schoolData?.id, filterAcademicYearId, filterClassId, filterSchoolLevelId, includeComponents, frequencyFilter]);
 
 
   const fetchDropdownDependencies = useCallback(async () => {
@@ -336,6 +343,39 @@ export default function ManageFeeStructuresPage() {
 
   return (
     <div className="space-y-8">
+      {/* Controls Row */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:gap-6 w-full">
+          <div className="flex flex-col">
+            <label className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Frequency</label>
+            <MiniSelect value={frequencyFilter || 'ALL'} onValueChange={(val)=> setFrequencyFilter(val === 'ALL' ? '' : val)}>
+              <MiniSelectTrigger className="h-9 w-44 bg-white/50 dark:bg-zinc-800/50">
+                <MiniSelectValue placeholder="All" />
+              </MiniSelectTrigger>
+              <MiniSelectContent className="bg-white dark:bg-zinc-900">
+                <MiniSelectItem value="ALL">All</MiniSelectItem>
+                <MiniSelectItem value="ONE_TIME">One Time</MiniSelectItem>
+                <MiniSelectItem value="MONTHLY">Monthly</MiniSelectItem>
+                <MiniSelectItem value="TERMLY">Termly</MiniSelectItem>
+                <MiniSelectItem value="ANNUALLY">Annually</MiniSelectItem>
+              </MiniSelectContent>
+            </MiniSelect>
+          </div>
+          <div className="flex items-center gap-3 mt-2 md:mt-0">
+            <div className="flex flex-col">
+              <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Components</span>
+              <div className="flex items-center gap-2">
+                <Switch checked={includeComponents} onCheckedChange={setIncludeComponents} />
+                <span className="text-xs text-zinc-600 dark:text-zinc-400">Include</span>
+              </div>
+            </div>
+          </div>
+          {feeStructures?.length > 0 && (
+            <div className="flex items-center text-xs text-zinc-500 dark:text-zinc-400">{feeStructures.length} structure{feeStructures.length!==1 && 's'} loaded</div>
+          )}
+        </div>
+      </div>
+
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className={`text-2xl md:text-3xl font-bold ${titleTextClasses} flex items-center`}>
