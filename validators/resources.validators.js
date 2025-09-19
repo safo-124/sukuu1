@@ -119,3 +119,22 @@ export const createBookSchema = z.object({
 
 export const updateBookSchema = createBookSchema.partial();
 export const bookIdSchema = z.string().min(1, "Book ID is required.");
+
+// --- Book Loan Schemas (NEW) ---
+export const createBookLoanSchema = z.object({
+  bookId: z.string().min(1, "Book ID is required."),
+  studentId: z.string().min(1, "Student ID is required."),
+  quantity: z.coerce.number().int().min(1).default(1),
+  days: z.coerce.number().int().min(1).max(365).default(14) // loan period in days
+});
+
+export const updateBookLoanSchema = z.object({
+  quantity: z.coerce.number().int().min(1).optional(),
+  dueDate: z.string().datetime().optional(),
+});
+
+export const returnBookLoanSchema = z.object({
+  returnedAt: z.string().datetime().optional(),
+});
+
+export const bookLoanIdSchema = z.string().min(1, "Book Loan ID is required.");

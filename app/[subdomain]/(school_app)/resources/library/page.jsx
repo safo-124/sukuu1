@@ -21,7 +21,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
-  Book, Edit3, Trash2, UserRound, Loader2, AlertTriangle, PlusCircle, FileText, Search, Library as LibraryIcon, ClipboardList
+  Book, Edit3, Trash2, UserRound, Loader2, AlertTriangle, PlusCircle, FileText, Search, Library as LibraryIcon, ClipboardList, Download, Upload
 } from 'lucide-react'; // Added LibraryIcon, Search, ClipboardList
 
 // Initial form data for Book
@@ -84,6 +84,28 @@ export default function ManageLibraryPage() {
   const [editingBook, setEditingBook] = useState(null);
   const [isSubmittingBook, setIsSubmittingBook] = useState(false);
   const [bookFormError, setBookFormError] = useState('');
+  const [importing, setImporting] = useState(false)
+
+  const handleImportChange = async (e) => {
+    if (!schoolData?.id) return
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImporting(true)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      const res = await fetch(`/api/schools/${schoolData.id}/resources/books/import`, { method: 'POST', body: form })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Import failed')
+      toast.success(`Imported ${data.count} book(s)`) 
+      fetchBooks()
+    } catch (err) {
+      toast.error('Import failed', { description: err.message })
+    } finally {
+      setImporting(false)
+      e.target.value = ''
+    }
+  }
 
   // Tailwind class constants
   const titleTextClasses = 'text-black dark:text-white';
@@ -209,6 +231,40 @@ export default function ManageLibraryPage() {
         </div>
         <div className='flex flex-col sm:flex-row gap-2'>
           {/* Add Book Button */}
+          <Button
+            variant='outline'
+            className={outlineButtonClasses}
+            onClick={async () => {
+              try {
+                const res = await fetch(`/api/schools/${schoolData.id}/resources/books/export`)
+                if (!res.ok) throw new Error('Export failed')
+                const blob = await res.blob()
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = `${schoolData?.subdomain || 'school'}-books.xlsx`
+                a.click()
+                URL.revokeObjectURL(url)
+              } catch (e) {
+                toast.error('Export failed', { description: e.message })
+              }
+            }}
+            title='Export to Excel'
+          >
+            <Download className='mr-2 h-4 w-4'/> Export
+          </Button>
+
+          <input id='book-import-file' type='file' accept='.xlsx,.xls' className='hidden' onChange={handleImportChange} />
+          <Button
+            variant='outline'
+            className={outlineButtonClasses}
+            disabled={importing}
+            title='Import from Excel'
+            onClick={() => document.getElementById('book-import-file')?.click()}
+          >
+            <Upload className='mr-2 h-4 w-4'/>{importing ? 'Importing…' : 'Import'}
+          </Button>
+
           <Dialog open={isBookDialogOpen} onOpenChange={(open) => { setIsBookDialogOpen(open); if (!open) setBookFormError(''); }}>
             <DialogTrigger asChild>
               <Button className={primaryButtonClasses} onClick={openAddBookDialog}> <PlusCircle className='mr-2 h-4 w-4' /> Add New Book </Button>
@@ -314,12 +370,19 @@ export default function ManageLibraryPage() {
       </div>
 
       {/* Optional: Future sections like Borrowed Books, Overdue, etc. */}
-      {/* <div className={`${glassCardClasses} mt-8`}>
+      <div className={`${glassCardClasses} mt-8`}>
         <h2 className={`text-xl font-bold ${titleTextClasses} mb-4 flex items-center`}>
-          <UserRound className='mr-2 h-6 w-6 opacity-80'/>Borrowed Books (Coming Soon)
+          <ClipboardList className='mr-2 h-6 w-6 opacity-80'/>Loans
         </h2>
-        <p className={descriptionTextClasses}>Manage book check-outs and returns.</p>
-      </div> */}
+        <div className='flex gap-2'>
+          <Link href={`/${schoolData?.subdomain}/resources/library/loans`}>
+            <Button variant='outline' className={outlineButtonClasses}>View Loans</Button>
+          </Link>
+          <Link href={`/${schoolData?.subdomain}/resources/library/loans/new`}>
+            <Button className={primaryButtonClasses}><PlusCircle className='h-4 w-4 mr-2'/>New Loan</Button>
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }

@@ -15,7 +15,7 @@ export async function GET(request, ctx) {
   const schoolId = params?.schoolId;
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'TEACHER' && session.user?.role !== 'SECRETARY' && session.user?.role !== 'ACCOUNTANT' && session.user?.role !== 'PARENT')) {
+  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'TEACHER' && session.user?.role !== 'SECRETARY' && session.user?.role !== 'ACCOUNTANT' && session.user?.role !== 'PARENT' && session.user?.role !== 'LIBRARIAN')) {
     // Broaden access for roles that might need to see student lists for invoices, etc.
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

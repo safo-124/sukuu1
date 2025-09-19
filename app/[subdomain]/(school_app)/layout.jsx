@@ -114,6 +114,7 @@ function getNavigationSections(schoolSubdomain, role) {
       { href: `/${schoolSubdomain}/people/teachers`, label: 'Manage Teachers', icon: UserCog },
       { href: `/${schoolSubdomain}/people/accountants`, label: 'Manage Accountants', icon: DollarSign },
       { href: `/${schoolSubdomain}/people/procurement`, label: 'Manage Procurement', icon: Briefcase },
+      { href: `/${schoolSubdomain}/people/librarians`, label: 'Manage Librarians', icon: Library },
       { href: `/${schoolSubdomain}/people/hr-staff`, label: 'Manage HR Staff', icon: Briefcase },
     ];
     const attendanceItems = [
@@ -206,8 +207,15 @@ function getNavigationSections(schoolSubdomain, role) {
           { title: 'Communication', items: communicationItems },
         ];
       }
-      case 'LIBRARIAN':
-        return [ { items: commonItems }, { title: 'Resources', items: [ { href: `/${schoolSubdomain}/resources/library`, label: 'Library', icon: Library } ] } ];
+      case 'LIBRARIAN': {
+        const librarianCommon = [ { href: `/${schoolSubdomain}/dashboard/librarian`, label: 'Dashboard', icon: LayoutDashboard } ];
+        const librarianResources = [ { href: `/${schoolSubdomain}/resources/library`, label: 'Library', icon: Library } ];
+        return [
+          { items: librarianCommon },
+          { title: 'Resources', items: librarianResources },
+          { title: 'Communication', items: communicationItems },
+        ];
+      }
       case 'TRANSPORT_MANAGER':
         return [ { items: commonItems }, { title: 'Resources', items: [ { href: `/${schoolSubdomain}/resources/transport`, label: 'Transport', icon: Bus } ] } ];
       case 'HOSTEL_WARDEN':
@@ -392,6 +400,13 @@ export default function SchoolAppLayout({ children }) {
             return;
           }
         }
+        // Librarian: land on librarian dashboard from generic dashboard
+        if (userRole === 'LIBRARIAN') {
+          if (currentPath === `/${subdomain}/dashboard`) {
+            router.push(`/${subdomain}/dashboard/librarian`);
+            return;
+          }
+        }
       }
 
       // If user is authenticated and authorized for the school and current path, clear error
@@ -516,7 +531,21 @@ export default function SchoolAppLayout({ children }) {
                 sections={fullSections}
                 collapsed={!isSidebarOpen}
                 onNavigate={() => {}}
-                headerLabel={userRole === 'PROCUREMENT_OFFICER' ? 'Procurement' : undefined}
+                headerLabel={(() => {
+                  switch (userRole) {
+                    case 'SCHOOL_ADMIN': return 'School Admin';
+                    case 'ACCOUNTANT': return 'Accountant';
+                    case 'SECRETARY': return 'Secretary';
+                    case 'HR_MANAGER': return 'HR Manager';
+                    case 'PROCUREMENT_OFFICER': return 'Procurement';
+                    case 'LIBRARIAN': return 'Librarian';
+                    case 'TRANSPORT_MANAGER': return 'Transport';
+                    case 'HOSTEL_WARDEN': return 'Hostel';
+                    case 'SUPER_ADMIN': return 'Super Admin';
+                    case 'PARENT': return 'Parent';
+                    default: return undefined; // falls back to component default
+                  }
+                })()}
                 studentDisplay={userRole === 'STUDENT' ? studentSidebarInfo : undefined}
               />
             </div>

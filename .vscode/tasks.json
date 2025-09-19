@@ -1,0 +1,14 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Prisma migrate dev",
+			"type": "shell",
+			"command": "npx prisma migrate dev --name library_loans",
+			"args": [],
+			"problemMatcher": [
+				"$tsc"
+			]
+		}
+	]
+}
