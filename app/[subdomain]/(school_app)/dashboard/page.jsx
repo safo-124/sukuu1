@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useSchool } from '../layout'; // Consume school data from context
 import { Skeleton } from '@/components/ui/skeleton';
@@ -71,6 +71,7 @@ export default function SchoolAdminDashboardPage() {
   const schoolData = useSchool(); // from SchoolAppLayout context
   const params = useParams();
   const subdomain = params?.subdomain;
+  const router = useRouter();
 
   const [dashboardStats, setDashboardStats] = useState({
     totalStudents: 0, 
@@ -90,6 +91,13 @@ export default function SchoolAdminDashboardPage() {
   const sectionTitleClasses = `text-xl font-semibold ${pageTitleClasses}`;
   const primaryButtonClasses = "bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200";
   const outlineButtonClasses = "border-zinc-300 text-black hover:bg-zinc-100 dark:border-zinc-700 dark:text-white dark:hover:bg-zinc-800";
+  // Redirect procurement officers to their dedicated dashboard
+  useEffect(() => {
+    if (session?.user?.role === 'PROCUREMENT_OFFICER' && subdomain) {
+      router.replace(`/${subdomain}/dashboard/procurement`);
+    }
+  }, [session?.user?.role, subdomain, router]);
+
 
 
   const fetchDashboardStats = useCallback(async () => {

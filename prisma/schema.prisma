@@ -86,6 +86,13 @@ enum PurchaseOrderStatus {
   CANCELLED
 }
 
+// Inventory Transactions
+enum InventoryTransactionType {
+  IN      // stock received into store
+  OUT     // stock issued out of store
+  ADJUST  // manual adjustment to a specific on-hand quantity
+}
+
 // --------------------
 // FINANCE RE-DESIGN ENUMS (Phase 1)
 // --------------------
@@ -194,6 +201,7 @@ model School {
   drivers                 Driver[]
   books                   Book[]
   HostelRoom              HostelRoom[]
+  inventoryTransactions   InventoryTransaction[]
 
   @@index([subdomain])
   @@index([customDomain])
@@ -225,6 +233,7 @@ model User {
   paymentsProcessed       Payment[]         @relation("ProcessedBy")
   expensesPaid            Expense[]         @relation("PaidByExpense")
   gradesPublished         Grade[]           @relation("GradePublishedBy")
+  inventoryTransactionsPerformed InventoryTransaction[] @relation("InventoryTransactionsPerformed")
 
   @@index([email])
   @@index([schoolId])
@@ -1208,6 +1217,7 @@ model Vendor {
   school         School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   purchaseOrders PurchaseOrder[]
   expenses       Expense[]
+  inventoryTransactions InventoryTransaction[]
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
@@ -1229,6 +1239,7 @@ model PurchaseOrder {
   schoolId             String
   school               School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   items                PurchaseOrderItem[]
+  inventoryTransactions InventoryTransaction[]
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
 
@@ -1278,12 +1289,36 @@ model InventoryItem {
   schoolId           String
   school             School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   purchaseOrderItems PurchaseOrderItem[]
+  transactions       InventoryTransaction[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   InvoiceItem        InvoiceItem[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
+}
+
+model InventoryTransaction {
+  id                 String                     @id @default(cuid())
+  itemId             String
+  item               InventoryItem              @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  schoolId           String
+  school             School                     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  type               InventoryTransactionType
+  quantity           Int                        // for IN/OUT this is the magnitude; for ADJUST this is the delta applied
+  resultingQuantity  Int                        // on-hand after this transaction
+  reason             String?
+  reference          String?                    // free-text reference like doc number
+  vendorId           String?
+  vendor             Vendor?                    @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  purchaseOrderId    String?
+  purchaseOrder      PurchaseOrder?             @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  performedByUserId  String?
+  performedBy        User?                      @relation("InventoryTransactionsPerformed", fields: [performedByUserId], references: [id], onDelete: SetNull)
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+
+  @@index([schoolId, itemId])
 }
 
 model Building {

@@ -219,7 +219,7 @@ export default function ManageExpensesPage() {
       const [categoriesRes, vendorsRes, staffUsersRes] = await Promise.allSettled([
         fetch(`/api/schools/${schoolData.id}/finance/expense-categories`), // Categories for expense dropdown
         fetch(`/api/schools/${schoolData.id}/finance/vendors`), // Vendors for expense dropdown (assuming this route exists)
-        fetch(`/api/schools/${schoolData.id}/people/teachers`), // Teachers as staff for paidBy (assuming this route exists)
+        fetch(`/api/schools/${schoolData.id}/people/staff?limit=1000`), // Unified staff users for Paid By dropdown
       ]);
 
       // Process Categories
@@ -245,8 +245,8 @@ export default function ManageExpensesPage() {
       // Process Staff Users (for Paid By)
       if (staffUsersRes.status === 'fulfilled' && staffUsersRes.value.ok) {
         const staffUsersData = await staffUsersRes.value.json();
-        // Assuming teachers API returns staff objects with user data inside
-        setStaffUsers(Array.isArray(staffUsersData.teachers) ? staffUsersData.teachers.map(s => s.user) : []); // Extract user objects
+        // Unified endpoint returns users array directly
+        setStaffUsers(Array.isArray(staffUsersData.users) ? staffUsersData.users : []);
       } else {
         const errorData = staffUsersRes.status === 'rejected' ? staffUsersRes.reason : await staffUsersRes.value.json().catch(() => ({}));
         console.error("Staff Users dropdown fetch failed:", errorData);

@@ -22,8 +22,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
-  FilePlus2, Edit3, Trash2, Store, List, Box, Layers, Loader2, AlertTriangle, Package, Tags, Scale
-} from 'lucide-react'; // Added Package, Tags, Scale icons
+  FilePlus2, Edit3, Trash2, Store, List, Box, Layers, Loader2, AlertTriangle, Package, Tags, Scale, PlusCircle, MinusCircle, Wrench, History
+} from 'lucide-react'; // Added actions & history icons
 
 // Initial form data for Inventory Category
 const initialCategoryFormData = {
@@ -41,6 +41,9 @@ const initialItemFormData = {
   reorderLevel: '',
   supplierInfo: '',
 };
+
+// Transaction dialog state
+const initialTxForm = { type: 'IN', quantity: 0, reason: '', reference: '', vendorId: '' };
 
 
 // Reusable FormFields Component for Inventory Category
@@ -115,6 +118,16 @@ export default function ManageStoresPage() {
 
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [isItemDialogOpen, setIsItemDialogOpen] = useState(false);
+  const [isTxDialogOpen, setIsTxDialogOpen] = useState(false);
+  const [txForm, setTxForm] = useState({ ...initialTxForm });
+  const [txItem, setTxItem] = useState(null);
+  const [isSubmittingTx, setIsSubmittingTx] = useState(false);
+  const [txError, setTxError] = useState('');
+
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [historyItem, setHistoryItem] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [history, setHistory] = useState({ total: 0, page: 1, pageSize: 20, records: [] });
 
   const [categoryFormData, setCategoryFormData] = useState({ ...initialCategoryFormData });
   const [itemFormData, setItemFormData] = useState({ ...initialItemFormData });
@@ -127,6 +140,10 @@ export default function ManageStoresPage() {
 
   const [categoryFormError, setCategoryFormError] = useState('');
   const [itemFormError, setItemFormError] = useState('');
+
+  // Search and filter UI state
+  const [query, setQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
 
   // Tailwind class constants
   const titleTextClasses = "text-black dark:text-white";
@@ -275,6 +292,61 @@ export default function ManageStoresPage() {
   const handleItemFormChange = (e) => setItemFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   const handleItemSelectChange = (name, value) => setItemFormData(prev => ({ ...prev, [name]: value === 'none' ? '' : value }));
 
+  // --- Transaction Handlers ---
+  const openTxDialog = (item, type) => {
+    setTxItem(item);
+    setTxForm({ ...initialTxForm, type, quantity: 0 });
+    setTxError('');
+    setIsTxDialogOpen(true);
+  };
+
+  const submitTransaction = async (e) => {
+    e.preventDefault();
+    if (!schoolData?.id || !txItem?.id) return;
+    setIsSubmittingTx(true); setTxError('');
+    try {
+      const payload = {
+        type: txForm.type,
+        quantity: Number(txForm.quantity) || 0,
+        reason: txForm.reason || null,
+        reference: txForm.reference || null,
+        vendorId: txForm.vendorId || null,
+      };
+      const res = await fetch(`/api/schools/${schoolData.id}/resources/inventory-items/${txItem.id}/transactions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = data.error || 'Failed to record transaction';
+        setTxError(msg); toast.error('Transaction failed', { description: msg });
+      } else {
+        toast.success('Transaction recorded');
+        setIsTxDialogOpen(false);
+        // Refresh items to reflect new qty
+        fetchItems();
+      }
+    } catch (err) {
+      setTxError('Unexpected error');
+    } finally { setIsSubmittingTx(false); }
+  };
+
+  const openHistory = async (item) => {
+    setHistoryItem(item);
+    setIsHistoryOpen(true);
+    await loadHistory(item.id, 1);
+  };
+
+  const loadHistory = async (itemId, page = 1) => {
+    if (!schoolData?.id) return;
+    setHistoryLoading(true);
+    try {
+      const res = await fetch(`/api/schools/${schoolData.id}/resources/inventory-items/${itemId}/transactions?page=${page}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load history');
+      setHistory(data);
+    } catch (err) {
+      toast.error('Failed to load history', { description: err.message });
+    } finally { setHistoryLoading(false); }
+  };
+
   const openAddItemDialog = () => {
     setEditingItem(null);
     setItemFormData({ ...initialItemFormData });
@@ -359,11 +431,19 @@ export default function ManageStoresPage() {
   const isLowStock = (item) => item.reorderLevel !== null && item.quantityInStock <= item.reorderLevel;
 
   const filteredItems = useMemo(() => {
+    let out = items;
     if (filter === 'low-stock') {
-      return items.filter(isLowStock);
+      out = out.filter(isLowStock);
     }
-    return items;
-  }, [items, filter]);
+    if (categoryFilter && categoryFilter !== 'all') {
+      out = out.filter(i => (i.categoryId || 'none') === categoryFilter);
+    }
+    if (query.trim()) {
+      const q = query.toLowerCase();
+      out = out.filter(i => (i.name || '').toLowerCase().includes(q) || (i.description || '').toLowerCase().includes(q));
+    }
+    return out;
+  }, [items, filter, query, categoryFilter]);
 
   return (
     <div className="space-y-8">
@@ -493,6 +573,19 @@ export default function ManageStoresPage() {
         <h2 className={`text-xl font-bold ${titleTextClasses} mb-4 flex items-center`}>
           <Package className="mr-2 h-6 w-6 opacity-80"/>Inventory Items {filter === 'low-stock' ? <span className="ml-2 text-sm text-red-600 dark:text-red-400">(Low stock)</span> : null}
         </h2>
+        <div className="flex flex-col md:flex-row gap-2 md:items-center md:justify-between mb-4">
+          <div className="flex gap-2">
+            <Input placeholder="Search items..." value={query} onChange={(e) => setQuery(e.target.value)} className="w-60" />
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-56"><SelectValue placeholder="Filter by category"/></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All categories</SelectItem>
+                <SelectItem value="none">No category</SelectItem>
+                {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
         <Table>
           <TableHeader>
             <TableRow className="border-zinc-200/80 dark:border-zinc-700/80">
@@ -523,6 +616,14 @@ export default function ManageStoresPage() {
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1 md:gap-2">
                     <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} onClick={() => openEditItemDialog(item)} title="Edit Item"> <Edit3 className="h-4 w-4" /> </Button>
+                    {(session?.user?.role === 'SCHOOL_ADMIN' || session?.user?.role === 'PROCUREMENT_OFFICER' || session?.user?.role === 'ACCOUNTANT') && (
+                      <>
+                        <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} onClick={() => openTxDialog(item, 'IN')} title="Receive (IN)"> <PlusCircle className="h-4 w-4" /> </Button>
+                        <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} onClick={() => openTxDialog(item, 'OUT')} title="Issue (OUT)"> <MinusCircle className="h-4 w-4" /> </Button>
+                        <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} onClick={() => openTxDialog(item, 'ADJUST')} title="Adjust (±)"> <Wrench className="h-4 w-4" /> </Button>
+                      </>
+                    )}
+                    <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} onClick={() => openHistory(item)} title="History"> <History className="h-4 w-4" /> </Button>
                     <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8 border-red-300 text-red-600 hover:bg-red-100 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/50`} onClick={() => handleDeleteItem(item.id, item.name)} title="Delete Item"> <Trash2 className="h-4 w-4" /> </Button>
                   </div>
                 </TableCell>
@@ -537,6 +638,96 @@ export default function ManageStoresPage() {
           </TableBody>
         </Table>
       </div>
+      {/* Transaction Dialog */}
+      <Dialog open={isTxDialogOpen} onOpenChange={(o) => { setIsTxDialogOpen(o); if (!o) setTxError(''); }}>
+        <DialogContent className="sm:max-w-lg md:max-w-xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+          <DialogHeader>
+            <DialogTitle className={titleTextClasses}>Record Transaction</DialogTitle>
+            <DialogDescription className={descriptionTextClasses}>Item: {txItem?.name}</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={submitTransaction} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label className="block text-sm mb-1">Type</Label>
+                <Select value={txForm.type} onValueChange={(v) => setTxForm(s => ({ ...s, type: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="IN">Receive (IN)</SelectItem>
+                    <SelectItem value="OUT">Issue (OUT)</SelectItem>
+                    <SelectItem value="ADJUST">Adjust (±)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="block text-sm mb-1">Quantity</Label>
+                <Input type="number" min="0" value={txForm.quantity} onChange={(e) => setTxForm(s => ({ ...s, quantity: e.target.value }))} required />
+              </div>
+              <div className="sm:col-span-2">
+                <Label className="block text-sm mb-1">Reference (optional)</Label>
+                <Input value={txForm.reference} onChange={(e) => setTxForm(s => ({ ...s, reference: e.target.value }))} />
+              </div>
+              <div className="sm:col-span-2">
+                <Label className="block text-sm mb-1">Reason (optional)</Label>
+                <Textarea rows={2} value={txForm.reason} onChange={(e) => setTxForm(s => ({ ...s, reason: e.target.value }))} />
+              </div>
+            </div>
+            {txError && <p className="text-sm text-red-600 dark:text-red-400">{txError}</p>}
+            <DialogFooter>
+              <DialogClose asChild><Button type="button" variant="outline" className={outlineButtonClasses}>Cancel</Button></DialogClose>
+              <Button type="submit" className={primaryButtonClasses} disabled={isSubmittingTx}>{isSubmittingTx ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Saving...</> : 'Save Transaction'}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* History Dialog */}
+      <Dialog open={isHistoryOpen} onOpenChange={(o) => setIsHistoryOpen(o)}>
+        <DialogContent className="sm:max-w-3xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+          <DialogHeader>
+            <DialogTitle className={titleTextClasses}>Transaction History</DialogTitle>
+            <DialogDescription className={descriptionTextClasses}>Item: {historyItem?.name}</DialogDescription>
+          </DialogHeader>
+          {historyLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_,i) => <Skeleton key={i} className="h-6 w-full" />)}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>When</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead className="text-right">Qty</TableHead>
+                    <TableHead className="text-right">Resulting</TableHead>
+                    <TableHead>By</TableHead>
+                    <TableHead>Ref</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {history.records?.length ? history.records.map(r => (
+                    <TableRow key={r.id}>
+                      <TableCell>{new Date(r.createdAt).toLocaleString()}</TableCell>
+                      <TableCell>{r.type}</TableCell>
+                      <TableCell className="text-right">{r.quantity}</TableCell>
+                      <TableCell className="text-right">{r.resultingQuantity}</TableCell>
+                      <TableCell>{r.performedBy ? `${r.performedBy.firstName || ''} ${r.performedBy.lastName || ''}`.trim() || r.performedBy.email : '-'}</TableCell>
+                      <TableCell>{r.reference || '-'}</TableCell>
+                    </TableRow>
+                  )) : (
+                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No history found.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+              <div className="flex items-center justify-between">
+                <Button variant="outline" onClick={() => loadHistory(historyItem.id, Math.max(1, history.page - 1))} disabled={history.page <= 1}>Previous</Button>
+                <div className="text-sm text-muted-foreground">Page {history.page}</div>
+                <Button variant="outline" onClick={() => loadHistory(historyItem.id, history.page + 1)} disabled={(history.page * history.pageSize) >= history.total}>Next</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

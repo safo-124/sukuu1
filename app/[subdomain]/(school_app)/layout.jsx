@@ -99,7 +99,7 @@ function SchoolHeader({ schoolName, schoolLogoUrl, onToggleSidebar, userSession 
 
 // --- Navigation builder (clean, top-level) ---
 function getNavigationSections(schoolSubdomain, role) {
-    const commonItems = [ { href: `/${schoolSubdomain}/dashboard`, label: 'Dashboard', icon: LayoutDashboard } ];
+  const commonItems = [ { href: `/${schoolSubdomain}/dashboard`, label: 'Dashboard', icon: LayoutDashboard } ];
     const academicItems = [
       { href: `/${schoolSubdomain}/academics/school-levels`, label: 'School Levels', icon: Layers },
       { href: `/${schoolSubdomain}/academics/departments`, label: 'Departments', icon: Briefcase },
@@ -167,6 +167,7 @@ function getNavigationSections(schoolSubdomain, role) {
           { title: 'People', items: peopleItems },
           { title: 'Attendance', items: attendanceItems },
           { title: 'Human Resources', items: hrItems },
+          { title: 'Communication', items: communicationItems },
           { title: 'School Setup', items: [ { href: `/${schoolSubdomain}/settings/profile`, label: 'School Profile', icon: Settings } ] },
         ];
       case 'ACCOUNTANT':
@@ -175,6 +176,7 @@ function getNavigationSections(schoolSubdomain, role) {
           { title: 'Finance', items: financeItems },
           { title: 'Human Resources', items: hrItems.filter(i => i.label === 'Payroll') },
           { title: 'People', items: [ { href: `/${schoolSubdomain}/people/teachers`, label: 'Staff Directory', icon: UserCog } ] },
+          { title: 'Communication', items: communicationItems },
         ];
       case 'SECRETARY':
         return [
@@ -188,12 +190,22 @@ function getNavigationSections(schoolSubdomain, role) {
           { title: 'Communication', items: communicationItems },
           { title: 'School Setup', items: schoolSetupItems },
         ];
-      case 'PROCUREMENT_OFFICER':
-        return [
-          { items: commonItems },
-          { title: 'Finance', items: financeItems.filter(i => ['Expenses'].includes(i.label)) },
-          { title: 'Resources', items: resourceItems.filter(i => ['Store'].includes(i.label)) },
+      case 'PROCUREMENT_OFFICER': {
+        // Custom dashboard link for procurement
+        const procurementCommon = [ { href: `/${schoolSubdomain}/dashboard/procurement`, label: 'Dashboard', icon: LayoutDashboard } ];
+        const procurementFinance = [
+          { href: `/${schoolSubdomain}/finance/purchase-orders`, label: 'Purchase Orders', icon: FileText },
+          { href: `/${schoolSubdomain}/finance/vendors`, label: 'Vendors', icon: Briefcase },
+          { href: `/${schoolSubdomain}/finance/expenses`, label: 'Expenses', icon: DollarSign },
         ];
+        const procurementResources = [ { href: `/${schoolSubdomain}/resources/stores`, label: 'Store', icon: Store } ];
+        return [
+          { items: procurementCommon },
+          { title: 'Finance', items: procurementFinance },
+          { title: 'Resources', items: procurementResources },
+          { title: 'Communication', items: communicationItems },
+        ];
+      }
       case 'LIBRARIAN':
         return [ { items: commonItems }, { title: 'Resources', items: [ { href: `/${schoolSubdomain}/resources/library`, label: 'Library', icon: Library } ] } ];
       case 'TRANSPORT_MANAGER':
@@ -504,6 +516,7 @@ export default function SchoolAppLayout({ children }) {
                 sections={fullSections}
                 collapsed={!isSidebarOpen}
                 onNavigate={() => {}}
+                headerLabel={userRole === 'PROCUREMENT_OFFICER' ? 'Procurement' : undefined}
                 studentDisplay={userRole === 'STUDENT' ? studentSidebarInfo : undefined}
               />
             </div>

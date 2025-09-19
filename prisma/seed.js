@@ -1,8 +1,45 @@
 // prisma/seed.js (CLEAN REWRITE)
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
 require('dotenv').config();
 const prisma = new PrismaClient();
+
+// Track any generated (non-ENV) credentials to persist them safely to disk
+const generatedCredentials = [];
+
+function generateStrongPassword(length = 20) {
+  // Exclude ambiguous characters; include upper/lower/digits/safe symbols
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower = 'abcdefghijkmnopqrstuvwxyz';
+  const digits = '23456789';
+  const symbols = '!@#$%^&*()_-+=[]{}~';
+  const all = upper + lower + digits + symbols;
+
+  // Ensure at least one from each set
+  const picks = [
+    upper[Math.floor(Math.random() * upper.length)],
+    lower[Math.floor(Math.random() * lower.length)],
+    digits[Math.floor(Math.random() * digits.length)],
+    symbols[Math.floor(Math.random() * symbols.length)],
+  ];
+
+  // Fill remaining with crypto randomness
+  const remaining = length - picks.length;
+  const bytes = crypto.randomBytes(remaining);
+  for (let i = 0; i < remaining; i++) {
+    picks.push(all[bytes[i] % all.length]);
+  }
+
+  // Shuffle
+  for (let i = picks.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [picks[i], picks[j]] = [picks[j], picks[i]];
+  }
+  return picks.join('');
+}
 
 const rolesToSeed = [
   { role: 'SUPER_ADMIN', envEmail: 'SEED_SUPERADMIN_EMAIL', envPass: 'SEED_SUPERADMIN_PASSWORD', defaultEmail: 'superadmin@example.com', firstName: 'Super', lastName: 'Admin', jobTitle: 'System Owner' },
@@ -13,7 +50,7 @@ const rolesToSeed = [
 async function ensureUserAndStaff(entry, schoolId) {
   const email = process.env[entry.envEmail] || entry.defaultEmail;
   const passwordSourceEnv = !!process.env[entry.envPass];
-  const plainPassword = process.env[entry.envPass] || 'ChangeMe123!';
+  const plainPassword = passwordSourceEnv ? process.env[entry.envPass] : generateStrongPassword(20);
   const forceReset = process.env.FORCE_RESET_SEED_PASSWORDS === 'true';
 
   let user = await prisma.user.findUnique({ where: { email } });
@@ -30,7 +67,16 @@ async function ensureUserAndStaff(entry, schoolId) {
         schoolId: entry.role === 'SUPER_ADMIN' ? null : schoolId,
       },
     });
-    console.log(`Created user ${email} (${entry.role}) passwordSource=${passwordSourceEnv ? 'ENV' : 'DEFAULT'} length=${plainPassword.length}`);
+    console.log(`Created user ${email} (${entry.role}) passwordSource=${passwordSourceEnv ? 'ENV' : 'GENERATED'} length=${plainPassword.length}`);
+    if (!passwordSourceEnv) {
+      generatedCredentials.push({
+        email,
+        role: entry.role,
+        password: plainPassword,
+        action: 'created',
+        timestamp: new Date().toISOString(),
+      });
+    }
   } else if (forceReset) {
     // Optionally force reset seed user passwords to the current plainPassword
     let needsReset = true;
@@ -40,7 +86,16 @@ async function ensureUserAndStaff(entry, schoolId) {
     if (needsReset) {
       const newHash = await bcrypt.hash(plainPassword, 10);
       await prisma.user.update({ where: { id: user.id }, data: { hashedPassword: newHash } });
-      console.log(`Reset password for existing seed user ${email} (${entry.role}) passwordSource=${passwordSourceEnv ? 'ENV' : 'DEFAULT'}`);
+      console.log(`Reset password for existing seed user ${email} (${entry.role}) passwordSource=${passwordSourceEnv ? 'ENV' : 'GENERATED'}`);
+      if (!passwordSourceEnv) {
+        generatedCredentials.push({
+          email,
+          role: entry.role,
+          password: plainPassword,
+          action: 'reset',
+          timestamp: new Date().toISOString(),
+        });
+      }
     } else {
       console.log(`Password already up-to-date for ${email} (${entry.role})`);
     }
@@ -507,6 +562,20 @@ async function main() {
     overdueInvoices: await prisma.invoice.count({ where: { schoolId: school.id, status: 'OVERDUE' } }),
   };
   console.log(JSON.stringify(summary, null, 2));
+
+  // Persist any generated credentials to disk for the developer to retrieve securely
+  if (generatedCredentials.length > 0) {
+    try {
+      const outPath = path.join(__dirname, 'seed-credentials.json');
+      const payload = { createdAt: new Date().toISOString(), credentials: generatedCredentials };
+      fs.writeFileSync(outPath, JSON.stringify(payload, null, 2), { encoding: 'utf8', flag: 'w' });
+      console.log(`Generated seed credentials written to ${outPath}`);
+    } catch (err) {
+      console.error('Failed to write generated seed credentials file:', err);
+    }
+  } else {
+    console.log('No generated credentials to persist (passwords supplied via ENV or users existed).');
+  }
   console.log('--- Seeding Complete ---');
 }
 

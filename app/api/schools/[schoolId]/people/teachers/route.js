@@ -13,7 +13,7 @@ export async function GET(request, { params }) {
   const { schoolId } = await params;
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'HR_MANAGER' && session.user?.role !== 'TEACHER' && session.user?.role !== 'HOSTEL_WARDEN' && session.user?.role !== 'ACCOUNTANT' && session.user?.role !== 'SECRETARY')) {
+  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'HR_MANAGER' && session.user?.role !== 'TEACHER' && session.user?.role !== 'HOSTEL_WARDEN' && session.user?.role !== 'ACCOUNTANT' && session.user?.role !== 'SECRETARY' && session.user?.role !== 'PROCUREMENT_OFFICER')) {
     // Broaden access for roles that might need to select staff for payroll, etc.
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

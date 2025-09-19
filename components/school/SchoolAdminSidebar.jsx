@@ -13,6 +13,8 @@ export default function SchoolAdminSidebar({
   onNavigate,
   widthExpanded = 256,
   widthCollapsed = 72,
+  // Optional custom header label (e.g., 'Procurement'); defaults to 'School Admin'
+  headerLabel,
   /**
    * Optional student display object: { fullName, className, sectionName, levelName }
    * When provided (i.e. user is a STUDENT) we show the student's identity instead of the generic admin label.
@@ -99,7 +101,13 @@ export default function SchoolAdminSidebar({
           </>
         ) : (
           <>
-            <div className="text-sm font-semibold tracking-wide truncate">{collapsed ? 'ADM' : 'School Admin'}</div>
+            {(() => {
+              const label = headerLabel || 'School Admin';
+              const acronym = label === 'School Admin' ? 'ADM' : (label.split(' ').map(p => p[0]).join('').substring(0,3).toUpperCase());
+              return (
+                <div className="text-sm font-semibold tracking-wide truncate">{collapsed ? acronym : label}</div>
+              );
+            })()}
             {!collapsed && <div className="text-[11px] opacity-80">Navigation</div>}
           </>
         )}
