@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useSchool } from '../layout'; // Consume school data from context
 import { Skeleton } from '@/components/ui/skeleton';
@@ -68,6 +69,8 @@ const StatCard = ({ title, value, icon, description, isLoading, linkTo }) => {
 export default function SchoolAdminDashboardPage() {
   const { data: session } = useSession();
   const schoolData = useSchool(); // from SchoolAppLayout context
+  const params = useParams();
+  const subdomain = params?.subdomain;
 
   const [dashboardStats, setDashboardStats] = useState({
     totalStudents: 0, 
@@ -206,7 +209,7 @@ export default function SchoolAdminDashboardPage() {
             icon={<ListChecks className={`h-5 w-5 ${descriptionTextClasses}`} />}
             isLoading={loadingStudentCounts}
             description="Assignments not yet submitted"
-            linkTo={`/${schoolData.subdomain}/academics/assignments`}
+            linkTo={`/${subdomain}/academics/assignments`}
           />
           <StatCard
             title="Unpaid Invoices"
@@ -214,7 +217,7 @@ export default function SchoolAdminDashboardPage() {
             icon={<Receipt className={`h-5 w-5 ${descriptionTextClasses}`} />}
             isLoading={loadingStudentCounts}
             description="Invoices with balance due"
-            linkTo={`/${schoolData.subdomain}/finance/invoices`}
+            linkTo={`/${subdomain}/finance/invoices`}
           />
           <StatCard
             title="Overall Average"
@@ -300,7 +303,7 @@ export default function SchoolAdminDashboardPage() {
           value={dashboardStats.totalStudents} 
           icon={<Users className={`h-5 w-5 ${descriptionTextClasses}`} />} 
           isLoading={isLoadingStats}
-          linkTo={`/${schoolData.subdomain}/people/students`}
+          linkTo={`/${subdomain}/people/students`}
           description="View all students"
         />
         <StatCard 
@@ -308,7 +311,7 @@ export default function SchoolAdminDashboardPage() {
           value={dashboardStats.totalTeachers} 
           icon={<UserCog className={`h-5 w-5 ${descriptionTextClasses}`} />} 
           isLoading={isLoadingStats}
-          linkTo={`/${schoolData.subdomain}/people/teachers`}
+          linkTo={`/${subdomain}/people/teachers`}
           description="Manage teaching staff"
         />
         <StatCard 
@@ -316,7 +319,7 @@ export default function SchoolAdminDashboardPage() {
           value={dashboardStats.totalClasses} // Use new stat
           icon={<Building className={`h-5 w-5 ${descriptionTextClasses}`} />} 
           isLoading={isLoadingStats}
-          linkTo={`/${schoolData.subdomain}/academics/classes`}
+          linkTo={`/${subdomain}/academics/classes`}
           description="View all classes"
         />
       </section>
@@ -327,22 +330,22 @@ export default function SchoolAdminDashboardPage() {
           <h2 className={`${sectionTitleClasses} mb-4 border-none pb-0`}>Quick Actions</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Button asChild className={`${primaryButtonClasses} justify-start text-sm py-3`}>
-              <Link href={`/${schoolData.subdomain}/people/students/add`}> 
+              <Link href={`/${subdomain}/people/students/add`}> 
                 <Users className="mr-2 h-4 w-4" /> Add New Student
               </Link>
             </Button>
             <Button asChild className={`${primaryButtonClasses} justify-start text-sm py-3`}>
-              <Link href={`/${schoolData.subdomain}/people/teachers/add`}>
+              <Link href={`/${subdomain}/people/teachers/add`}>
                 <UserCog className="mr-2 h-4 w-4" /> Add New Teacher
               </Link>
             </Button>
             <Button asChild className={`${primaryButtonClasses} justify-start text-sm py-3`}>
-              <Link href={`/${schoolData.subdomain}/academics/timetable`}>
+              <Link href={`/${subdomain}/academics/timetable`}>
                 <CalendarDays className="mr-2 h-4 w-4" /> View Timetable
               </Link>
             </Button>
             <Button asChild className={`${primaryButtonClasses} justify-start text-sm py-3`}>
-              <Link href={`/${schoolData.subdomain}/communication/announcements/create`}>
+              <Link href={`/${subdomain}/communication/announcements/create`}>
                 <BellPlus className="mr-2 h-4 w-4" /> Send Announcement
               </Link>
             </Button>

@@ -190,13 +190,18 @@ export default function ManageSubjectsPage() {
     if (!schoolData?.id) return;
     setIsLoading(true); setError('');
     try {
-      const response = await fetch(`/api/schools/${schoolData.id}/academics/subjects`);
+      // If the logged-in user is a student, call the student-specific endpoint
+      const isStudent = session?.user?.role === 'STUDENT';
+      const url = isStudent
+        ? `/api/schools/${schoolData.id}/students/me/subjects`
+        : `/api/schools/${schoolData.id}/academics/subjects`;
+      const response = await fetch(url);
       if (!response.ok) { const errData = await response.json().catch(() => ({})); throw new Error(errData.error || 'Failed to fetch subjects.'); }
       const data = await response.json();
       setSubjects(data.subjects || []);
     } catch (err) { toast.error("Error fetching subjects", { description: err.message }); setError(err.message);
     } finally { setIsLoading(false); }
-  }, [schoolData?.id]);
+  }, [schoolData?.id, session?.user?.role]);
 
   const fetchDropdownDependencies = useCallback(async () => {
     if (!schoolData?.id) return;
@@ -244,7 +249,7 @@ export default function ManageSubjectsPage() {
         // For Edit mode, teacher & levels are displayed as read-only for now.
         // If you want to edit them, the API and this form data setup would need to change.
         teacherId: subject.staffSubjectLevels?.[0]?.staff?.id || '',
-        schoolLevelIds: subject.schoolLevelLinks?.map(link => link.schoolLevel.id) || [],
+        schoolLevelIds: subject.schoolLevelLinks?.map(link => link?.schoolLevel?.id).filter(Boolean) || [],
     });
     setFormError('');
     setIsEditDialogOpen(true); // Use isEditDialogOpen here
@@ -319,94 +324,151 @@ export default function ManageSubjectsPage() {
 
   return (
     <div className="space-y-8">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className={`text-2xl md:text-3xl font-bold ${titleTextClasses} flex items-center`}>
-            <BookOpen className="mr-3 h-8 w-8 opacity-80"/>Manage Subjects
+            <BookOpen className="mr-3 h-8 w-8 opacity-80"/>{session?.user?.role === 'STUDENT' ? 'My Subjects' : 'Manage Subjects'}
           </h1>
-          <p className={descriptionTextClasses}>Define subjects, assign them to school levels, and link an initial teacher.</p>
+          <p className={descriptionTextClasses}>{session?.user?.role === 'STUDENT' ? 'Subjects for your current class' : 'Define subjects, assign them to school levels, and link an initial teacher.'}</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setFormError(''); }}> {/* Changed to isDialogOpen */}
-          <DialogTrigger asChild>
-            <Button className={primaryButtonClasses} onClick={openAddDialog}> <FilePlus2 className="mr-2 h-4 w-4" /> Add New Subject </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-lg md:max-w-2xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
-            <DialogHeader> <DialogTitle className={titleTextClasses}>Add New Subject</DialogTitle> <DialogDescription className={descriptionTextClasses}>Enter details and assign to levels & a teacher.</DialogDescription> </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-6 py-1">
-              <SubjectFormFields
-                formData={formData}
-                onFormChange={handleFormChange}
-                onSelectChange={handleSelectChange}
-                onMultiSelectChange={handleMultiSelectChange}
-                departmentsList={departments}
-                teachersList={teachers}
-                schoolLevelsList={schoolLevels}
-                isLoadingDeps={isLoadingDeps}
-                isEdit={false}
-              />
-              {formError && isDialogOpen && ( <p className="text-sm text-red-600 dark:text-red-400 md:col-span-full">{formError}</p> )} {/* Changed to isDialogOpen */}
-              <DialogFooter className="pt-6">
-                <DialogClose asChild><Button type="button" variant="outline" className={outlineButtonClasses}>Cancel</Button></DialogClose>
-                <Button type="submit" className={primaryButtonClasses} disabled={isSubmitting || isLoadingDeps}> {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Creating...</> : 'Create Subject'} </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        {session?.user?.role !== 'STUDENT' && (
+          <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setFormError(''); }}>
+            <DialogTrigger asChild>
+              <Button className={primaryButtonClasses} onClick={openAddDialog}> <FilePlus2 className="mr-2 h-4 w-4" /> Add New Subject </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg md:max-w-2xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+              <DialogHeader> <DialogTitle className={titleTextClasses}>Add New Subject</DialogTitle> <DialogDescription className={descriptionTextClasses}>Enter details and assign to levels & a teacher.</DialogDescription> </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-6 py-1">
+                <SubjectFormFields
+                  formData={formData}
+                  onFormChange={handleFormChange}
+                  onSelectChange={handleSelectChange}
+                  onMultiSelectChange={handleMultiSelectChange}
+                  departmentsList={departments}
+                  teachersList={teachers}
+                  schoolLevelsList={schoolLevels}
+                  isLoadingDeps={isLoadingDeps}
+                  isEdit={false}
+                />
+                {formError && isDialogOpen && ( <p className="text-sm text-red-600 dark:text-red-400 md:col-span-full">{formError}</p> )} {/* Changed to isDialogOpen */}
+                <DialogFooter className="pt-6">
+                  <DialogClose asChild><Button type="button" variant="outline" className={outlineButtonClasses}>Cancel</Button></DialogClose>
+                  <Button type="submit" className={primaryButtonClasses} disabled={isSubmitting || isLoadingDeps}> {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Creating...</> : 'Create Subject'} </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {error && !isDialogOpen && !isEditDialogOpen && ( <Alert variant="destructive" className="bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300 dark:border-red-700/50"> <AlertTriangle className="h-4 w-4" /> <AlertTitle>Error</AlertTitle> <AlertDescription>{error}</AlertDescription> </Alert> )}
 
       <div className={`${glassCardClasses} overflow-x-auto`}>
-        <Table>
-          <TableHeader>
-            <TableRow className="border-zinc-200/80 dark:border-zinc-700/80">
-              <TableHead className={`${titleTextClasses} font-semibold`}>Subject Name</TableHead>
-              <TableHead className={`${titleTextClasses} font-semibold hidden sm:table-cell`}>Code</TableHead>
-              <TableHead className={`${titleTextClasses} font-semibold hidden md:table-cell`}>Weekly Hrs</TableHead>
-              <TableHead className={`${titleTextClasses} font-semibold hidden lg:table-cell`}>School Levels</TableHead>
-              <TableHead className={`${titleTextClasses} font-semibold hidden xl:table-cell`}>Teacher(s) @ Level</TableHead>
-              <TableHead className={`text-right ${titleTextClasses} font-semibold`}>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              Array.from({ length: 5 }).map((_, index) => (
-                <TableRow key={`skeleton-${index}`} className="border-zinc-200/50 dark:border-zinc-800/50">
-                  <TableCell><Skeleton className="h-5 w-32 rounded" /></TableCell>
-                  <TableCell className="hidden sm:table-cell"><Skeleton className="h-5 w-16 rounded" /></TableCell>
-                  <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-12 rounded" /></TableCell>
-                  <TableCell className="hidden lg:table-cell"><Skeleton className="h-5 w-32 rounded" /></TableCell>
-                  <TableCell className="hidden xl:table-cell"><Skeleton className="h-5 w-32 rounded" /></TableCell>
-                  <TableCell className="text-right"><div className="flex justify-end gap-2"><Skeleton className="h-8 w-8 rounded" /><Skeleton className="h-8 w-8 rounded" /></div></TableCell>
-                </TableRow>
-              ))
-            ) : subjects.length > 0 ? subjects.map((subject) => (
-              <TableRow key={subject.id} className="border-zinc-200/50 dark:border-zinc-800/50 hover:bg-zinc-500/5 dark:hover:bg-white/5">
-                <TableCell className={`${descriptionTextClasses} font-medium`}>{subject.name}</TableCell>
-                <TableCell className={`${descriptionTextClasses} hidden sm:table-cell`}>{subject.subjectCode || 'N/A'}</TableCell>
-                <TableCell className={`${descriptionTextClasses} hidden md:table-cell`}>{subject.weeklyHours !== null ? subject.weeklyHours : 'N/A'}</TableCell>
-                <TableCell className={`${descriptionTextClasses} hidden lg:table-cell text-xs`}>
-                  {subject.schoolLevelLinks?.map(link => link.schoolLevel.name).join(', ') || <span className="italic text-zinc-500">N/A</span>}
-                </TableCell>
-                <TableCell className={`${descriptionTextClasses} hidden xl:table-cell text-xs`}>
-                  {subject.staffSubjectLevels?.map(link => `${link.staff.user.firstName} ${link.staff.user.lastName} (${link.schoolLevel.name})`).join('; ') || <span className="italic text-zinc-500">N/A</span>}
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-1 md:gap-2">
-                    <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} onClick={() => openEditDialog(subject)} title="Edit Subject"> <Edit3 className="h-4 w-4" /> </Button>
-                    <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8 border-red-300 text-red-600 hover:bg-red-100 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/50`} onClick={() => handleDelete(subject.id, subject.name)} title="Delete Subject"> <Trash2 className="h-4 w-4" /> </Button>
-                  </div>
-                </TableCell>
+        {session?.user?.role === 'STUDENT' ? (
+          <Table>
+            <TableHeader>
+              <TableRow className="border-zinc-200/80 dark:border-zinc-700/80">
+                <TableHead className={`${titleTextClasses} font-semibold`}>Subject</TableHead>
+                <TableHead className={`${titleTextClasses} font-semibold hidden sm:table-cell`}>Code</TableHead>
+                <TableHead className={`${titleTextClasses} font-semibold hidden md:table-cell`}>Weekly Hrs</TableHead>
+                <TableHead className={`${titleTextClasses} font-semibold`}>Teacher(s)</TableHead>
               </TableRow>
-            )) : (
-              <TableRow className="border-zinc-200/50 dark:border-zinc-800/50">
-                <TableCell colSpan="6" className={`text-center py-10 ${descriptionTextClasses}`}>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, index) => (
+                  <TableRow key={`skeleton-${index}`} className="border-zinc-200/50 dark:border-zinc-800/50">
+                    <TableCell><Skeleton className="h-5 w-32 rounded" /></TableCell>
+                    <TableCell className="hidden sm:table-cell"><Skeleton className="h-5 w-16 rounded" /></TableCell>
+                    <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-12 rounded" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-40 rounded" /></TableCell>
+                  </TableRow>
+                ))
+              ) : subjects.length > 0 ? subjects.map((subject) => (
+                <TableRow key={subject.id} className="border-zinc-200/50 dark:border-zinc-800/50 hover:bg-zinc-500/5 dark:hover:bg-white/5">
+                  <TableCell className={`${descriptionTextClasses} font-medium`}>{subject.name}</TableCell>
+                  <TableCell className={`${descriptionTextClasses} hidden sm:table-cell`}>{subject.subjectCode || 'N/A'}</TableCell>
+                  <TableCell className={`${descriptionTextClasses} hidden md:table-cell`}>{subject.weeklyHours ?? 'N/A'}</TableCell>
+                  <TableCell className={`${descriptionTextClasses}`}>
+                    {subject.teachers && subject.teachers.length > 0
+                      ? subject.teachers.map(t => t.name).join('; ')
+                      : <span className="italic text-zinc-500">TBA</span>}
+                  </TableCell>
+                </TableRow>
+              )) : (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center text-sm text-zinc-500">No subjects found for your current class.</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        ) : (
+          // Admin/Teacher view (existing table and actions)
+          <Table>
+            <TableHeader>
+              <TableRow className="border-zinc-200/80 dark:border-zinc-700/80">
+                <TableHead className={`${titleTextClasses} font-semibold`}>Subject Name</TableHead>
+                <TableHead className={`${titleTextClasses} font-semibold hidden sm:table-cell`}>Code</TableHead>
+                <TableHead className={`${titleTextClasses} font-semibold hidden md:table-cell`}>Weekly Hrs</TableHead>
+                <TableHead className={`${titleTextClasses} font-semibold hidden lg:table-cell`}>School Levels</TableHead>
+                <TableHead className={`${titleTextClasses} font-semibold hidden xl:table-cell`}>Teacher(s) @ Level</TableHead>
+                <TableHead className={`text-right ${titleTextClasses} font-semibold`}>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, index) => (
+                  <TableRow key={`skeleton-${index}`} className="border-zinc-200/50 dark:border-zinc-800/50">
+                    <TableCell><Skeleton className="h-5 w-32 rounded" /></TableCell>
+                    <TableCell className="hidden sm:table-cell"><Skeleton className="h-5 w-16 rounded" /></TableCell>
+                    <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-12 rounded" /></TableCell>
+                    <TableCell className="hidden lg:table-cell"><Skeleton className="h-5 w-32 rounded" /></TableCell>
+                    <TableCell className="hidden xl:table-cell"><Skeleton className="h-5 w-32 rounded" /></TableCell>
+                    <TableCell className="text-right"><div className="flex justify-end gap-2"><Skeleton className="h-8 w-8 rounded" /><Skeleton className="h-8 w-8 rounded" /></div></TableCell>
+                  </TableRow>
+                ))
+              ) : subjects.length > 0 ? subjects.map((subject) => (
+                <TableRow key={subject.id} className="border-zinc-200/50 dark:border-zinc-800/50 hover:bg-zinc-500/5 dark:hover:bg-white/5">
+                  <TableCell className={`${descriptionTextClasses} font-medium`}>{subject.name}</TableCell>
+                  <TableCell className={`${descriptionTextClasses} hidden sm:table-cell`}>{subject.subjectCode || 'N/A'}</TableCell>
+                  <TableCell className={`${descriptionTextClasses} hidden md:table-cell`}>{subject.weeklyHours !== null ? subject.weeklyHours : 'N/A'}</TableCell>
+                  <TableCell className={`${descriptionTextClasses} hidden lg:table-cell text-xs`}>
+                    {(subject.schoolLevelLinks || [])
+                      .map(link => link?.schoolLevel?.name)
+                      .filter(Boolean)
+                      .join(', ') || <span className="italic text-zinc-500">N/A</span>}
+                  </TableCell>
+                  <TableCell className={`${descriptionTextClasses} hidden xl:table-cell text-xs`}>
+                    {(subject.staffSubjectLevels || [])
+                      .map(link => {
+                        const fn = link?.staff?.user?.firstName || '';
+                        const ln = link?.staff?.user?.lastName || '';
+                        const lvl = link?.schoolLevel?.name || '';
+                        const name = [fn, ln].filter(Boolean).join(' ');
+                        if (!name && !lvl) return null;
+                        return `${name}${lvl ? ` (${lvl})` : ''}`;
+                      })
+                      .filter(Boolean)
+                      .join('; ') || <span className="italic text-zinc-500">N/A</span>}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1 md:gap-2">
+                      <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} onClick={() => openEditDialog(subject)} title="Edit Subject"> <Edit3 className="h-4 w-4" /> </Button>
+                      <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8 border-red-300 text-red-600 hover:bg-red-100 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/50`} onClick={() => handleDelete(subject.id, subject.name)} title="Delete Subject"> <Trash2 className="h-4 w-4" /> </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )) : (
+                <TableRow className="border-zinc-200/50 dark:border-zinc-800/50">
+                  <TableCell colSpan="6" className={`text-center py-10 ${descriptionTextClasses}`}>
                   No subjects defined yet. Ensure Departments, Teachers, and School Levels are set up first.
                 </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        )}
       </div>
 
       {/* Edit Subject Dialog */}

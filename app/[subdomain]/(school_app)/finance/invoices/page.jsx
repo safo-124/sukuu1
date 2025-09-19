@@ -272,9 +272,146 @@ const InvoiceItemFormFields = ({ formData, onFormChange, onSelectChange, feeStru
 };
 
 
+// --- Read-only view for STUDENT role ---
+function StudentSelfInvoices() {
+  const school = useSchool();
+  const { data: session } = useSession();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [invoices, setInvoices] = useState([]);
+  const [status, setStatus] = useState('ALL');
+
+  const fetchInvoices = useCallback(async () => {
+    if (!school?.id || !session) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/schools/${school.id}/students/me/invoices`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load invoices');
+      setInvoices(Array.isArray(data.invoices) ? data.invoices : []);
+    } catch (e) {
+      setError(e.message);
+      toast.error('Failed to load invoices', { description: e.message });
+    } finally {
+      setLoading(false);
+    }
+  }, [school?.id, session]);
+
+  useEffect(() => { if (school?.id && session) fetchInvoices(); }, [school?.id, session, fetchInvoices]);
+
+  const titleTextClasses = 'text-black dark:text-white';
+  const descriptionTextClasses = 'text-zinc-600 dark:text-zinc-400';
+  const glassCardClasses = 'p-6 md:p-8 rounded-xl backdrop-blur-xl backdrop-saturate-150 shadow-xl dark:shadow-2xl bg-white/60 border border-zinc-200/50 dark:bg-zinc-900/60 dark:border-zinc-700/50';
+
+  const filtered = invoices.filter(inv => status === 'ALL' ? true : inv.status === status);
+
+  const statusBadge = (s) => {
+    let cn = 'px-2 py-1 rounded-full text-xs font-semibold';
+    switch (s) {
+      case 'PAID': cn += ' bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'; break;
+      case 'PARTIALLY_PAID': cn += ' bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'; break;
+      case 'OVERDUE': cn += ' bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'; break;
+      case 'SENT': cn += ' bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'; break;
+      case 'DRAFT': cn += ' bg-zinc-100 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-300'; break;
+      default: cn += ' bg-zinc-100 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-300'; break;
+    }
+    return <span className={cn}>{s.replace('_', ' ')}</span>;
+  };
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h1 className={`text-2xl md:text-3xl font-bold ${titleTextClasses} flex items-center`}>
+          <DollarSign className="mr-3 h-8 w-8 opacity-80"/>My Invoices
+        </h1>
+        <p className={descriptionTextClasses}>View your invoices and balances. This is read-only.</p>
+      </div>
+
+      {/* Filters */}
+      <div className={`${glassCardClasses} flex flex-col md:flex-row gap-3 items-center`}>
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <span className="text-sm text-muted-foreground">Status</span>
+          <Select value={status} onValueChange={setStatus}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="All" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All</SelectItem>
+              <SelectItem value="PAID">Paid</SelectItem>
+              <SelectItem value="PARTIALLY_PAID">Partially Paid</SelectItem>
+              <SelectItem value="OVERDUE">Overdue</SelectItem>
+              <SelectItem value="SENT">Sent</SelectItem>
+              <SelectItem value="DRAFT">Draft</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <button onClick={fetchInvoices} className="ml-auto md:ml-0 inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-black text-white dark:bg-white dark:text-black">
+          Refresh
+        </button>
+      </div>
+
+      {error && (
+        <Alert variant="destructive" className="bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300 dark:border-red-700/50">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className={`${glassCardClasses} overflow-x-auto`}>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className={`${titleTextClasses}`}>Date</TableHead>
+              <TableHead className={`${titleTextClasses} text-right`}>Total</TableHead>
+              <TableHead className={`${titleTextClasses} text-right`}>Paid</TableHead>
+              <TableHead className={`${titleTextClasses} text-right`}>Due</TableHead>
+              <TableHead className={`${titleTextClasses} text-center`}>Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              Array.from({ length: 5 }).map((_, idx) => (
+                <TableRow key={`s-${idx}`}>
+                  <TableCell><Skeleton className="h-5 w-28"/></TableCell>
+                  <TableCell className="text-right"><Skeleton className="h-5 w-16"/></TableCell>
+                  <TableCell className="text-right"><Skeleton className="h-5 w-16"/></TableCell>
+                  <TableCell className="text-right"><Skeleton className="h-5 w-16"/></TableCell>
+                  <TableCell className="text-center"><Skeleton className="h-5 w-20"/></TableCell>
+                </TableRow>
+              ))
+            ) : filtered.length > 0 ? (
+              filtered.map((inv) => (
+                <TableRow key={inv.id}>
+                  <TableCell className="text-sm">{inv.createdAt ? new Date(inv.createdAt).toLocaleDateString() : '—'}</TableCell>
+                  <TableCell className="text-sm text-right">${(inv.total ?? 0).toFixed(2)}</TableCell>
+                  <TableCell className="text-sm text-right">${(inv.paid ?? 0).toFixed(2)}</TableCell>
+                  <TableCell className="text-sm text-right">${(inv.due ?? Math.max((inv.total ?? 0) - (inv.paid ?? 0), 0)).toFixed(2)}</TableCell>
+                  <TableCell className="text-sm text-center">{statusBadge(inv.status)}</TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center text-sm text-zinc-500">No invoices found.</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
+
 export default function ManageInvoicesPage() {
   const schoolData = useSchool();
   const { data: session } = useSession();
+
+  // If the logged-in user is a STUDENT, show read-only self invoices
+  if (session?.user?.role === 'STUDENT') {
+    return <StudentSelfInvoices />;
+  }
 
   const [invoices, setInvoices] = useState([]);
   const [students, setStudents] = useState([]); // For student dropdown

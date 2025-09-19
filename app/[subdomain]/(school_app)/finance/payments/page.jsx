@@ -372,6 +372,141 @@ export default function ManagePaymentsPage() {
   ], []);
 
 
+  // --- Read-only view for STUDENT role ---
+  function StudentSelfPayments() {
+    const school = useSchool();
+    const { data: session } = useSession();
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [payments, setPayments] = useState([]);
+    const [method, setMethod] = useState('ALL');
+    const [from, setFrom] = useState('');
+    const [to, setTo] = useState('');
+
+    const fetchPayments = useCallback(async () => {
+      if (!school?.id || !session) return;
+      setLoading(true);
+      setError('');
+      try {
+        const params = new URLSearchParams();
+        if (method && method !== 'ALL') params.set('method', method);
+        if (from) params.set('from', from);
+        if (to) params.set('to', to);
+        const res = await fetch(`/api/schools/${school.id}/students/me/payments?${params.toString()}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to load payments');
+        setPayments(Array.isArray(data.payments) ? data.payments : []);
+      } catch (e) {
+        setError(e.message);
+        toast.error('Failed to load payments', { description: e.message });
+      } finally {
+        setLoading(false);
+      }
+    }, [school?.id, session, method, from, to]);
+
+    useEffect(() => { if (school?.id && session) fetchPayments(); }, [school?.id, session, fetchPayments]);
+
+    const titleTextClasses = 'text-black dark:text-white';
+    const descriptionTextClasses = 'text-zinc-600 dark:text-zinc-400';
+    const glassCardClasses = 'p-6 md:p-8 rounded-xl backdrop-blur-xl backdrop-saturate-150 shadow-xl dark:shadow-2xl bg-white/60 border border-zinc-200/50 dark:bg-zinc-900/60 dark:border-zinc-700/50';
+
+    const filtered = payments.filter(p => method === 'ALL' ? true : p.paymentMethod === method);
+
+    return (
+      <div className="space-y-8">
+        <div>
+          <h1 className={`text-2xl md:text-3xl font-bold ${titleTextClasses} flex items-center`}>
+            <Receipt className="mr-3 h-8 w-8 opacity-80"/>My Payments
+          </h1>
+          <p className={descriptionTextClasses}>View your payment receipts. This is read-only.</p>
+        </div>
+
+        {/* Filters */}
+        <div className={`${glassCardClasses} flex flex-col md:flex-row gap-3 items-center`}>
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <span className="text-sm text-muted-foreground">Method</span>
+            <Select value={method} onValueChange={setMethod}>
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="All" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All</SelectItem>
+                <SelectItem value="CASH">Cash</SelectItem>
+                <SelectItem value="BANK_TRANSFER">Bank Transfer</SelectItem>
+                <SelectItem value="CREDIT_CARD">Credit Card</SelectItem>
+                <SelectItem value="MOBILE_MONEY">Mobile Money</SelectItem>
+                <SelectItem value="ONLINE_GATEWAY">Online Gateway</SelectItem>
+                <SelectItem value="OTHER">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <span className="text-sm text-muted-foreground">From</span>
+            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-44" />
+          </div>
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <span className="text-sm text-muted-foreground">To</span>
+            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-44" />
+          </div>
+          <button onClick={fetchPayments} className="ml-auto md:ml-0 inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-black text-white dark:bg-white dark:text-black">
+            <CalendarDays className="h-4 w-4"/> Apply
+          </button>
+        </div>
+
+        {error && (
+          <Alert variant="destructive" className="bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300 dark:border-red-700/50">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className={`${glassCardClasses} overflow-x-auto`}>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className={`${titleTextClasses}`}>Date</TableHead>
+                <TableHead className={`${titleTextClasses} text-right`}>Amount</TableHead>
+                <TableHead className={`${titleTextClasses}`}>Method</TableHead>
+                <TableHead className={`${titleTextClasses}`}>Invoice</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                Array.from({ length: 5 }).map((_, idx) => (
+                  <TableRow key={`s-${idx}`}>
+                    <TableCell><Skeleton className="h-5 w-28"/></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-5 w-16"/></TableCell>
+                    <TableCell><Skeleton className="h-5 w-24"/></TableCell>
+                    <TableCell><Skeleton className="h-5 w-32"/></TableCell>
+                  </TableRow>
+                ))
+              ) : filtered.length > 0 ? (
+                filtered.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="text-sm">{p.paymentDate ? new Date(p.paymentDate).toLocaleDateString() : '—'}</TableCell>
+                    <TableCell className="text-sm text-right">${(p.amount ?? 0).toFixed(2)}</TableCell>
+                    <TableCell className="text-sm">{p.paymentMethod?.replace('_', ' ')}</TableCell>
+                    <TableCell className="text-sm">{p.invoice?.invoiceNumber || '—'}</TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center text-sm text-zinc-500">No payments found.</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    );
+  }
+
+  // If the logged-in user is a STUDENT, show read-only self payments
+  if (session?.user?.role === 'STUDENT') {
+    return <StudentSelfPayments />;
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">

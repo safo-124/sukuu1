@@ -121,9 +121,144 @@ const StudentAttendanceFormFields = ({ formData, onFormChange, onSelectChange, s
   );
 };
 
+// --- Read-only view for STUDENT role ---
+function StudentSelfAttendance() {
+  const school = useSchool();
+  const { data: session } = useSession();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [attendance, setAttendance] = useState([]);
+  const [status, setStatus] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+
+  const fetchAttendance = useCallback(async () => {
+    if (!school?.id || !session) return;
+    setLoading(true);
+    setError('');
+    try {
+  const params = new URLSearchParams();
+  if (status && status !== 'ALL') params.set('status', status);
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      const url = `/api/schools/${school.id}/students/me/attendance?${params.toString()}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load attendance');
+      setAttendance(data.attendance || []);
+    } catch (e) {
+      setError(e.message);
+      toast.error('Failed to load attendance', { description: e.message });
+    } finally {
+      setLoading(false);
+    }
+  }, [school?.id, session, status, from, to]);
+
+  useEffect(() => { if (school?.id && session) fetchAttendance(); }, [school?.id, session, fetchAttendance]);
+
+  const titleTextClasses = 'text-black dark:text-white';
+  const descriptionTextClasses = 'text-zinc-600 dark:text-zinc-400';
+  const glassCardClasses = 'p-6 md:p-8 rounded-xl backdrop-blur-xl backdrop-saturate-150 shadow-xl dark:shadow-2xl bg-white/60 border border-zinc-200/50 dark:bg-zinc-900/60 dark:border-zinc-700/50';
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h1 className={`text-2xl md:text-3xl font-bold ${titleTextClasses} flex items-center`}>
+          <CheckSquare className="mr-3 h-8 w-8 opacity-80"/>My Attendance
+        </h1>
+        <p className={descriptionTextClasses}>View your attendance records. This is read-only.</p>
+      </div>
+
+      {/* Filters */}
+      <div className={`${glassCardClasses} flex flex-col md:flex-row gap-3 items-center`}>
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <span className="text-sm text-muted-foreground">Status</span>
+          <Select value={status} onValueChange={setStatus}>
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="All" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All</SelectItem>
+              <SelectItem value="PRESENT">Present</SelectItem>
+              <SelectItem value="ABSENT">Absent</SelectItem>
+              <SelectItem value="LATE">Late</SelectItem>
+              <SelectItem value="EXCUSED">Excused</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <span className="text-sm text-muted-foreground">From</span>
+          <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-44" />
+        </div>
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <span className="text-sm text-muted-foreground">To</span>
+          <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-44" />
+        </div>
+        <button onClick={fetchAttendance} className="ml-auto md:ml-0 inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-black text-white dark:bg-white dark:text-black">
+          <CalendarDays className="h-4 w-4"/> Apply
+        </button>
+      </div>
+
+      {error && (
+        <Alert variant="destructive" className="bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300 dark:border-red-700/50">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className={`${glassCardClasses} overflow-x-auto`}>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className={`${titleTextClasses}`}>Date</TableHead>
+              <TableHead className={`${titleTextClasses}`}>Status</TableHead>
+              <TableHead className={`${titleTextClasses} hidden md:table-cell`}>Section</TableHead>
+              <TableHead className={`${titleTextClasses} hidden md:table-cell`}>Class</TableHead>
+              <TableHead className={`${titleTextClasses} hidden lg:table-cell`}>Remarks</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              Array.from({ length: 5 }).map((_, idx) => (
+                <TableRow key={`s-${idx}`}>
+                  <TableCell><Skeleton className="h-5 w-28"/></TableCell>
+                  <TableCell><Skeleton className="h-5 w-20"/></TableCell>
+                  <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-24"/></TableCell>
+                  <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-24"/></TableCell>
+                  <TableCell className="hidden lg:table-cell"><Skeleton className="h-5 w-40"/></TableCell>
+                </TableRow>
+              ))
+            ) : attendance.length > 0 ? (
+              attendance.map((a) => (
+                <TableRow key={a.id}>
+                  <TableCell className="text-sm">{new Date(a.date).toLocaleDateString()}</TableCell>
+                  <TableCell className="text-sm">{a.status}</TableCell>
+                  <TableCell className="text-sm hidden md:table-cell">{a.section?.name || '—'}</TableCell>
+                  <TableCell className="text-sm hidden md:table-cell">{a.section?.class?.name || '—'}</TableCell>
+                  <TableCell className="text-sm hidden lg:table-cell">{a.remarks || '—'}</TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center text-sm text-zinc-500">No attendance records found.</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
 export default function ManageStudentAttendancePage() {
   const schoolData = useSchool();
   const { data: session } = useSession();
+
+  // If the logged-in user is a STUDENT, show read-only self attendance
+  if (session?.user?.role === 'STUDENT') {
+    return <StudentSelfAttendance />;
+  }
 
   const [studentAttendances, setStudentAttendances] = useState([]);
   const [sections, setSections] = useState([]); // For section dropdown

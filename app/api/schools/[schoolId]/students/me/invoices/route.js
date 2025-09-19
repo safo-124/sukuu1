@@ -18,15 +18,18 @@ export async function GET(request, { params }) {
     const invoices = await prisma.invoice.findMany({
       where: { schoolId, studentId: student.id },
       include: {
-        items: { select: { amount: true } },
-        payments: { select: { amount: true, status: true } }
+        items: { select: { totalPrice: true, quantity: true, unitPrice: true } },
+        payments: { select: { amount: true } }
       },
       orderBy: { createdAt: 'desc' }
     });
 
     const shaped = invoices.map(inv => {
-      const total = (inv.items || []).reduce((s, it) => s + (Number(it.amount) || 0), 0);
-      const paid = (inv.payments || []).reduce((s, p) => s + (Number(p.amount) || 0), 0);
+      // Prefer invoice cached fields when available
+      const computedItemsTotal = (inv.items || []).reduce((s, it) => s + (Number(it.totalPrice) || (Number(it.quantity) * Number(it.unitPrice)) || 0), 0);
+      const computedPaid = (inv.payments || []).reduce((s, p) => s + (Number(p.amount) || 0), 0);
+      const total = Number(inv.totalAmount ?? computedItemsTotal) || 0;
+      const paid = Number(inv.paidAmount ?? computedPaid) || 0;
       const due = Math.max(total - paid, 0);
       return { id: inv.id, status: inv.status, total, paid, due, createdAt: inv.createdAt };
     });
