@@ -190,6 +190,35 @@ export const updateAccountantSchema = z.object({
 
 export const accountantIdSchema = z.string().min(1);
 
+// --- Procurement Officer Schemas (NEW) ---
+export const createProcurementOfficerSchema = z.object({
+  firstName: z.string().min(1).max(100),
+  lastName: z.string().min(1).max(100),
+  email: z.string().email().min(1),
+  password: z.string().min(8),
+  phoneNumber: z.string().nullable().optional(),
+  profilePictureUrl: z.string().url().nullable().optional(),
+  staffIdNumber: z.string().min(1).max(50),
+  jobTitle: z.string().min(1).max(100).default("Procurement Officer"),
+  qualification: z.string().nullable().optional(),
+  departmentId: z.string().nullable().optional(),
+});
+
+export const updateProcurementOfficerSchema = z.object({
+  firstName: z.string().min(1).max(100).optional(),
+  lastName: z.string().min(1).max(100).optional(),
+  email: z.string().email().min(1).optional(),
+  password: z.string().min(8).optional(),
+  phoneNumber: z.string().nullable().optional(),
+  profilePictureUrl: z.string().url().nullable().optional(),
+  staffIdNumber: z.string().min(1).max(50).optional(),
+  jobTitle: z.string().min(1).max(100).optional(),
+  qualification: z.string().nullable().optional(),
+  departmentId: z.string().nullable().optional(),
+}).partial();
+
+export const procurementOfficerIdSchema = z.string().min(1);
+
 // --- HR Staff Schemas (NEW) ---
 export const createHRStaffSchema = z.object({
   firstName: z.string().min(1).max(100),

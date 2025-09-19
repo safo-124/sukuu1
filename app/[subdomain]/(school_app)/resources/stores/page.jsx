@@ -1,7 +1,8 @@
 // app/[subdomain]/(school_app)/resources/stores/page.jsx
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useSchool } from '../../layout';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
@@ -103,6 +104,8 @@ const InventoryItemFormFields = ({ formData, onFormChange, onSelectChange, categ
 export default function ManageStoresPage() {
   const schoolData = useSchool();
   const { data: session } = useSession();
+  const searchParams = useSearchParams();
+  const filter = searchParams?.get('filter') || '';
 
   const [categories, setCategories] = useState([]);
   const [items, setItems] = useState([]);
@@ -355,6 +358,13 @@ export default function ManageStoresPage() {
 
   const isLowStock = (item) => item.reorderLevel !== null && item.quantityInStock <= item.reorderLevel;
 
+  const filteredItems = useMemo(() => {
+    if (filter === 'low-stock') {
+      return items.filter(isLowStock);
+    }
+    return items;
+  }, [items, filter]);
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -481,7 +491,7 @@ export default function ManageStoresPage() {
       {/* Inventory Items Table */}
       <div className={`${glassCardClasses} overflow-x-auto`}>
         <h2 className={`text-xl font-bold ${titleTextClasses} mb-4 flex items-center`}>
-          <Package className="mr-2 h-6 w-6 opacity-80"/>Inventory Items
+          <Package className="mr-2 h-6 w-6 opacity-80"/>Inventory Items {filter === 'low-stock' ? <span className="ml-2 text-sm text-red-600 dark:text-red-400">(Low stock)</span> : null}
         </h2>
         <Table>
           <TableHeader>
@@ -504,7 +514,7 @@ export default function ManageStoresPage() {
                   <TableCell className="text-right"><div className="flex justify-end gap-2"><Skeleton className="h-8 w-8 rounded" /><Skeleton className="h-8 w-8 rounded" /></div></TableCell>
                 </TableRow>
               ))
-            ) : items.length > 0 ? items.map((item) => (
+            ) : filteredItems.length > 0 ? filteredItems.map((item) => (
               <TableRow key={item.id} className={`border-zinc-200/50 dark:border-zinc-800/50 hover:bg-zinc-500/5 dark:hover:bg-white/5 ${isLowStock(item) ? 'bg-orange-500/10 dark:bg-orange-800/20' : ''}`}>
                 <TableCell className={`${descriptionTextClasses} font-medium ${isLowStock(item) ? 'text-orange-600 dark:text-orange-400' : ''}`}>{item.name}</TableCell>
                 <TableCell className={`${descriptionTextClasses} hidden sm:table-cell`}>{getCategoryName(item.categoryId)}</TableCell>

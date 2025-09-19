@@ -113,6 +113,7 @@ function getNavigationSections(schoolSubdomain, role) {
       { href: `/${schoolSubdomain}/people/students`, label: 'Manage Students', icon: Users },
       { href: `/${schoolSubdomain}/people/teachers`, label: 'Manage Teachers', icon: UserCog },
       { href: `/${schoolSubdomain}/people/accountants`, label: 'Manage Accountants', icon: DollarSign },
+      { href: `/${schoolSubdomain}/people/procurement`, label: 'Manage Procurement', icon: Briefcase },
       { href: `/${schoolSubdomain}/people/hr-staff`, label: 'Manage HR Staff', icon: Briefcase },
     ];
     const attendanceItems = [
@@ -333,7 +334,7 @@ export default function SchoolAppLayout({ children }) {
       const userRole = session.user?.role;
       const currentPath = window.location.pathname;
 
-      if (userRole === 'TEACHER') {
+  if (userRole === 'TEACHER') {
         // Redirect teacher from generic dashboard or admin login page
         if (currentPath === `/${subdomain}/dashboard` || currentPath === schoolAdminLoginPath) {
           router.push(`/${subdomain}/dashboard/teacher`);
@@ -370,6 +371,14 @@ export default function SchoolAppLayout({ children }) {
           // Can redirect to main dashboard or allow them to see it. For now, redirect.
           router.push(`/${subdomain}/dashboard`);
           return;
+        }
+
+        // Procurement officer: land on procurement dashboard when visiting generic dashboard
+        if (userRole === 'PROCUREMENT_OFFICER') {
+          if (currentPath === `/${subdomain}/dashboard`) {
+            router.push(`/${subdomain}/dashboard/procurement`);
+            return;
+          }
         }
       }
 

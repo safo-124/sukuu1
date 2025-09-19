@@ -12,7 +12,7 @@ export async function GET(request, { params }) {
   const { schoolId } = await params;
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'LIBRARIAN' && session.user?.role !== 'TRANSPORT_MANAGER' && session.user?.role !== 'HOSTEL_WARDEN' && session.user?.role !== 'TEACHER')) {
+  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'LIBRARIAN' && session.user?.role !== 'TRANSPORT_MANAGER' && session.user?.role !== 'HOSTEL_WARDEN' && session.user?.role !== 'TEACHER' && session.user?.role !== 'PROCUREMENT_OFFICER')) {
     // Broaden access as various roles might need to see rooms
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
