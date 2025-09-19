@@ -4,7 +4,8 @@ import prisma from '@/lib/prisma';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { z } from 'zod';
-import { schoolIdSchema, updatePayrollRecordSchema, payrollRecordIdSchema } from '@/validators/academics.validators'; // Import schemas
+import { schoolIdSchema } from '@/validators/finance.validators';
+import { updatePayrollRecordSchema, payrollRecordIdSchema } from '@/validators/finance.validators';
 
 // GET /api/schools/[schoolId]/hr/payroll/[recordId]
 // Fetches a single payroll record by ID

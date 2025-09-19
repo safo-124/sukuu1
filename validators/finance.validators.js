@@ -183,6 +183,29 @@ export const createVendorSchema = z.object({
 export const updateVendorSchema = createVendorSchema.partial();
 export const vendorIdSchema = z.string().min(1, "Vendor ID is required.");
 
+// --- HR Payroll Schemas (NEW) ---
+const basePayrollRecordShape = {
+  staffId: z.string().min(1, 'Staff ID is required.'),
+  payPeriodStart: z.string().datetime('payPeriodStart must be a valid ISO date time.'),
+  payPeriodEnd: z.string().datetime('payPeriodEnd must be a valid ISO date time.'),
+  basicSalary: z.coerce.number().min(0, 'Basic salary cannot be negative.'),
+  allowances: z.coerce.number().min(0, 'Allowances cannot be negative.').optional(),
+  deductions: z.coerce.number().min(0, 'Deductions cannot be negative.').optional(),
+  paymentDate: z.string().datetime().optional(),
+  isPaid: z.boolean().optional().default(false),
+};
+
+export const updatePayrollRecordSchema = z.object(basePayrollRecordShape)
+  .partial()
+  .refine(d => {
+    if (d.payPeriodStart && d.payPeriodEnd) {
+      return new Date(d.payPeriodStart) < new Date(d.payPeriodEnd);
+    }
+    return true;
+  }, { message: 'payPeriodEnd must be after payPeriodStart when both provided.', path: ['payPeriodEnd'] });
+
+export const payrollRecordIdSchema = z.string().min(1, 'Payroll Record ID is required.');
+
 // --- Bulk Fee Assignment (NEW) ---
 // Modes: byClassId, bySchoolLevelId, explicit studentIds array
 export const bulkFeeAssignmentSchema = z.object({
@@ -314,7 +337,7 @@ export const invoiceNumberSchema = z.string().regex(/^INV-[A-Z0-9\-]{6,}$/i, 'In
 
 // --- Scholarship Schemas (NEW) ---
 // Accept either PERCENTAGE with percentage value, or FIXED with amount value.
-export const createScholarshipSchema = z.object({
+const baseScholarshipShape = {
   studentId: z.string().min(1, 'Student ID is required.'),
   academicYearId: z.string().min(1, 'Academic Year ID is required.'),
   type: z.enum(['PERCENTAGE','FIXED'], { errorMap: () => ({ message: 'Invalid scholarship type.' }) }),
@@ -322,7 +345,9 @@ export const createScholarshipSchema = z.object({
   amount: z.coerce.number().min(0).optional(),
   notes: z.string().max(1000).nullable().optional(),
   isActive: z.boolean().optional(),
-}).superRefine((d, ctx) => {
+};
+
+export const createScholarshipSchema = z.object(baseScholarshipShape).superRefine((d, ctx) => {
   if (d.type === 'PERCENTAGE') {
     if (d.percentage == null) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['percentage'], message: 'Percentage value required for percentage scholarship.' });
     if (d.amount != null) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['amount'], message: 'Do not supply amount for percentage scholarship.' });
@@ -332,7 +357,7 @@ export const createScholarshipSchema = z.object({
   }
 });
 
-export const updateScholarshipSchema = createScholarshipSchema.partial().superRefine((d, ctx) => {
+export const updateScholarshipSchema = z.object(baseScholarshipShape).partial().superRefine((d, ctx) => {
   // If type provided ensure corresponding value coherence; if switching type must supply the new value
   if (d.type === 'PERCENTAGE') {
     if (d.percentage == null) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['percentage'], message: 'Percentage required when type is PERCENTAGE.' });

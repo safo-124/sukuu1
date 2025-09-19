@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { batchGradeSubmissionSchema } from '@/validators/exams.validators'; // Import from your exams validator
+import { batchGradeSubmissionSchema } from '@/validators/grades.validators';
 
 // GET handler (for general grade listing, if needed later)
 export async function GET(request, { params }) {
