@@ -224,6 +224,7 @@ model User {
   studentAttendancesTaken Attendance[]      @relation("TakenBy")
   paymentsProcessed       Payment[]         @relation("ProcessedBy")
   expensesPaid            Expense[]         @relation("PaidByExpense")
+  gradesPublished         Grade[]           @relation("GradePublishedBy")
 
   @@index([email])
   @@index([schoolId])
@@ -734,10 +735,17 @@ model Grade {
   assignmentId String? // Foreign key to Assignment
   assignment   Assignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
 
+  // Publication control: once published, only SCHOOL_ADMIN (and SUPER_ADMIN) can modify
+  isPublished    Boolean   @default(false)
+  publishedAt    DateTime?
+  publishedById  String?
+  publishedBy    User?     @relation("GradePublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
+
   @@unique([studentId, examScheduleId, subjectId])
   @@index([studentId, subjectId, academicYearId])
   @@index([schoolId])
   @@index([assignmentId]) // New index
+  @@index([isPublished])
 }
 
 model GradingWeightConfig {

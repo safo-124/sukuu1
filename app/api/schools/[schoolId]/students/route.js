@@ -2,6 +2,7 @@
 import prisma from '@/lib/prisma';
 // Ensure this path is correct and schemas are properly exported from the validator file
 import { createStudentSchema } from '@/validators/student.validators'; 
+import bcrypt from 'bcryptjs';
 import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
@@ -104,14 +105,38 @@ export async function POST(request, { params }) {
       email, phone, address, city, state, country,
       guardianName, guardianRelation, guardianPhone, guardianEmail,
       academicYearId, sectionId,
+      createUserAccount, password
     } = validation.data;
 
-    const result = await prisma.$transaction(async (tx) => {
+    const { newStudent, createdUser } = await prisma.$transaction(async (tx) => {
       const existingStudentByAdmissionNo = await tx.student.findUnique({
         where: { schoolId_studentIdNumber: { schoolId, studentIdNumber } }
       });
       if (existingStudentByAdmissionNo) {
         throw { type: 'UniqueConstraintError', field: 'studentIdNumber', message: 'Admission number already exists for this school.' };
+      }
+
+      let userRecord = null;
+      if (createUserAccount) {
+        if (!email) {
+          throw { type: 'ValidationError', field: 'email', message: 'Email is required to create a user account.' };
+        }
+        const existingUser = await tx.user.findUnique({ where: { email } });
+        if (existingUser) {
+          throw { type: 'ValidationError', field: 'email', message: 'A user with this email already exists.' };
+        }
+        const hashedPassword = await bcrypt.hash(password, 10);
+        userRecord = await tx.user.create({
+          data: {
+            email,
+            hashedPassword,
+            role: 'STUDENT',
+            schoolId,
+            firstName,
+            lastName,
+            isActive: true,
+          }
+        });
       }
       
       const sectionRecord = await tx.section.findFirst({
@@ -122,7 +147,7 @@ export async function POST(request, { params }) {
         throw new Error("Invalid Section, Class, or Academic Year selection for this school, or they don't match.");
       }
 
-      const newStudent = await tx.student.create({
+      const studentCreated = await tx.student.create({
         data: {
           schoolId, firstName, lastName, middleName: middleName || null, studentIdNumber,
           admissionDate, dateOfBirth: dateOfBirth || null, gender: gender || null,
@@ -130,12 +155,13 @@ export async function POST(request, { params }) {
           city: city || null, state: state || null, country: country || null,
           guardianName: guardianName || null, guardianRelation: guardianRelation || null,
           guardianPhone: guardianPhone || null, guardianEmail: guardianEmail || null,
+          userId: userRecord ? userRecord.id : null,
         },
       });
 
       await tx.studentEnrollment.create({
         data: {
-          studentId: newStudent.id,
+          studentId: studentCreated.id,
           sectionId: sectionRecord.id,
           academicYearId: academicYearId,
           schoolId: schoolId,
@@ -144,23 +170,23 @@ export async function POST(request, { params }) {
           status: "Active",
         }
       });
-      return newStudent;
+      return { newStudent: studentCreated, createdUser: userRecord };
     });
     
     const createdStudentDetails = await prisma.student.findUnique({
-        where: { id: result.id },
+        where: { id: newStudent.id },
         include: {
             enrollments: {
                 where: {isCurrent: true},
                 include: { section: { include: { class: { include: { schoolLevel: true }}}}, academicYear: true }}
         }
     });
-
-    return NextResponse.json({ success: true, student: createdStudentDetails }, { status: 201 });
+    return NextResponse.json({ success: true, student: createdStudentDetails, userCreated: !!createdUser }, { status: 201 });
 
   } catch (error) {
     console.error(`API (POST Student) - Error creating student for school ${schoolId}:`, error);
-    if (error.type === 'UniqueConstraintError') { return NextResponse.json({ error: error.message, field: error.field }, { status: 409 }); }
+  if (error.type === 'UniqueConstraintError') { return NextResponse.json({ error: error.message, field: error.field }, { status: 409 }); }
+  if (error.type === 'ValidationError') { return NextResponse.json({ error: error.message, field: error.field }, { status: 400 }); }
     if (error.message.includes("Invalid Section, Class, or Academic Year")) { return NextResponse.json({ error: error.message }, { status: 400 }); }
     if (error.code === 'P2002') {
       if (error.meta?.target?.includes('studentIdNumber')) { return NextResponse.json({ error: 'Admission number already exists for this school.'}, { status: 409 }); }

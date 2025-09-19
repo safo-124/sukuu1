@@ -13,6 +13,11 @@ export default function SchoolAdminSidebar({
   onNavigate,
   widthExpanded = 256,
   widthCollapsed = 72,
+  /**
+   * Optional student display object: { fullName, className, sectionName, levelName }
+   * When provided (i.e. user is a STUDENT) we show the student's identity instead of the generic admin label.
+   */
+  studentDisplay,
 }) {
   const pathname = usePathname();
   const [openGroups, setOpenGroups] = useState({});
@@ -80,8 +85,24 @@ export default function SchoolAdminSidebar({
       style={{ width: collapsed ? widthCollapsed : widthExpanded }}
     >
       <div className={`p-4 pb-3 bg-gradient-to-r from-zinc-800 via-zinc-700 to-zinc-800 text-white shadow-sm ${collapsed ? 'px-2' : ''}`}>
-        <div className="text-sm font-semibold tracking-wide truncate">{collapsed ? 'ADM' : 'School Admin'}</div>
-        {!collapsed && <div className="text-[11px] opacity-80">Navigation</div>}
+        {studentDisplay ? (
+          <>
+            <div className="text-sm font-semibold tracking-wide truncate" title={studentDisplay.fullName}>
+              {collapsed ? (studentDisplay.fullName?.split(' ').map(p=>p[0]).join('').substring(0,3).toUpperCase() || 'STD') : studentDisplay.fullName}
+            </div>
+            {!collapsed && (
+              <div className="text-[11px] opacity-80 truncate" title={[studentDisplay.className, studentDisplay.sectionName].filter(Boolean).join(' • ')}>
+                {[studentDisplay.className, studentDisplay.sectionName].filter(Boolean).join(' ')}
+                {studentDisplay.levelName ? ` • ${studentDisplay.levelName}` : ''}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="text-sm font-semibold tracking-wide truncate">{collapsed ? 'ADM' : 'School Admin'}</div>
+            {!collapsed && <div className="text-[11px] opacity-80">Navigation</div>}
+          </>
+        )}
       </div>
       <div className="flex-1 overflow-y-auto thin-scrollbar" data-sidebar-scroll>
         <nav className="p-3 text-sm">

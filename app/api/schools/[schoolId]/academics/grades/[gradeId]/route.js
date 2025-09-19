@@ -39,6 +39,14 @@ export async function PUT(request, { params }) {
   }
 
   try {
+    // Fetch existing grade first to enforce publication restrictions
+    const existing = await prisma.grade.findFirst({ where: { id: gradeId, schoolId } });
+    if (!existing) {
+      return NextResponse.json({ error: 'Grade record not found.' }, { status: 404 });
+    }
+    if (existing.isPublished && !['SCHOOL_ADMIN','SUPER_ADMIN'].includes(session.user?.role)) {
+      return NextResponse.json({ error: 'Published grades can only be modified by an admin.' }, { status: 403 });
+    }
     const body = await request.json();
     const validation = updateGradeSchema.safeParse(body);
 
@@ -79,6 +87,13 @@ export async function DELETE(request, { params }) {
   }
 
   try {
+    const existing = await prisma.grade.findFirst({ where: { id: gradeId, schoolId } });
+    if (!existing) {
+      return NextResponse.json({ error: 'Grade record not found for deletion.' }, { status: 404 });
+    }
+    if (existing.isPublished && !['SCHOOL_ADMIN','SUPER_ADMIN'].includes(session.user?.role)) {
+      return NextResponse.json({ error: 'Published grades can only be deleted by an admin.' }, { status: 403 });
+    }
     await prisma.grade.delete({
       where: { id: gradeId, schoolId: schoolId },
     });

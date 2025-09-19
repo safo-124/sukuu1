@@ -25,25 +25,15 @@ export async function GET(request, ctx) {
     const academicYearId = searchParams.get('academicYearId');
     const includeAging = searchParams.get('includeAging') === '1';
 
-    const baseInvoiceWhere = {
-      schoolId,
-      ...(academicYearId ? { academicYearId } : {}),
-    };
+    // Invoices currently do NOT have academicYearId column in schema snippet provided (only fee structures & enrollments do) – remove filter to avoid runtime error if attempted.
+    // If later an academicYearId field is added to Invoice, re-enable below.
+    const baseInvoiceWhere = { schoolId };
 
     // Summaries
     const [invoiceAgg, paymentAgg, expenseAgg, recentInvoices, recentExpenses, invoiceCount] = await Promise.all([
-      prisma.invoice.aggregate({
-        _sum: { totalAmount: true, paidAmount: true },
-        where: baseInvoiceWhere,
-      }),
-      prisma.payment.aggregate({
-        _sum: { amount: true },
-        where: { schoolId, ...(academicYearId ? { academicYearId } : {}) },
-      }),
-      prisma.expense.aggregate({
-        _sum: { amount: true },
-        where: { schoolId, ...(academicYearId ? { academicYearId } : {}) },
-      }),
+      prisma.invoice.aggregate({ _sum: { totalAmount: true, paidAmount: true }, where: baseInvoiceWhere }),
+      prisma.payment.aggregate({ _sum: { amount: true }, where: { schoolId } }),
+      prisma.expense.aggregate({ _sum: { amount: true }, where: { schoolId } }),
       prisma.invoice.findMany({
         where: baseInvoiceWhere,
         orderBy: { issueDate: 'desc' },
@@ -51,7 +41,7 @@ export async function GET(request, ctx) {
         select: { id: true, invoiceNumber: true, totalAmount: true, paidAmount: true, status: true, issueDate: true, dueDate: true }
       }),
       prisma.expense.findMany({
-        where: { schoolId, ...(academicYearId ? { academicYearId } : {}) },
+        where: { schoolId },
         orderBy: { date: 'desc' },
         take: 5,
         select: { id: true, description: true, amount: true, date: true }

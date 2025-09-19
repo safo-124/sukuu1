@@ -39,6 +39,7 @@ const initialStudentFormData = {
   address: '', city: '', state: '', country: '',
   guardianName: '', guardianRelation: '', guardianPhone: '', guardianEmail: '',
   academicYearId: '', classId: '', sectionId: '',
+  createUserAccount: false, password: '', confirmPassword: '',
 };
 
 const genderOptions = ["MALE", "FEMALE", "OTHER", "PREFER_NOT_TO_SAY"];
@@ -84,8 +85,8 @@ const StudentFormFields = ({ formData, onFormChange, onSelectChange, academicYea
                 <SelectContent className="bg-white dark:bg-zinc-900">{genderOptions.map(g => <SelectItem key={g} value={g} className="hover:bg-zinc-100 dark:hover:bg-zinc-800">{g.charAt(0) + g.slice(1).toLowerCase().replace('_', ' ')}</SelectItem>)}</SelectContent>
             </Select>
         </div>
-        <div><Label htmlFor="admissionNumber" className={labelTextClasses}>Admission No. <span className="text-red-500">*</span></Label><Input id="admissionNumber" name="studentIdNumber" value={formData.studentIdNumber || ''} onChange={onFormChange} required className={`${inputTextClasses} mt-1`} /></div>
-        <div><Label htmlFor="admissionDate" className={labelTextClasses}>Admission Date <span className="text-red-500">*</span></Label><Input id="admissionDate" name="admissionDate" type="date" value={formData.admissionDate || ''} onChange={onFormChange} required className={`${inputTextClasses} mt-1`} /></div>
+  <div><Label htmlFor="admissionNumber" className={labelTextClasses}>Admission No. <span className="text-red-500">*</span></Label><Input disabled={isEdit} id="admissionNumber" name="studentIdNumber" value={formData.studentIdNumber || ''} onChange={onFormChange} required className={`${inputTextClasses} mt-1 ${isEdit ? 'opacity-70 cursor-not-allowed' : ''}`} /></div>
+  <div><Label htmlFor="admissionDate" className={labelTextClasses}>Admission Date <span className="text-red-500">*</span></Label><Input disabled={isEdit} id="admissionDate" name="admissionDate" type="date" value={formData.admissionDate || ''} onChange={onFormChange} required className={`${inputTextClasses} mt-1 ${isEdit ? 'opacity-70 cursor-not-allowed' : ''}`} /></div>
         
         <h3 className={`md:col-span-3 text-base font-semibold ${titleTextClasses} pb-2 border-b dark:border-zinc-700 mt-4 mb-2`}>Contact & Address</h3>
         <div><Label htmlFor="email" className={labelTextClasses}>Student Email</Label><Input id="email" name="email" type="email" value={formData.email || ''} onChange={onFormChange} className={`${inputTextClasses} mt-1`} /></div>
@@ -98,28 +99,32 @@ const StudentFormFields = ({ formData, onFormChange, onSelectChange, academicYea
         <div><Label htmlFor="guardianPhone" className={labelTextClasses}>Guardian Phone <span className="text-red-500">*</span></Label><Input id="guardianPhone" name="guardianPhone" value={formData.guardianPhone || ''} onChange={onFormChange} required className={`${inputTextClasses} mt-1`} /></div>
         <div className="md:col-span-2"><Label htmlFor="guardianEmail" className={labelTextClasses}>Guardian Email</Label><Input id="guardianEmail" name="guardianEmail" type="email" value={formData.guardianEmail || ''} onChange={onFormChange} className={`${inputTextClasses} mt-1`} /></div>
         
-        <h3 className={`md:col-span-3 text-base font-semibold ${titleTextClasses} pb-2 border-b dark:border-zinc-700 mt-4 mb-2`}>Initial Enrollment</h3>
-        <div>
-            <Label htmlFor="academicYearId" className={labelTextClasses}>Academic Year <span className="text-red-500">*</span></Label>
-            <Select name="academicYearId" value={formData.academicYearId || ''} onValueChange={(value) => onSelectChange('academicYearId', value)} disabled={isLoadingDeps}>
-                <SelectTrigger className={`${inputTextClasses} mt-1`}><SelectValue placeholder="Select Academic Year" /></SelectTrigger>
-                <SelectContent className="bg-white dark:bg-zinc-900">{isLoadingDeps ? <SelectItem value="loading" disabled>Loading...</SelectItem> : academicYearsList?.map(ay => <SelectItem key={ay.id} value={ay.id}>{ay.name}</SelectItem>)}</SelectContent>
-            </Select>
-        </div>
-        <div>
-            <Label htmlFor="classId" className={labelTextClasses}>Class <span className="text-red-500">*</span></Label>
-            <Select name="classId" value={formData.classId || ''} onValueChange={(value) => onSelectChange('classId', value)} disabled={!formData.academicYearId || isLoadingDeps || filteredClasses.length === 0}>
-                <SelectTrigger className={`${inputTextClasses} mt-1`}><SelectValue placeholder="Select Class" /></SelectTrigger>
-                <SelectContent className="bg-white dark:bg-zinc-900">{isLoadingDeps ? <SelectItem value="loading" disabled>Loading...</SelectItem> : (filteredClasses.length === 0 && formData.academicYearId ? <SelectItem value="no-classes" disabled>No classes for selected year</SelectItem> : filteredClasses.map(c => <SelectItem key={c.id} value={c.id}>{c.name} ({c.schoolLevel?.name})</SelectItem>))}</SelectContent>
-            </Select>
-        </div>
-        <div>
-            <Label htmlFor="sectionId" className={labelTextClasses}>Section <span className="text-red-500">*</span></Label>
-            <Select name="sectionId" value={formData.sectionId || ''} onValueChange={(value) => onSelectChange('sectionId', value)} disabled={!formData.classId || isLoadingDeps || filteredSections.length === 0}>
-                <SelectTrigger className={`${inputTextClasses} mt-1`}><SelectValue placeholder="Select Section" /></SelectTrigger>
-                <SelectContent className="bg-white dark:bg-zinc-900">{isLoadingDeps ? <SelectItem value="loading" disabled>Loading...</SelectItem> : (filteredSections.length === 0 && formData.classId ? <SelectItem value="no-sections" disabled>No sections for selected class</SelectItem> : filteredSections.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>))}</SelectContent>
-            </Select>
-        </div>
+    {!isEdit && (
+      <>
+      <h3 className={`md:col-span-3 text-base font-semibold ${titleTextClasses} pb-2 border-b dark:border-zinc-700 mt-4 mb-2`}>Initial Enrollment</h3>
+      <div>
+        <Label htmlFor="academicYearId" className={labelTextClasses}>Academic Year <span className="text-red-500">*</span></Label>
+        <Select name="academicYearId" value={formData.academicYearId || ''} onValueChange={(value) => onSelectChange('academicYearId', value)} disabled={isLoadingDeps}>
+          <SelectTrigger className={`${inputTextClasses} mt-1`}><SelectValue placeholder="Select Academic Year" /></SelectTrigger>
+          <SelectContent className="bg-white dark:bg-zinc-900">{isLoadingDeps ? <SelectItem value="loading" disabled>Loading...</SelectItem> : academicYearsList?.map(ay => <SelectItem key={ay.id} value={ay.id}>{ay.name}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>
+      <div>
+        <Label htmlFor="classId" className={labelTextClasses}>Class <span className="text-red-500">*</span></Label>
+        <Select name="classId" value={formData.classId || ''} onValueChange={(value) => onSelectChange('classId', value)} disabled={!formData.academicYearId || isLoadingDeps || filteredClasses.length === 0}>
+          <SelectTrigger className={`${inputTextClasses} mt-1`}><SelectValue placeholder="Select Class" /></SelectTrigger>
+          <SelectContent className="bg-white dark:bg-zinc-900">{isLoadingDeps ? <SelectItem value="loading" disabled>Loading...</SelectItem> : (filteredClasses.length === 0 && formData.academicYearId ? <SelectItem value="no-classes" disabled>No classes for selected year</SelectItem> : filteredClasses.map(c => <SelectItem key={c.id} value={c.id}>{c.name} ({c.schoolLevel?.name})</SelectItem>))}</SelectContent>
+        </Select>
+      </div>
+      <div>
+        <Label htmlFor="sectionId" className={labelTextClasses}>Section <span className="text-red-500">*</span></Label>
+        <Select name="sectionId" value={formData.sectionId || ''} onValueChange={(value) => onSelectChange('sectionId', value)} disabled={!formData.classId || isLoadingDeps || filteredSections.length === 0}>
+          <SelectTrigger className={`${inputTextClasses} mt-1`}><SelectValue placeholder="Select Section" /></SelectTrigger>
+          <SelectContent className="bg-white dark:bg-zinc-900">{isLoadingDeps ? <SelectItem value="loading" disabled>Loading...</SelectItem> : (filteredSections.length === 0 && formData.classId ? <SelectItem value="no-sections" disabled>No sections for selected class</SelectItem> : filteredSections.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>))}</SelectContent>
+        </Select>
+      </div>
+      </>
+    )}
     </div>
   );
 };
@@ -151,6 +156,16 @@ export default function ManageStudentsPage() {
   const [addStudentFormData, setAddStudentFormData] = useState({...initialStudentFormData});
   const [isSubmittingStudent, setIsSubmittingStudent] = useState(false);
   const [addFormError, setAddFormError] = useState('');
+
+  // Edit dialog state
+  const [isEditStudentDialogOpen, setIsEditStudentDialogOpen] = useState(false);
+  const [editStudentFormData, setEditStudentFormData] = useState(null); // null until loaded
+  const [editTargetStudent, setEditTargetStudent] = useState(null);
+  const [isLoadingEditStudent, setIsLoadingEditStudent] = useState(false);
+  const [editFormError, setEditFormError] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [originalEditData, setOriginalEditData] = useState(null);
+  const [hasEditChanges, setHasEditChanges] = useState(false);
 
   const [academicYears, setAcademicYears] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -266,11 +281,25 @@ export default function ManageStudentsPage() {
         setAddFormError("Academic Year, Class, and Section are required.");
         return;
     }
+    if (addStudentFormData.createUserAccount) {
+      if (!addStudentFormData.password || addStudentFormData.password.length < 8) {
+        const msg = 'Password must be at least 8 characters.';
+        toast.error('Validation Error', { description: msg });
+        setAddFormError(msg); return;
+      }
+      if (addStudentFormData.password !== addStudentFormData.confirmPassword) {
+        const msg = 'Passwords do not match.';
+        toast.error('Validation Error', { description: msg });
+        setAddFormError(msg); return;
+      }
+    }
     setIsSubmittingStudent(true); setAddFormError('');
     try {
       // Ensure admissionDate and dateOfBirth are valid dates before sending
       const payload = {
         ...addStudentFormData,
+        // confirmPassword is client-side only
+        confirmPassword: undefined,
         admissionDate: addStudentFormData.admissionDate ? new Date(addStudentFormData.admissionDate).toISOString() : null,
         dateOfBirth: addStudentFormData.dateOfBirth ? new Date(addStudentFormData.dateOfBirth).toISOString() : null,
       };
@@ -300,8 +329,146 @@ export default function ManageStudentsPage() {
     router.push(`${pathname}?${params.toString()}`, { scroll: false });
   };
 
-  const openEditStudentDialog = (student) => toast.info(`Editing ${student.firstName} (WIP)`);
-  const viewStudentProfile = (studentId) => router.push(`/${schoolData.subdomain}/people/students/${studentId}`);
+  const openEditStudentDialog = async (student) => {
+    if (!schoolData?.id) return;
+    setEditTargetStudent(student);
+    setEditFormError('');
+    setIsLoadingEditStudent(true);
+    setIsEditStudentDialogOpen(true);
+    try {
+      const res = await fetch(`/api/schools/${schoolData.id}/students/${student.id}?full=true`);
+      if (!res.ok) {
+        const d = await res.json().catch(()=>({}));
+        throw new Error(d.error || 'Failed to load student details');
+      }
+      const d = await res.json();
+      const s = d.student;
+      // Map API response to form structure; enrollment fields are not editable here
+      setEditStudentFormData({
+        firstName: s.firstName || '',
+        lastName: s.lastName || '',
+        middleName: s.middleName || '',
+        studentIdNumber: s.studentIdNumber || '',
+        admissionDate: s.admissionDate ? new Date(s.admissionDate).toISOString().split('T')[0] : '',
+        dateOfBirth: s.dateOfBirth ? new Date(s.dateOfBirth).toISOString().split('T')[0] : '',
+        gender: s.gender || '',
+        email: s.email || '',
+        phone: s.phone || '',
+        address: s.address || '',
+        city: s.city || '',
+        state: s.state || '',
+        country: s.country || '',
+        guardianName: s.guardianName || '',
+        guardianRelation: s.guardianRelation || '',
+        guardianPhone: s.guardianPhone || '',
+        guardianEmail: s.guardianEmail || '',
+        academicYearId: '',
+        classId: '',
+        sectionId: '',
+      });
+      setOriginalEditData({
+        firstName: s.firstName || '',
+        lastName: s.lastName || '',
+        middleName: s.middleName || '',
+        studentIdNumber: s.studentIdNumber || '',
+        admissionDate: s.admissionDate ? new Date(s.admissionDate).toISOString().split('T')[0] : '',
+        dateOfBirth: s.dateOfBirth ? new Date(s.dateOfBirth).toISOString().split('T')[0] : '',
+        gender: s.gender || '',
+        email: s.email || '',
+        phone: s.phone || '',
+        address: s.address || '',
+        city: s.city || '',
+        state: s.state || '',
+        country: s.country || '',
+        guardianName: s.guardianName || '',
+        guardianRelation: s.guardianRelation || '',
+        guardianPhone: s.guardianPhone || '',
+        guardianEmail: s.guardianEmail || '',
+        academicYearId: '',
+        classId: '',
+        sectionId: '',
+      });
+      setHasEditChanges(false);
+    } catch (e) {
+      console.error('Load edit student failed', e);
+      setEditFormError(e.message);
+      toast.error('Failed to load student', { description: e.message });
+    } finally {
+      setIsLoadingEditStudent(false);
+    }
+  };
+
+  const handleEditStudentFormChange = (e) => {
+    const { name, value } = e.target;
+    setEditStudentFormData(prev => {
+      const updated = { ...prev, [name]: value };
+      if (originalEditData) {
+        const differs = Object.keys(originalEditData).some(k => originalEditData[k] !== updated[k]);
+        setHasEditChanges(differs);
+      }
+      return updated;
+    });
+  };
+  const handleEditStudentSelectChange = (name, value) => {
+    setEditStudentFormData(prev => {
+      const updated = { ...prev, [name]: value };
+      if (originalEditData) {
+        const differs = Object.keys(originalEditData).some(k => originalEditData[k] !== updated[k]);
+        setHasEditChanges(differs);
+      }
+      return updated;
+    });
+  };
+
+  const handleEditStudentSubmit = async (e) => {
+    e.preventDefault();
+    if (!schoolData?.id || !editTargetStudent) return;
+    setIsSavingEdit(true); setEditFormError('');
+    try {
+      const originalRow = students.find(s => s.id === editTargetStudent.id) || {};
+      const { admissionDate, studentIdNumber, academicYearId, classId, sectionId, ...editable } = editStudentFormData || {};
+      // Build diff payload: only keys whose value differs (ignoring undefined)
+      const payload = {};
+      Object.entries(editable).forEach(([k,v]) => {
+        if (v === '') v = null; // treat empty as null
+        const originalComparable = originalRow[k] === undefined ? null : originalRow[k];
+        if (k === 'dateOfBirth' && v) {
+          // convert for submission
+          const iso = new Date(v).toISOString();
+          if (originalRow.dateOfBirth !== iso) payload[k] = iso; else if (!originalRow.dateOfBirth && v) payload[k] = iso;
+        } else if (v !== originalComparable) {
+          payload[k] = v;
+        }
+      });
+      if (Object.keys(payload).length === 0) {
+        toast.info('No changes to save');
+        setIsSavingEdit(false);
+        return;
+      }
+      const res = await fetch(`/api/schools/${schoolData.id}/students/${editTargetStudent.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        let msg = data.error || 'Failed to update student';
+        if (data.issues) msg = data.issues.map(i=>`${i.path.join('.')}: ${i.message}`).join('; ');
+        setEditFormError(msg); toast.error('Update failed', { description: msg });
+      } else {
+        toast.success('Student updated successfully');
+        // Optimistic local list update for displayed columns
+        setStudents(prev => prev.map(s => s.id === editTargetStudent.id ? { ...s, ...payload } : s));
+        setIsEditStudentDialogOpen(false);
+      }
+    } catch (err) {
+      console.error('Edit submit error', err);
+      setEditFormError(err.message); toast.error('Unexpected error', { description: err.message });
+    } finally { setIsSavingEdit(false); }
+  };
+  const viewStudentProfile = (studentId) => {
+    // Fallback: derive base path from current pathname if subdomain not yet loaded
+    const base = schoolData?.subdomain ? `/${schoolData.subdomain}` : pathname.split('/').slice(0,2).join('/') || '';
+    router.push(`${base}/people/students/${studentId}`);
+  };
 
   return (
     <div className="space-y-8">
@@ -334,6 +501,51 @@ export default function ManageStudentsPage() {
                     isLoadingDeps={isLoadingDropdowns}
                     outlineButtonClasses={outlineButtonClasses} // Pass this if StudentFormFields uses it
                 />
+                <div className="border-t pt-4 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <input id="createUserAccount" type="checkbox" className="h-4 w-4" checked={!!addStudentFormData.createUserAccount} onChange={(e)=>setAddStudentFormData(p=>({...p, createUserAccount: e.target.checked, password: e.target.checked ? p.password : ''}))} />
+                    <Label htmlFor="createUserAccount" className="text-sm font-medium text-black dark:text-white">Create portal login account now?</Label>
+                  </div>
+                  {addStudentFormData.createUserAccount && (
+                    <div className="grid md:grid-cols-3 gap-4">
+                      <div className="md:col-span-2">
+                        <Label htmlFor="studentAccountEmail" className="text-black dark:text-white text-sm mb-1 block">Account Email (required)</Label>
+                        <Input id="studentAccountEmail" name="email" type="email" value={addStudentFormData.email} onChange={handleAddStudentFormChange} placeholder="student@example.com" className="bg-white/50 dark:bg-zinc-800/50" required={addStudentFormData.createUserAccount} />
+                      </div>
+                      <div className="md:col-span-1">
+                        <Label htmlFor="studentPassword" className="text-black dark:text-white text-sm mb-1 block">Password</Label>
+                        <div className="flex gap-2">
+                          <Input id="studentPassword" name="password" type="text" value={addStudentFormData.password} onChange={handleAddStudentFormChange} placeholder="Min 8 chars" className="bg-white/50 dark:bg-zinc-800/50" required={addStudentFormData.createUserAccount} />
+                          <Button type="button" variant="outline" className={outlineButtonClasses} onClick={()=>{
+                            const gen = () => {
+                              const upper='ABCDEFGHJKLMNPQRSTUVWXYZ';
+                              const lower='abcdefghijkmnopqrstuvwxyz';
+                              const digits='23456789';
+                              const symbols='!@#$%^&*';
+                              const all = upper+lower+digits+symbols;
+                              const pick = s=>s[Math.floor(Math.random()*s.length)];
+                              const base=[pick(upper),pick(lower),pick(digits)];
+                              for(let i=base.length;i<12;i++){ base.push(pick(all)); }
+                              for(let i=base.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [base[i],base[j]]=[base[j],base[i]]; }
+                              return base.join('');
+                            };
+                            const generated = gen();
+                            setAddStudentFormData(p=>({...p, password: generated, confirmPassword: generated}));
+                          }}>Gen</Button>
+                        </div>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Must include upper, lower & a digit.</p>
+                      </div>
+                      <div className="md:col-span-1">
+                        <Label htmlFor="studentConfirmPassword" className="text-black dark:text-white text-sm mb-1 block">Confirm Password</Label>
+                        <Input id="studentConfirmPassword" name="confirmPassword" type="text" value={addStudentFormData.confirmPassword} onChange={handleAddStudentFormChange} placeholder="Repeat password" className="bg-white/50 dark:bg-zinc-800/50" required={addStudentFormData.createUserAccount} />
+                        {addStudentFormData.createUserAccount && addStudentFormData.password && addStudentFormData.confirmPassword && addStudentFormData.password !== addStudentFormData.confirmPassword && (
+                          <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
+                        )}
+                      </div>
+                      <div className="md:col-span-3 text-xs text-zinc-600 dark:text-zinc-400">The student will log in at <code className="font-mono">/{schoolData?.subdomain || '<subdomain>'}/student-login</code> using this email & password.</div>
+                    </div>
+                  )}
+                </div>
                 {addFormError && ( <p className="text-sm text-red-600 dark:text-red-400 md:col-span-full">{addFormError}</p> )}
                 <DialogFooter className="pt-6"> 
                   <DialogClose asChild><Button type="button" variant="outline" className={outlineButtonClasses}>Cancel</Button></DialogClose> 
@@ -352,6 +564,51 @@ export default function ManageStudentsPage() {
           <Input type="search" placeholder="Search students by name, admission no..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`pl-10 w-full md:w-1/2 lg:w-1/3 ${inputTextClasses}`} />
         </div>
       </div>
+
+      {/* Edit Student Dialog */}
+      <Dialog open={isEditStudentDialogOpen} onOpenChange={(open)=>{ setIsEditStudentDialogOpen(open); if(!open){ setEditStudentFormData(null); setEditTargetStudent(null); setEditFormError(''); }}}>
+        <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+          <DialogHeader>
+            <DialogTitle className={titleTextClasses}>Edit Student</DialogTitle>
+            <DialogDescription className={descriptionTextClasses}>Update the student's profile information.</DialogDescription>
+          </DialogHeader>
+          {editFormError && (
+            <Alert variant="destructive" className="bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300 dark:border-red-700/50 mb-2">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{editFormError}</AlertDescription>
+            </Alert>
+          )}
+          <form onSubmit={handleEditStudentSubmit} className="space-y-6 py-1">
+            {isLoadingEditStudent ? (
+              <div className="flex items-center justify-center h-60"><Loader2 className="h-8 w-8 animate-spin text-sky-600" /></div>
+            ) : (
+              <StudentFormFields
+                formData={editStudentFormData}
+                onFormChange={handleEditStudentFormChange}
+                onSelectChange={handleEditStudentSelectChange}
+                academicYearsList={academicYears}
+                classesList={classes}
+                sectionsList={sections}
+                isLoadingDeps={false}
+                isEdit={true}
+                outlineButtonClasses={outlineButtonClasses}
+              />
+            )}
+            {!isLoadingEditStudent && editStudentFormData && (
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Admission number and admission date are immutable. Enrollment changes are handled separately.</p>
+            )}
+            <DialogFooter className="pt-4">
+              <DialogClose asChild>
+                <Button type="button" variant="outline" className={outlineButtonClasses} disabled={isSavingEdit}>Cancel</Button>
+              </DialogClose>
+              <Button type="submit" className={primaryButtonClasses} disabled={isSavingEdit || isLoadingEditStudent || !editStudentFormData || !hasEditChanges}>
+                {isSavingEdit ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Saving...</> : (hasEditChanges ? 'Save Changes' : 'No Changes')}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {error && !isAddStudentDialogOpen && ( <Alert variant="destructive" className="bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300 dark:border-red-700/50"> <AlertTriangle className="h-4 w-4" /> <AlertTitle>Error</AlertTitle> <AlertDescription>{error}</AlertDescription> </Alert> )}
 
@@ -385,7 +642,9 @@ export default function ManageStudentsPage() {
                 <TableCell className={`${descriptionTextClasses} hidden sm:table-cell`}>{student.guardianName || 'N/A'} ({student.guardianRelation || 'Guardian'})</TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1 md:gap-2">
-                    <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} title="Edit Student" onClick={() => openEditStudentDialog(student)}> <Edit3 className="h-4 w-4" /> </Button>
+                    {session?.user?.role === 'SCHOOL_ADMIN' && (
+                      <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} title="Edit Student" onClick={() => openEditStudentDialog(student)}> <Edit3 className="h-4 w-4" /> </Button>
+                    )}
                     <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} title="View Profile" onClick={() => viewStudentProfile(student.id)}> <Eye className="h-4 w-4" /> </Button>
                   </div>
                 </TableCell>

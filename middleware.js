@@ -65,6 +65,22 @@ export async function middleware(request) {
         '/hr/payroll',
         '/teacher-login',
       ];
+      const studentAllowedPrefixes = [
+        '/dashboard',
+        '/student/dashboard',
+        '/academics/assignments',
+        '/academics/grades',
+        '/academics/timetable',
+        '/academics/examinations',
+        '/academics/subjects',
+        '/attendance/students',
+        '/finance/invoices',
+        '/finance/payments',
+        '/resources/library',
+        '/resources/hostel',
+        '/communication/announcements',
+        '/login'
+      ];
       const startsWithAny = (p, arr) => arr.some(a => p === a || p.startsWith(a + '/'));
 
       const buildTenantPath = (p) => `/${tenant}${p}`;
@@ -101,7 +117,7 @@ export async function middleware(request) {
           url.pathname = buildTenantPath(role === 'TEACHER' ? '/dashboard/teacher' : '/dashboard');
           return NextResponse.redirect(url);
         }
-        if (role === 'TEACHER') {
+  if (role === 'TEACHER') {
           if (lowerTenantPath === '/dashboard') {
             url.pathname = buildTenantPath('/dashboard/teacher');
             return NextResponse.redirect(url);
@@ -114,6 +130,17 @@ export async function middleware(request) {
           const isAllowed = startsWithAny(lowerTenantPath, teacherAllowedPrefixes);
           if (!isAllowed) {
             url.pathname = buildTenantPath('/dashboard/teacher');
+            return NextResponse.redirect(url);
+          }
+        } else if (role === 'STUDENT') {
+          // Students redirected away from teacher or admin-only areas
+          if (lowerTenantPath.startsWith('/dashboard/teacher')) {
+            url.pathname = buildTenantPath('/dashboard');
+            return NextResponse.redirect(url);
+          }
+          const isAllowed = startsWithAny(lowerTenantPath, studentAllowedPrefixes);
+          if (!isAllowed) {
+            url.pathname = buildTenantPath('/dashboard');
             return NextResponse.redirect(url);
           }
         } else {
@@ -174,6 +201,22 @@ export async function middleware(request) {
         '/hr/payroll',
         '/teacher-login',
       ];
+      const studentAllowedPrefixes = [
+        '/dashboard',
+        '/student/dashboard',
+        '/academics/assignments',
+        '/academics/grades',
+        '/academics/timetable',
+        '/academics/examinations',
+        '/academics/subjects',
+        '/attendance/students',
+        '/finance/invoices',
+        '/finance/payments',
+        '/resources/library',
+        '/resources/hostel',
+        '/communication/announcements',
+        '/login'
+      ];
 
       const startsWithAny = (p, arr) => arr.some(a => p === a || p.startsWith(a + '/'));
 
@@ -216,7 +259,7 @@ export async function middleware(request) {
           return NextResponse.redirect(url);
         }
 
-        if (role === 'TEACHER') {
+  if (role === 'TEACHER') {
           // Teachers redirected away from generic admin dashboard
           if (lowerPath === '/dashboard') {
             url.pathname = '/dashboard/teacher';
@@ -233,6 +276,16 @@ export async function middleware(request) {
             url.pathname = '/dashboard/teacher';
             return NextResponse.redirect(url);
           }
+        } else if (role === 'STUDENT') {
+          if (lowerPath.startsWith('/dashboard/teacher')) {
+            url.pathname = '/dashboard';
+            return NextResponse.redirect(url);
+          }
+          const isAllowed = startsWithAny(lowerPath, studentAllowedPrefixes);
+            if (!isAllowed) {
+              url.pathname = '/dashboard';
+              return NextResponse.redirect(url);
+            }
         } else {
           // Non-teachers going to teacher-only academics should go to admin academics
           if (lowerPath.startsWith('/teacher/academics')) {

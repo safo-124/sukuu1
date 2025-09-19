@@ -190,6 +190,35 @@ export const updateAccountantSchema = z.object({
 
 export const accountantIdSchema = z.string().min(1);
 
+// --- HR Staff Schemas (NEW) ---
+export const createHRStaffSchema = z.object({
+  firstName: z.string().min(1).max(100),
+  lastName: z.string().min(1).max(100),
+  email: z.string().email().min(1),
+  password: z.string().min(8),
+  phoneNumber: z.string().nullable().optional(),
+  profilePictureUrl: z.string().url().nullable().optional(),
+  staffIdNumber: z.string().min(1).max(50),
+  jobTitle: z.string().min(1).max(100).default('HR Manager'),
+  qualification: z.string().nullable().optional(),
+  departmentId: z.string().nullable().optional(),
+});
+
+export const updateHRStaffSchema = z.object({
+  firstName: z.string().min(1).max(100).optional(),
+  lastName: z.string().min(1).max(100).optional(),
+  email: z.string().email().min(1).optional(),
+  password: z.string().min(8).optional(),
+  phoneNumber: z.string().nullable().optional(),
+  profilePictureUrl: z.string().url().nullable().optional(),
+  staffIdNumber: z.string().min(1).max(50).optional(),
+  jobTitle: z.string().min(1).max(100).optional(),
+  qualification: z.string().nullable().optional(),
+  departmentId: z.string().nullable().optional(),
+}).partial();
+
+export const hrStaffIdSchema = z.string().min(1);
+
 
 // --- Student Attendance Schemas ---
 export const createStudentAttendanceSchema = z.object({
@@ -278,6 +307,61 @@ export const createPayrollRecordSchema = z.object(basePayrollRecordShape).refine
     }
     return true;
 });
+
+// --- Leave Management Schemas (NEW) ---
+// LeaveType
+const baseLeaveTypeSchema = z.object({
+  name: z.string().min(1, 'Leave type name is required.').max(100),
+  defaultDays: z.coerce.number().int().positive().max(365).nullable().optional(),
+});
+export const createLeaveTypeSchema = baseLeaveTypeSchema;
+export const updateLeaveTypeSchema = baseLeaveTypeSchema.partial();
+export const leaveTypeIdSchema = z.string().min(1);
+
+// LeaveApplication
+// Status transitions: only allow updating status via dedicated update (approve/reject)
+export const leaveApplicationStatusEnum = z.enum(['PENDING','APPROVED','REJECTED']);
+
+export const createLeaveApplicationSchema = z.object({
+  staffId: z.string().min(1, 'Staff ID is required.'),
+  leaveTypeId: z.string().min(1, 'Leave Type ID is required.'),
+  startDate: z.string().datetime('startDate must be ISO datetime string'),
+  endDate: z.string().datetime('endDate must be ISO datetime string'),
+  reason: z.string().max(1000).nullable().optional(),
+}).refine(data => new Date(data.startDate) <= new Date(data.endDate), {
+  message: 'End date must be on or after start date.',
+  path: ['endDate']
+});
+
+export const updateLeaveApplicationSchema = z.object({
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+  reason: z.string().max(1000).nullable().optional(),
+}).refine(data => {
+  if (data.startDate && data.endDate) {
+    return new Date(data.startDate) <= new Date(data.endDate);
+  }
+  return true;
+}, { message: 'End date must be on or after start date when both provided.', path: ['endDate'] });
+
+export const moderateLeaveApplicationSchema = z.object({
+  status: leaveApplicationStatusEnum.refine(v => v !== 'PENDING', { message: 'Use APPROVED or REJECTED.' }),
+  comments: z.string().max(1000).nullable().optional(),
+});
+
+export const leaveApplicationIdSchema = z.string().min(1);
+
+// Filtering schemas (for query params)
+export const leaveApplicationFilterSchema = z.object({
+  staffId: z.string().min(1).optional(),
+  leaveTypeId: z.string().min(1).optional(),
+  status: leaveApplicationStatusEnum.optional(),
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
+}).refine(d => {
+  if (d.from && d.to) return new Date(d.from) <= new Date(d.to);
+  return true;
+}, { message: 'to must be after from', path: ['to'] });
 
 // --- Exam & Grade Schemas ---
 export const examSchema = z.object({

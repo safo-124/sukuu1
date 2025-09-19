@@ -16,7 +16,8 @@ async function authorize(schoolId) {
 // GET accountant profile with financial trail
 export async function GET(request, { params }) {
   try {
-    const { schoolId, accountantId } = params;
+    // Await params per Next.js 15+ requirement (params is now a promise-like in some runtimes)
+    const { schoolId, accountantId } = await params;
     const { error } = await authorize(schoolId);
     if (error) return error;
 
@@ -70,7 +71,7 @@ export async function GET(request, { params }) {
 
 export async function PATCH(request, { params }) {
   try {
-    const { schoolId, accountantId } = params;
+    const { schoolId, accountantId } = await params;
     const { error } = await authorize(schoolId);
     if (error) return error;
 
@@ -151,7 +152,7 @@ export async function PATCH(request, { params }) {
 
 export async function DELETE(request, { params }) {
   try {
-    const { schoolId, accountantId } = params;
+    const { schoolId, accountantId } = await params;
     const { error } = await authorize(schoolId);
     if (error) return error;
 

@@ -91,19 +91,25 @@ export const createStudentSchema = z.object({
     .cuid({ message: "A valid Section must be selected for enrollment." }),
   
   // Optional: For creating a student user account at the same time
-  // createUserAccount: z.boolean().default(false).optional(),
-  // password: z.string().min(8, "Password must be at least 8 characters").optional(),
+  createUserAccount: z.boolean().default(false).optional(),
+  password: z.string()
+    .min(8, { message: 'Password must be at least 8 characters.' })
+    .max(72, { message: 'Password cannot exceed 72 characters.' })
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/, { message: 'Password must include upper, lower, and a digit.' })
+    .optional()
+    .nullable(),
 
 })
-// .refine(data => { // Example if creating user account and password becomes required
-//   if (data.createUserAccount && (!data.password || data.password.length < 8)) {
-//     return false;
-//   }
-//   return true;
-// }, {
-//   message: "Password is required (min 8 characters) if creating a user account.",
-//   path: ["password"], 
-// })
+ .refine(data => {
+   if (data.createUserAccount) {
+     if (!data.email) return false; // email required if creating account
+     if (!data.password) return false;
+   }
+   return true;
+ }, {
+   message: 'Email & password are required when creating a user account.',
+   path: ['password']
+ })
 ;
 
 // Schema for updating an existing student's core profile information

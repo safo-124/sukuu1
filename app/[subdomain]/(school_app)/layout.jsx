@@ -113,12 +113,17 @@ function getNavigationSections(schoolSubdomain, role) {
       { href: `/${schoolSubdomain}/people/students`, label: 'Manage Students', icon: Users },
       { href: `/${schoolSubdomain}/people/teachers`, label: 'Manage Teachers', icon: UserCog },
       { href: `/${schoolSubdomain}/people/accountants`, label: 'Manage Accountants', icon: DollarSign },
+      { href: `/${schoolSubdomain}/people/hr-staff`, label: 'Manage HR Staff', icon: Briefcase },
     ];
     const attendanceItems = [
       { href: `/${schoolSubdomain}/attendance/students`, label: 'Student Attendance', icon: CheckSquare },
       { href: `/${schoolSubdomain}/attendance/staff`, label: 'Staff Attendance', icon: ClipboardList },
     ];
-    const hrItems = [ { href: `/${schoolSubdomain}/hr/payroll`, label: 'Payroll', icon: Receipt } ];
+    const hrItems = [
+      { href: `/${schoolSubdomain}/hr/payroll`, label: 'Payroll', icon: Receipt },
+      { href: `/${schoolSubdomain}/hr/leave/types`, label: 'Leave Types', icon: Layers },
+      { href: `/${schoolSubdomain}/hr/leave/applications`, label: 'Leave Applications', icon: ClipboardList },
+    ];
     const financeItems = [
       { href: `/${schoolSubdomain}/finance/overview`, label: 'Financial Overview', icon: PieChart },
       { href: `/${schoolSubdomain}/finance/fee-structures`, label: 'Fee Structures', icon: FileText },
@@ -240,6 +245,10 @@ export default function SchoolAppLayout({ children }) {
   const [authError, setAuthError] = useState(null);
   const edgeHook = useEdgeHoverSidebar({ sidebarWidth: 256, defaultOpen: true });
   const { isOpen: isSidebarOpen, setIsOpen: setIsSidebarOpen } = edgeHook;
+
+  // --- Student sidebar identity state (must stay at top-level for Hooks order) ---
+  const [studentSidebarInfo, setStudentSidebarInfo] = useState(null);
+  const [studentInfoTried, setStudentInfoTried] = useState(false);
 
   const subdomain = params.subdomain;
 
@@ -369,6 +378,28 @@ export default function SchoolAppLayout({ children }) {
     }
   }, [sessionStatus, session, schoolData, isLoadingSchoolData, subdomain, router]);
 
+  // Fetch student self profile (top-level effect; conditional logic inside)
+  useEffect(() => {
+    let ignore = false;
+    async function loadStudentInfo() {
+      if (session?.user?.role !== 'STUDENT' || !schoolData?.id) return;
+      try {
+        const res = await fetch(`/api/schools/${schoolData.id}/students/me/profile`);
+        if (!res.ok) throw new Error('Failed');
+        const data = await res.json();
+        if (!ignore && data?.student) {
+          setStudentSidebarInfo(data.student);
+        }
+      } catch (e) {
+        if (!ignore) setStudentSidebarInfo(null);
+      } finally {
+        if (!ignore) setStudentInfoTried(true);
+      }
+    }
+    loadStudentInfo();
+    return () => { ignore = true; };
+  }, [session?.user?.role, schoolData?.id]);
+
   const toggleSidebar = () => setIsSidebarOpen(o => !o);
   // Edge hover auto-toggle state
   const [edgeAuto, setEdgeAuto] = useState({ enabled: true, lastInside: Date.now(), autoOpened: false });
@@ -464,6 +495,7 @@ export default function SchoolAppLayout({ children }) {
                 sections={fullSections}
                 collapsed={!isSidebarOpen}
                 onNavigate={() => {}}
+                studentDisplay={userRole === 'STUDENT' ? studentSidebarInfo : undefined}
               />
             </div>
           )}

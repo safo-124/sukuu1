@@ -55,32 +55,53 @@ export async function GET(request, ctx) {
     const pageSize = qp.pageSize;
     const skip = (page - 1) * pageSize;
 
-    const [rows, totalCount, scholarshipMap] = await prisma.$transaction([
-      prisma.invoice.findMany({
-        where,
-        skip,
-        take: pageSize,
-        orderBy: { [qp.sortBy]: qp.sortDir },
-        include: {
-          student: { select: { id: true, firstName: true, lastName: true, studentIdNumber: true } },
-          ...(includeItems ? { items: true } : {}),
-        }
-      }),
-      prisma.invoice.count({ where }),
-      // Preload scholarships for involved students (only if flag set)
-      includeScholarship ? prisma.scholarship.findMany({
-        where: {
-          schoolId,
-          studentId: { in: await prisma.invoice.findMany({ where, select: { studentId: true }, distinct: ['studentId'] }).then(r => r.map(x => x.studentId)) },
-          isActive: true,
-        },
-        select: { id: true, studentId: true, type: true, percentage: true, amount: true }
-      }) : Promise.resolve([])
-    ]);
+    // NOTE: Prior implementation attempted to pass a plain Promise (Promise.resolve([])) inside prisma.$transaction which causes a runtime error.
+    // We split the logic: always fetch invoices + count in a transaction; optionally fetch scholarships separately.
+    let rows, totalCount, scholarshipMap = [];
 
-    let scholarshipIndex = {};
     if (includeScholarship) {
-      scholarshipMap.forEach(s => { scholarshipIndex[s.studentId] = s; });
+      // Prefetch distinct studentIds for current result set scope (NOT paginated list of all invoices for school: we want scholarships for paginated invoices only)
+      // First, get paginated invoices and total count atomically.
+      [rows, totalCount] = await prisma.$transaction([
+        prisma.invoice.findMany({
+          where,
+            skip,
+            take: pageSize,
+            orderBy: { [qp.sortBy]: qp.sortDir },
+            include: {
+              student: { select: { id: true, firstName: true, lastName: true, studentIdNumber: true } },
+              ...(includeItems ? { items: true } : {}),
+            }
+        }),
+        prisma.invoice.count({ where })
+      ]);
+
+      const studentIds = [...new Set(rows.map(r => r.studentId).filter(Boolean))];
+      if (studentIds.length) {
+        scholarshipMap = await prisma.scholarship.findMany({
+          where: { schoolId, studentId: { in: studentIds }, isActive: true },
+          select: { id: true, studentId: true, type: true, percentage: true, amount: true }
+        });
+      }
+    } else {
+      [rows, totalCount] = await prisma.$transaction([
+        prisma.invoice.findMany({
+          where,
+          skip,
+          take: pageSize,
+          orderBy: { [qp.sortBy]: qp.sortDir },
+          include: {
+            student: { select: { id: true, firstName: true, lastName: true, studentIdNumber: true } },
+            ...(includeItems ? { items: true } : {}),
+          }
+        }),
+        prisma.invoice.count({ where })
+      ]);
+    }
+
+    const scholarshipIndex = {};
+    if (includeScholarship && scholarshipMap?.length) {
+      for (const s of scholarshipMap) scholarshipIndex[s.studentId] = s;
     }
 
     const invoices = rows.map(inv => {

@@ -7,6 +7,7 @@ import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import RequireRole from '@/components/auth/RequireRole';
 
 // Shadcn UI Imports
 import { Button } from "@/components/ui/button";
@@ -84,7 +85,7 @@ const ExamScheduleFormFields = ({ formData, onFormChange, onSelectChange, examsL
   );
 };
 
-export default function ManageExaminationsPage() {
+function AdminExaminationsPage() {
   const schoolData = useSchool();
   const { data: session } = useSession();
   const params = useParams();
@@ -295,4 +296,38 @@ export default function ManageExaminationsPage() {
       </div>
     </div>
   );
+}
+
+function StudentExamsPlaceholder() {
+  const titleTextClasses = "text-black dark:text-white";
+  const descriptionTextClasses = "text-zinc-600 dark:text-zinc-400";
+  return (
+    <RequireRole role="STUDENT">
+      <div className="space-y-4">
+        <h1 className={`text-2xl md:text-3xl font-bold ${titleTextClasses} flex items-center`}>
+          <GraduationCap className="mr-3 h-8 w-8 opacity-80"/>My Exams
+        </h1>
+        <div className="p-6 rounded-xl bg-white/60 dark:bg-zinc-900/60 border border-zinc-200/50 dark:border-zinc-700/50">
+          <p className={descriptionTextClasses}>
+            Your exams schedule and results page is coming soon. For now, please check your grades and assignments.
+          </p>
+        </div>
+      </div>
+    </RequireRole>
+  );
+}
+
+export default function ExaminationsPage() {
+  const { data: session, status } = useSession();
+  if (status === 'loading') {
+    return (
+      <div className="flex justify-center items-center h-48">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+  if (session?.user?.role === 'STUDENT') {
+    return <StudentExamsPlaceholder/>;
+  }
+  return <AdminExaminationsPage/>;
 }

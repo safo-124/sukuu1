@@ -6,6 +6,7 @@ import { useSchool } from '../../layout';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 import React from 'react'; // Import React for React.Fragment
+import RequireRole from '@/components/auth/RequireRole';
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -145,7 +146,7 @@ const TimetableFormFields = ({ formData, onFormChange, onSelectChange, sectionsL
 };
 
 
-export default function ManageTimetablePage() {
+function AdminTimetablePage() {
   const schoolData = useSchool();
   const { data: session } = useSession();
 
@@ -983,4 +984,38 @@ export default function ManageTimetablePage() {
       )}
     </div>
   );
+}
+
+function StudentTimetablePlaceholder() {
+  const titleTextClasses = "text-black dark:text-white";
+  const descriptionTextClasses = "text-zinc-600 dark:text-zinc-400";
+  return (
+    <RequireRole role="STUDENT">
+      <div className="space-y-4">
+        <h1 className={`text-2xl md:text-3xl font-bold ${titleTextClasses} flex items-center`}>
+          <CalendarDays className="mr-3 h-8 w-8 opacity-80"/>My Timetable
+        </h1>
+        <div className="p-6 rounded-xl bg-white/60 dark:bg-zinc-900/60 border border-zinc-200/50 dark:border-zinc-700/50">
+          <p className={descriptionTextClasses}>
+            Your timetable view is coming soon. In the meantime, you can check your assignments and grades from the Academics section.
+          </p>
+        </div>
+      </div>
+    </RequireRole>
+  );
+}
+
+export default function TimetablePage() {
+  const { data: session, status } = useSession();
+  if (status === 'loading') {
+    return (
+      <div className="flex justify-center items-center h-48">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+  if (session?.user?.role === 'STUDENT') {
+    return <StudentTimetablePlaceholder/>;
+  }
+  return <AdminTimetablePage/>;
 }

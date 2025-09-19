@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/card"; // Using parts of Shadcn Card for structure
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { Users, UserCog, Building, CalendarDays, BellPlus, DollarSign, PresentationChart, PieChart } from 'lucide-react';
+import { Users, UserCog, Building, CalendarDays, BellPlus, DollarSign, BarChart3, PieChart, ListChecks, Receipt, Clock3 } from 'lucide-react';
 
 // --- Helper: StatCard Component (Ensure it's robust for undefined values during loading) ---
 const StatCard = ({ title, value, icon, description, isLoading, linkTo }) => {
@@ -75,6 +75,10 @@ export default function SchoolAdminDashboardPage() {
     totalClasses: 0, // Added totalClasses
   });
   const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [studentPerformance, setStudentPerformance] = useState(null);
+  const [loadingPerformance, setLoadingPerformance] = useState(false);
+  const [studentCounts, setStudentCounts] = useState({ pendingAssignments: 0, unpaidInvoices: 0, nextExam: null });
+  const [loadingStudentCounts, setLoadingStudentCounts] = useState(false);
 
   // Tailwind class constants
   const pageTitleClasses = "text-zinc-900 dark:text-zinc-50";
@@ -110,10 +114,63 @@ export default function SchoolAdminDashboardPage() {
   }, [schoolData?.id]);
 
   useEffect(() => {
-    if (schoolData?.id) {
+    if (schoolData?.id && session?.user?.role !== 'STUDENT') {
       fetchDashboardStats();
     }
-  }, [schoolData, fetchDashboardStats]);
+  }, [schoolData, fetchDashboardStats, session?.user?.role]);
+
+  // Load student performance if student
+  useEffect(() => {
+    if (!schoolData?.id || session?.user?.role !== 'STUDENT') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoadingPerformance(true);
+        const res = await fetch(`/api/schools/${schoolData.id}/students/me/performance`);
+        if (!cancelled && res.ok) {
+          setStudentPerformance(await res.json());
+        }
+      } catch (e) {
+        console.error('Performance load error', e);
+      } finally {
+        if (!cancelled) setLoadingPerformance(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [schoolData?.id, session?.user?.role]);
+
+  // Load student quick counts (assignments, invoices, next exam)
+  useEffect(() => {
+    if (!schoolData?.id || session?.user?.role !== 'STUDENT') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoadingStudentCounts(true);
+        const [assRes, invRes] = await Promise.all([
+          fetch(`/api/schools/${schoolData.id}/students/me/assignments`),
+          fetch(`/api/schools/${schoolData.id}/students/me/invoices`),
+        ]);
+        let pendingAssignments = 0;
+        if (assRes.ok) {
+          const d = await assRes.json();
+          const now = new Date();
+          pendingAssignments = (d.assignments || []).filter(a => !a.submittedAt && (!a.dueDate || new Date(a.dueDate) >= now)).length;
+        }
+        let unpaidInvoices = 0;
+        if (invRes.ok) {
+          const d = await invRes.json();
+          unpaidInvoices = (d.invoices || []).filter(inv => (inv.due ?? (inv.total - inv.paid)) > 0).length;
+        }
+        if (!cancelled) setStudentCounts({ pendingAssignments, unpaidInvoices, nextExam: null });
+      } catch (e) {
+        console.error('Student quick counts error', e);
+        if (!cancelled) setStudentCounts({ pendingAssignments: 0, unpaidInvoices: 0, nextExam: null });
+      } finally {
+        if (!cancelled) setLoadingStudentCounts(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [schoolData?.id, session?.user?.role]);
 
   // Skeleton for the entire page if schoolData isn't available from context yet
   if (!schoolData && isLoadingStats) { 
@@ -133,6 +190,97 @@ export default function SchoolAdminDashboardPage() {
       return <div className={`text-xl p-4 md:p-6 lg:p-8 ${pageTitleClasses}`}>Loading school information or school not found...</div>;
   }
 
+
+  // Student dashboard variant
+  if (session?.user?.role === 'STUDENT') {
+    return (
+      <div className="space-y-8">
+        <div>
+          <h1 className={`text-3xl font-bold ${pageTitleClasses}`}>My Dashboard</h1>
+          <p className={descriptionTextClasses}>Overview of your academic performance and recent metrics.</p>
+        </div>
+        <section className="grid gap-4 md:grid-cols-3">
+          <StatCard
+            title="Pending Assignments"
+            value={studentCounts.pendingAssignments}
+            icon={<ListChecks className={`h-5 w-5 ${descriptionTextClasses}`} />}
+            isLoading={loadingStudentCounts}
+            description="Assignments not yet submitted"
+            linkTo={`/${schoolData.subdomain}/academics/assignments`}
+          />
+          <StatCard
+            title="Unpaid Invoices"
+            value={studentCounts.unpaidInvoices}
+            icon={<Receipt className={`h-5 w-5 ${descriptionTextClasses}`} />}
+            isLoading={loadingStudentCounts}
+            description="Invoices with balance due"
+            linkTo={`/${schoolData.subdomain}/finance/invoices`}
+          />
+          <StatCard
+            title="Overall Average"
+            value={studentPerformance?.overallAverage != null ? studentPerformance.overallAverage.toFixed(1) : '-'}
+            icon={<PieChart className={`h-5 w-5 ${descriptionTextClasses}`} />}
+            isLoading={loadingPerformance}
+            description="Cumulative published grades"
+          />
+        </section>
+        <section className="grid gap-4 md:grid-cols-3">
+          <StatCard
+            title="Subjects Graded"
+            value={studentPerformance?.subjects?.length || 0}
+            icon={<BarChart3 className={`h-5 w-5 ${descriptionTextClasses}`} />}
+            isLoading={loadingPerformance}
+            description="Subjects with published marks"
+          />
+          <StatCard
+            title="Terms Counted"
+            value={studentPerformance?.terms?.length || 0}
+            icon={<CalendarDays className={`h-5 w-5 ${descriptionTextClasses}`} />}
+            isLoading={loadingPerformance}
+            description="Terms contributing to average"
+          />
+          <StatCard
+            title="Next Exam"
+            value={studentCounts.nextExam?.date ? new Date(studentCounts.nextExam.date).toLocaleDateString() : '—'}
+            icon={<Clock3 className={`h-5 w-5 ${descriptionTextClasses}`} />}
+            isLoading={loadingStudentCounts}
+            description={studentCounts.nextExam?.name || 'Upcoming exam schedule'}
+          />
+        </section>
+        <section className="space-y-4">
+          <h2 className={`text-xl font-semibold ${pageTitleClasses}`}>Subject Averages</h2>
+          {loadingPerformance && <Skeleton className="h-24 w-full" />}
+          {!loadingPerformance && (!studentPerformance?.subjects?.length) && <p className="text-sm text-muted-foreground">No published grades yet.</p>}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {studentPerformance?.subjects?.map(s => (
+              <div key={s.subjectId} className={glassCardClasses}>
+                <div className="p-4 space-y-1">
+                  <p className="text-sm font-medium">{s.name}</p>
+                  <p className="text-2xl font-bold">{s.average.toFixed(1)}</p>
+                  <p className="text-[11px] text-muted-foreground">Assessments: {s.count}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="space-y-4">
+          <h2 className={`text-xl font-semibold ${pageTitleClasses}`}>Term Averages</h2>
+          {loadingPerformance && <Skeleton className="h-20 w-full" />}
+          <div className="grid gap-4 md:grid-cols-3">
+            {studentPerformance?.terms?.map(t => (
+              <div key={t.termId} className={glassCardClasses}>
+                <div className="p-4 space-y-1">
+                  <p className="text-sm font-medium">{t.name}</p>
+                  <p className="text-xl font-bold">{t.average.toFixed(1)}</p>
+                  <p className="text-[11px] text-muted-foreground">Grades: {t.count}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

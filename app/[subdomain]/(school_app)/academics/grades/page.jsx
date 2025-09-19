@@ -8,10 +8,129 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Percent, Filter, Trophy } from 'lucide-react';
+import RequireRole from '@/components/auth/RequireRole';
+
+// ---------------- STUDENT LIGHTWEIGHT VIEW ----------------
+function StudentGradesLite() {
+  const { data: session } = useSession();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [grades, setGrades] = useState([]);
+  const [subjectFilter, setSubjectFilter] = useState('all');
+
+  useEffect(() => {
+    let ignore = false;
+    async function load() {
+      if (session?.user?.role !== 'STUDENT' || !session?.user?.schoolId) { setLoading(false); return; }
+      try {
+        const res = await fetch(`/api/schools/${session.user.schoolId}/students/me/grades`);
+        if (!res.ok) throw new Error('Failed to load grades');
+        const data = await res.json();
+        if (!ignore) setGrades(data.grades || []);
+      } catch (e) { if (!ignore) setError(e.message); }
+      finally { if (!ignore) setLoading(false); }
+    }
+    load();
+    return () => { ignore = true; };
+  }, [session?.user?.role, session?.user?.schoolId]);
+
+  const subjects = useMemo(() => {
+    const map = new Map();
+    grades.forEach(g => { if (g.subject) map.set(g.subject.id, g.subject.name); });
+    return Array.from(map, ([id, name]) => ({ id, name }));
+  }, [grades]);
+
+  const filtered = useMemo(() => grades.filter(g => subjectFilter === 'all' || g.subject?.id === subjectFilter), [grades, subjectFilter]);
+  const stats = useMemo(() => {
+    if (!filtered.length) return { avg: 0, count: 0, best: null };
+    const numeric = filtered.map(g => g.score ?? g.marksObtained ?? g.value ?? 0);
+    const avg = numeric.reduce((a,b)=>a+b,0) / numeric.length;
+    let bestIdx = 0; for (let i=1;i<numeric.length;i++) if (numeric[i] > numeric[bestIdx]) bestIdx = i;
+    return { avg, count: filtered.length, best: filtered[bestIdx] };
+  }, [filtered]);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <Percent className="h-5 w-5 text-sky-600" />
+          <h1 className="text-xl font-semibold tracking-tight">My Grades</h1>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-sm">
+            <Filter className="h-4 w-4 text-zinc-500" />
+            <Select value={subjectFilter} onValueChange={setSubjectFilter}>
+              <SelectTrigger className="h-8 w-48"><SelectValue placeholder="Filter Subject" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Subjects</SelectItem>
+                {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          {stats.count > 0 && (
+            <div className="flex items-center gap-3 text-xs text-zinc-600 dark:text-zinc-400">
+              <span>Avg: <strong>{stats.avg.toFixed(1)}</strong></span>
+              {stats.best && <span className="flex items-center gap-1"><Trophy className="h-3.5 w-3.5 text-amber-500" /> {stats.best.subject?.name}: {stats.best.score ?? stats.best.marksObtained ?? stats.best.value}</span>}
+            </div>
+          )}
+        </div>
+      </div>
+      {loading && (
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-40" />
+          {Array.from({ length: 6 }).map((_,i)=><Skeleton key={i} className="h-10 w-full" />)}
+        </div>
+      )}
+      {!loading && error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+      {!loading && !error && filtered.length === 0 && <div className="text-sm text-muted-foreground">No grades available.</div>}
+      {!loading && !error && filtered.length > 0 && (
+        <div className="rounded-md border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-40">Subject</TableHead>
+                <TableHead>Score</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Exam</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map(g => {
+                const date = g.createdAt ? new Date(g.createdAt) : null;
+                const dateStr = date ? date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—';
+                const scoreVal = g.score ?? g.marksObtained ?? g.value ?? '—';
+                return (
+                  <TableRow key={g.id}>
+                    <TableCell className="font-medium">{g.subject?.name || '—'}</TableCell>
+                    <TableCell>{scoreVal}</TableCell>
+                    <TableCell>{dateStr}</TableCell>
+                    <TableCell>{g.examSchedule ? (g.examSchedule.name || 'Exam') : '—'}</TableCell>
+                    <TableCell><Badge variant="secondary" className="text-[10px]">Published</Badge></TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function TeacherGradesPage() {
   const school = useSchool();
   const { data: session } = useSession();
+  if (session?.user?.role === 'STUDENT') return (
+    <RequireRole role="STUDENT" fallback={null}>
+      <StudentGradesLite />
+    </RequireRole>
+  );
   const [subjects, setSubjects] = useState([]);
   const [sections, setSections] = useState([]);
   const [students, setStudents] = useState([]);
