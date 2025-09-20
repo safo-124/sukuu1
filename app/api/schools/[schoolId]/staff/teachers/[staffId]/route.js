@@ -32,7 +32,8 @@ export async function GET(request, { params }) {
             isActive: true,
           }
         },
-        department: { select: { id: true, name: true } }
+        department: { select: { id: true, name: true } },
+        hostels: { select: { id: true, name: true } }
       }
     });
 
@@ -63,15 +64,16 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: 'Invalid input.', issues: validation.error.issues }, { status: 400 });
     }
 
-    const { 
-        firstName, lastName, email, password, isActive, // User fields
-        staffIdNumber, jobTitle, qualification, dateOfJoining, departmentId // Staff fields
-    } = validation.data;
+  const { 
+    firstName, lastName, email, password, isActive, // User fields
+    staffIdNumber, jobTitle, qualification, dateOfJoining, departmentId, // Staff fields
+    isHostelWarden, hostelId
+  } = validation.data;
 
     // Fetch the existing staff record to get the linked userId
   const existingStaff = await prisma.staff.findFirst({
     where: { id: staffId, schoolId: schoolId },
-        include: { user: { select: { id: true, email: true }}} // Include user to check email change
+        include: { user: { select: { id: true, email: true, role: true }}, hostels: { select: { id: true } } } // Include user to check email/role and existing hostel links
     });
 
     if (!existingStaff || existingStaff.user.role !== 'TEACHER') {
@@ -123,10 +125,39 @@ export async function PUT(request, { params }) {
 
 
         if (Object.keys(staffDataToUpdate).length > 0) {
-       await tx.staff.update({
-                where: { id: staffId },
-                data: staffDataToUpdate,
+          await tx.staff.update({
+            where: { id: staffId },
+            data: staffDataToUpdate,
+          });
+        }
+
+        // Handle hostel warden assignment/unassignment
+        if (isHostelWarden !== undefined || hostelId !== undefined) {
+          // Ensure user is a TEACHER for any warden assignment changes
+          if (existingStaff.user.role !== 'TEACHER') {
+            throw { type: 'ValidationError', field: 'role', message: 'Only teachers can be assigned as hostel wardens.' };
+          }
+
+          // Unassign from all hostels if explicitly turning off or if setting no hostel
+          if (isHostelWarden === false || (isHostelWarden === true && !hostelId)) {
+            await tx.hostel.updateMany({
+              where: { schoolId, wardenId: staffId },
+              data: { wardenId: null },
             });
+          }
+
+          // If assigning a specific hostel
+          if (isHostelWarden === true && hostelId) {
+            // Validate hostel belongs to same school
+            const hostel = await tx.hostel.findFirst({ where: { id: hostelId, schoolId }, select: { id: true } });
+            if (!hostel) {
+              throw { type: 'ValidationError', field: 'hostelId', message: 'Hostel not found for this school.' };
+            }
+            // First, remove this teacher as warden from other hostels (only one assignment supported)
+            await tx.hostel.updateMany({ where: { schoolId, wardenId: staffId, NOT: { id: hostelId } }, data: { wardenId: null } });
+            // Assign to the given hostel
+            await tx.hostel.update({ where: { id: hostelId }, data: { wardenId: staffId } });
+          }
         }
         
     return tx.staff.findUnique({
@@ -142,6 +173,9 @@ export async function PUT(request, { params }) {
     console.error(`Failed to update teacher ${staffId} for school ${schoolId}:`, error);
     if (error.type === 'UniqueConstraintError') {
       return NextResponse.json({ error: error.message, field: error.field }, { status: 409 });
+    }
+    if (error.type === 'ValidationError') {
+      return NextResponse.json({ error: error.message, field: error.field }, { status: 400 });
     }
     if (error.code === 'P2002') { // Prisma unique constraint fallback
       let field = "detail";

@@ -1,37 +1,37 @@
-// app/api/schools/[schoolId]/resources/hostels/stats/route.js
+// app/api/schools/[schoolId]/resources/hostels/[hostelId]/stats/route.js
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { z } from 'zod';
-import { schoolIdSchema } from '@/validators/resources.validators';
-
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+import { schoolIdSchema, hostelIdSchema } from '@/validators/resources.validators';
 
 export async function GET(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId, hostelId } = params;
   const session = await getServerSession(authOptions);
-  if (!session || session.user?.schoolId !== schoolId || !['SCHOOL_ADMIN','HOSTEL_WARDEN','TEACHER','SECRETARY'].includes(session.user?.role)) {
+  if (!session || session.user?.schoolId !== schoolId || !['SCHOOL_ADMIN','HOSTEL_WARDEN','TEACHER'].includes(session.user?.role)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {
     schoolIdSchema.parse(schoolId);
+    hostelIdSchema.parse(hostelId);
 
-    const [hostelCount, roomAgg, genderGroup] = await prisma.$transaction([
-      prisma.hostel.count({ where: { schoolId } }),
+    // Ensure hostel exists in school
+    const hostel = await prisma.hostel.findFirst({ where: { id: hostelId, schoolId }, select: { id: true } });
+    if (!hostel) return NextResponse.json({ error: 'Hostel not found' }, { status: 404 });
+
+    const [roomAgg, totalRooms, genderGroup] = await prisma.$transaction([
       prisma.hostelRoom.aggregate({
-        where: { schoolId },
+        where: { schoolId, hostelId },
         _sum: { bedCapacity: true, currentOccupancy: true }
       }),
+      prisma.hostelRoom.count({ where: { schoolId, hostelId } }),
       prisma.student.groupBy({
         by: ['gender'],
-        where: { schoolId, hostelRoomId: { not: null } },
+        where: { schoolId, hostelRoom: { hostelId } },
         _count: { _all: true }
       })
     ]);
-
-    const totalRooms = await prisma.hostelRoom.count({ where: { schoolId } });
 
     const capacity = roomAgg._sum.bedCapacity || 0;
     const occupancy = roomAgg._sum.currentOccupancy || 0;
@@ -45,14 +45,14 @@ export async function GET(request, { params }) {
     }
 
     return NextResponse.json({
-      totals: { hostels: hostelCount, rooms: totalRooms, capacity, occupancy, vacancy, occupancyRate },
+      totals: { rooms: totalRooms, capacity, occupancy, vacancy, occupancyRate },
       genderSplit
     }, { status: 200 });
   } catch (err) {
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: 'Validation Error', issues: err.issues }, { status: 400 });
     }
-    console.error('Hostel stats error', err);
+    console.error('Hostel stats (single) error', err);
     return NextResponse.json({ error: 'Failed to fetch hostel stats' }, { status: 500 });
   }
 }

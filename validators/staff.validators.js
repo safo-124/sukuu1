@@ -39,4 +39,8 @@ export const updateTeacherSchema = z.object({
   dateOfJoining: z.string().refine((date) => !isNaN(Date.parse(date)), { message: "Invalid date of joining." })
                    .transform((date) => new Date(date)).optional(),
   departmentId: z.string().cuid({ message: "Invalid Department ID."}).optional().nullable(),
+
+  // Hostel warden fields (optional updates)
+  isHostelWarden: z.boolean().optional(),
+  hostelId: z.string().cuid({ message: 'Invalid Hostel ID.' }).optional().nullable(),
 });

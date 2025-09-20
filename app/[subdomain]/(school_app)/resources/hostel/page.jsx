@@ -151,6 +151,17 @@ export default function ManageHostelPage() {
 
   const [hostels, setHostels] = useState([]);
   const [hostelRooms, setHostelRooms] = useState([]); // Rooms for the currently selected hostel
+  const [unassignedStudents, setUnassignedStudents] = useState([]);
+  const [isLoadingStudents, setIsLoadingStudents] = useState(false);
+  const [selectedRoomForAllocation, setSelectedRoomForAllocation] = useState(null);
+  const [genderFilter, setGenderFilter] = useState('');
+  const [overallStats, setOverallStats] = useState(null);
+  const [hostelStats, setHostelStats] = useState(null);
+  const [isOccupantsDialogOpen, setIsOccupantsDialogOpen] = useState(false);
+  const [selectedRoomForOccupants, setSelectedRoomForOccupants] = useState(null);
+  const [roomOccupants, setRoomOccupants] = useState([]);
+  const [loadingOccupants, setLoadingOccupants] = useState(false);
+  const [moveTargetRoomByStudent, setMoveTargetRoomByStudent] = useState({});
   const [staffList, setStaffList] = useState([]); // For warden dropdown
 
   const [isLoading, setIsLoading] = useState(true); // For main tables
@@ -209,6 +220,40 @@ export default function ManageHostelPage() {
     } finally { setIsLoading(false); }
   }, [schoolData?.id, initialHostelId]);
 
+  const fetchUnassignedStudents = useCallback(async () => {
+    if (!schoolData?.id) return;
+    setIsLoadingStudents(true);
+    try {
+      const params = new URLSearchParams({ onlyUnassigned: 'true' });
+      if (genderFilter) params.set('gender', genderFilter);
+      const res = await fetch(`/api/schools/${schoolData.id}/people/students?${params.toString()}`);
+      if (!res.ok) throw new Error('Failed to load unassigned students');
+      const data = await res.json();
+      setUnassignedStudents(data.students || []);
+    } catch (e) {
+      setUnassignedStudents([]);
+    } finally { setIsLoadingStudents(false); }
+  }, [schoolData?.id, genderFilter]);
+
+  const loadOccupants = useCallback(async (roomId) => {
+    if (!schoolData?.id || !roomId) return;
+    setLoadingOccupants(true);
+    try {
+      const res = await fetch(`/api/schools/${schoolData.id}/people/students?hostelRoomId=${roomId}&limit=100`);
+      if (!res.ok) throw new Error('Failed to load occupants');
+      const data = await res.json();
+      setRoomOccupants(data.students || []);
+    } catch (e) {
+      setRoomOccupants([]);
+    } finally { setLoadingOccupants(false); }
+  }, [schoolData?.id]);
+
+  const openOccupantsDialog = (room) => {
+    setSelectedRoomForOccupants(room);
+    setIsOccupantsDialogOpen(true);
+    loadOccupants(room.id);
+  };
+
   const fetchDropdownDependencies = useCallback(async () => {
     if (!schoolData?.id) return;
     setIsLoadingDeps(true);
@@ -246,17 +291,40 @@ export default function ManageHostelPage() {
     }
   }, [schoolData?.id]);
 
+  const fetchOverallStats = useCallback(async () => {
+    if (!schoolData?.id) return;
+    try {
+      const res = await fetch(`/api/schools/${schoolData.id}/resources/hostels/stats`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setOverallStats(data);
+    } catch {}
+  }, [schoolData?.id]);
+
+  const fetchSelectedHostelStats = useCallback(async () => {
+    if (!schoolData?.id || !initialHostelId) { setHostelStats(null); return; }
+    try {
+      const res = await fetch(`/api/schools/${schoolData.id}/resources/hostels/${initialHostelId}/stats`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setHostelStats(data);
+    } catch {}
+  }, [schoolData?.id, initialHostelId]);
+
 
   useEffect(() => {
     if (schoolData?.id && session) {
       if (!initialHostelId) { // Only fetch main hostels list if not viewing specific rooms
         fetchHostels();
+        fetchOverallStats();
       } else {
         fetchHostelRooms(); // Fetch rooms if hostelId is in URL
+        fetchSelectedHostelStats();
       }
       fetchDropdownDependencies(); // Always fetch dropdowns
+      fetchUnassignedStudents();
     }
-  }, [schoolData, session, initialHostelId, fetchHostels, fetchHostelRooms, fetchDropdownDependencies]);
+  }, [schoolData, session, initialHostelId, fetchHostels, fetchHostelRooms, fetchDropdownDependencies, fetchUnassignedStudents, fetchOverallStats, fetchSelectedHostelStats]);
 
   // --- Hostel Form Handlers ---
   const handleHostelFormChange = (e) => setHostelFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -519,6 +587,14 @@ export default function ManageHostelPage() {
       {/* Hostels Table (Visible if no specific hostelId in URL) */}
       {!initialHostelId && (
         <div className={`${glassCardClasses} overflow-x-auto`}>
+          {overallStats?.totals && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+              <div className="p-3 rounded-lg border bg-white/60 dark:bg-zinc-900/60"><div className="text-xs ${descriptionTextClasses}">Hostels</div><div className="text-2xl font-semibold ${titleTextClasses}">{overallStats.totals.hostels}</div></div>
+              <div className="p-3 rounded-lg border bg-white/60 dark:bg-zinc-900/60"><div className="text-xs ${descriptionTextClasses}">Rooms</div><div className="text-2xl font-semibold ${titleTextClasses}">{overallStats.totals.rooms}</div></div>
+              <div className="p-3 rounded-lg border bg-white/60 dark:bg-zinc-900/60"><div className="text-xs ${descriptionTextClasses}">Capacity</div><div className="text-2xl font-semibold ${titleTextClasses}">{overallStats.totals.capacity}</div></div>
+              <div className="p-3 rounded-lg border bg-white/60 dark:bg-zinc-900/60"><div className="text-xs ${descriptionTextClasses}">Occupancy</div><div className="text-2xl font-semibold ${titleTextClasses}">{overallStats.totals.occupancy} ({overallStats.totals.occupancyRate}%)</div></div>
+            </div>
+          )}
           <h2 className={`text-xl font-bold ${titleTextClasses} mb-4 flex items-center`}>
             <Home className="mr-2 h-6 w-6 opacity-80"/>Defined Hostels
           </h2>
@@ -575,9 +651,83 @@ export default function ManageHostelPage() {
       {/* Hostel Rooms Table (Visible if specific hostelId in URL) */}
       {initialHostelId && (
         <div className={`${glassCardClasses} overflow-x-auto`}>
+          {hostelStats?.totals && (
+            <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-4">
+              <div className="p-3 rounded-lg border bg-white/60 dark:bg-zinc-900/60"><div className="text-xs ${descriptionTextClasses}">Rooms</div><div className="text-2xl font-semibold ${titleTextClasses}">{hostelStats.totals.rooms}</div></div>
+              <div className="p-3 rounded-lg border bg-white/60 dark:bg-zinc-900/60"><div className="text-xs ${descriptionTextClasses}">Capacity</div><div className="text-2xl font-semibold ${titleTextClasses}">{hostelStats.totals.capacity}</div></div>
+              <div className="p-3 rounded-lg border bg-white/60 dark:bg-zinc-900/60"><div className="text-xs ${descriptionTextClasses}">Occupancy</div><div className="text-2xl font-semibold ${titleTextClasses}">{hostelStats.totals.occupancy} ({hostelStats.totals.occupancyRate}%)</div></div>
+              <div className="p-3 rounded-lg border bg-white/60 dark:bg-zinc-900/60"><div className="text-xs ${descriptionTextClasses}">Vacancy</div><div className="text-2xl font-semibold ${titleTextClasses}">{hostelStats.totals.vacancy}</div></div>
+              <div className="p-3 rounded-lg border bg-white/60 dark:bg-zinc-900/60"><div className="text-xs ${descriptionTextClasses}">Male</div><div className="text-2xl font-semibold ${titleTextClasses}">{hostelStats.genderSplit?.MALE ?? 0}</div></div>
+              <div className="p-3 rounded-lg border bg-white/60 dark:bg-zinc-900/60"><div className="text-xs ${descriptionTextClasses}">Female</div><div className="text-2xl font-semibold ${titleTextClasses}">{hostelStats.genderSplit?.FEMALE ?? 0}</div></div>
+            </div>
+          )}
           <h2 className={`text-xl font-bold ${titleTextClasses} mb-4 flex items-center`}>
             <BedDouble className="mr-2 h-6 w-6 opacity-80"/>Rooms for {getHostelName(initialHostelId)}
           </h2>
+          {/* Allocation panel */}
+          <div className="mb-4 p-3 border rounded-lg bg-white/60 dark:bg-zinc-900/60">
+            <div className="flex items-end gap-3 flex-wrap">
+              <div>
+                <Label className="text-xs">Filter by gender</Label>
+                <Select value={genderFilter || 'all'} onValueChange={(v) => setGenderFilter(v === 'all' ? '' : v)}>
+                  <SelectTrigger className="w-40"><SelectValue placeholder="All" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="MALE">Male</SelectItem>
+                    <SelectItem value="FEMALE">Female</SelectItem>
+                    <SelectItem value="OTHER">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button variant="outline" onClick={fetchUnassignedStudents} className="mt-5">Refresh Students</Button>
+            </div>
+            <div className="mt-3 overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead className="hidden sm:table-cell">Student ID</TableHead>
+                    <TableHead className="text-right">Allocate To</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoadingStudents ? (
+                    <TableRow><TableCell colSpan={3}><Skeleton className="h-5 w-full"/></TableCell></TableRow>
+                  ) : (unassignedStudents || []).slice(0, 10).map(s => (
+                    <TableRow key={s.id}>
+                      <TableCell>{s.firstName} {s.lastName}</TableCell>
+                      <TableCell className="hidden sm:table-cell">{s.studentIdNumber}</TableCell>
+                      <TableCell className="text-right">
+                        <Select value={selectedRoomForAllocation?.[s.id] || 'none'} onValueChange={(val) => setSelectedRoomForAllocation(prev => ({ ...(prev||{}), [s.id]: val }))}>
+                          <SelectTrigger className="w-56"><SelectValue placeholder="Choose room"/></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Select room</SelectItem>
+                            {hostelRooms.map(r => (
+                              <SelectItem key={r.id} value={r.id}>
+                                {r.roomNumber} ({r.currentOccupancy}/{r.bedCapacity})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button size="sm" className="ml-2" onClick={async () => {
+                          const roomId = selectedRoomForAllocation?.[s.id];
+                          if (!roomId || roomId === 'none') { toast.error('Pick a room first'); return; }
+                          const res = await fetch(`/api/schools/${schoolData.id}/resources/hostels/${initialHostelId}/rooms/${roomId}/allocations`, {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ studentId: s.id })
+                          });
+                          const data = await res.json();
+                          if (!res.ok) { toast.error(data.error || 'Allocation failed'); return; }
+                          toast.success('Allocated');
+                          fetchUnassignedStudents();
+                          fetchHostelRooms();
+                        }}>Allocate</Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
           <Table>
             <TableHeader>
               <TableRow className="border-zinc-200/80 dark:border-zinc-700/80">
@@ -610,10 +760,7 @@ export default function ManageHostelPage() {
                   <TableCell className={`${descriptionTextClasses} text-right hidden md:table-cell`}>{room.pricePerTerm ? `$${room.pricePerTerm.toFixed(2)}` : 'N/A'}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1 md:gap-2">
-                      {/* Link to allocate students (future feature) */}
-                      {/* <Link href={`/${schoolData.subdomain}/resources/hostel/allocate?roomId=${room.id}`} passHref>
-                        <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} title="Allocate Students"> <Users className="h-4 w-4" /> </Button>
-                      </Link> */}
+                      <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} onClick={() => openOccupantsDialog(room)} title="View Occupants"> <Users className="h-4 w-4" /> </Button>
                       <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} onClick={() => openEditRoomDialog(room, { id: initialHostelId, name: getHostelName(initialHostelId) })} title="Edit Room"> <Edit3 className="h-4 w-4" /> </Button>
                       <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8 border-red-300 text-red-600 hover:bg-red-100 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/50`} onClick={() => handleDeleteHostelRoom(room.id, room.roomNumber, room.hostelId)} title="Delete Room"> <Trash2 className="h-4 w-4" /> </Button>
                     </div>
@@ -630,6 +777,90 @@ export default function ManageHostelPage() {
           </Table>
         </div>
       )}
+
+      {/* Occupants Dialog */}
+      <Dialog open={isOccupantsDialogOpen} onOpenChange={(open) => { setIsOccupantsDialogOpen(open); if (!open) { setSelectedRoomForOccupants(null); setRoomOccupants([]); setMoveTargetRoomByStudent({}); } }}>
+        <DialogContent className="sm:max-w-2xl md:max-w-3xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+          <DialogHeader>
+            <DialogTitle className={titleTextClasses}>Occupants - Room {selectedRoomForOccupants?.roomNumber}</DialogTitle>
+            <DialogDescription className={descriptionTextClasses}>
+              View, unassign, or move students assigned to this room.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className={`text-sm ${descriptionTextClasses}`}>Capacity: {selectedRoomForOccupants?.currentOccupancy}/{selectedRoomForOccupants?.bedCapacity}</p>
+              <Button variant="outline" size="sm" onClick={() => selectedRoomForOccupants && loadOccupants(selectedRoomForOccupants.id)}>Refresh</Button>
+            </div>
+            <div className="max-h-[55vh] overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead className="hidden sm:table-cell">Student ID</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loadingOccupants ? (
+                    Array.from({ length: 4 }).map((_, idx) => (
+                      <TableRow key={`occ-skl-${idx}`}><TableCell colSpan={3}><Skeleton className="h-5 w-full"/></TableCell></TableRow>
+                    ))
+                  ) : roomOccupants.length > 0 ? roomOccupants.map(stu => (
+                    <TableRow key={stu.id}>
+                      <TableCell>{stu.firstName} {stu.lastName}</TableCell>
+                      <TableCell className="hidden sm:table-cell">{stu.studentIdNumber}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end items-center gap-2">
+                          <Button variant="outline" size="sm" className="border-red-300 text-red-600 hover:bg-red-100 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/50" onClick={async () => {
+                            if (!selectedRoomForOccupants) return;
+                            const res = await fetch(`/api/schools/${schoolData.id}/resources/hostels/${initialHostelId}/rooms/${selectedRoomForOccupants.id}/allocations`, {
+                              method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ studentId: stu.id })
+                            });
+                            const data = await res.json().catch(() => ({}));
+                            if (!res.ok) { toast.error(data.error || 'Unassign failed'); return; }
+                            toast.success('Student unassigned');
+                            loadOccupants(selectedRoomForOccupants.id);
+                            fetchHostelRooms();
+                          }}>Unassign</Button>
+
+                          <div className="flex items-center gap-2">
+                            <Select value={moveTargetRoomByStudent?.[stu.id] || 'none'} onValueChange={(val) => setMoveTargetRoomByStudent(prev => ({ ...(prev||{}), [stu.id]: val }))}>
+                              <SelectTrigger className="w-48"><SelectValue placeholder="Move to room"/></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">Select room</SelectItem>
+                                {hostelRooms.filter(r => r.id !== selectedRoomForOccupants?.id).map(r => (
+                                  <SelectItem key={r.id} value={r.id}>{r.roomNumber} ({r.currentOccupancy}/{r.bedCapacity})</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Button size="sm" onClick={async () => {
+                              const toRoomId = moveTargetRoomByStudent?.[stu.id];
+                              if (!selectedRoomForOccupants || !toRoomId || toRoomId === 'none') { toast.error('Pick destination room'); return; }
+                              const res = await fetch(`/api/schools/${schoolData.id}/resources/hostels/${initialHostelId}/rooms/${selectedRoomForOccupants.id}/move`, {
+                                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ studentId: stu.id, toRoomId })
+                              });
+                              const data = await res.json().catch(() => ({}));
+                              if (!res.ok) { toast.error(data.error || 'Move failed'); return; }
+                              toast.success('Student moved');
+                              loadOccupants(selectedRoomForOccupants.id);
+                              fetchHostelRooms();
+                            }}>Move</Button>
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )) : (
+                    <TableRow>
+                      <TableCell colSpan={3} className={`text-center py-8 ${descriptionTextClasses}`}>No occupants in this room.</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

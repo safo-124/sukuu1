@@ -73,6 +73,20 @@ export const createHostelRoomSchema = z.object({
 
 export const updateHostelRoomSchema = createHostelRoomSchema.partial();
 export const hostelRoomIdSchema = z.string().min(1, "Hostel Room ID is required.");
+
+// --- Hostel Allocation Schemas (NEW) ---
+export const allocateStudentToRoomSchema = z.object({
+  studentId: z.string().min(1, 'Student ID is required.'),
+});
+
+export const unassignStudentFromRoomSchema = z.object({
+  studentId: z.string().min(1, 'Student ID is required.'),
+});
+
+export const moveStudentRoomSchema = z.object({
+  studentId: z.string().min(1, 'Student ID is required.'),
+  toRoomId: z.string().min(1, 'Destination Room ID is required.'),
+});
 // --- Vehicle Schemas (NEW) ---
 export const createVehicleSchema = z.object({
   registrationNumber: z.string().min(1, "Registration number is required.").max(50, "Registration number is too long."),

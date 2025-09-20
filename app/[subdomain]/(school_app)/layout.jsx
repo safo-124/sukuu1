@@ -115,7 +115,7 @@ function getNavigationSections(schoolSubdomain, role) {
       { href: `/${schoolSubdomain}/people/accountants`, label: 'Manage Accountants', icon: DollarSign },
       { href: `/${schoolSubdomain}/people/procurement`, label: 'Manage Procurement', icon: Briefcase },
   { href: `/${schoolSubdomain}/people/librarians`, label: 'Manage Librarians', icon: Library },
-  { href: `/${schoolSubdomain}/people/wardens`, label: 'Manage Wardens', icon: Home },
+  // Removed dedicated wardens management; warden assignment is integrated into Teachers
       { href: `/${schoolSubdomain}/people/hr-staff`, label: 'Manage HR Staff', icon: Briefcase },
     ];
     const attendanceItems = [

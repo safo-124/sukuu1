@@ -1,3 +1,5 @@
+# Sukuu1 (Next.js)
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
 ## Getting Started
@@ -27,8 +29,6 @@ To learn more about Next.js, take a look at the following resources:
 - [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
 - [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
 ## Deploy on Vercel
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
@@ -51,43 +51,49 @@ The project now includes a Scholarships module enabling percentage or fixed redu
 | GET    | `/api/schools/{schoolId}/finance/invoices?includeScholarship=true`       | Invoice listing enriched with scholarship metadata |
 
 ### Validators
+
 Defined in `validators/finance.validators.js`:
+
 - `createScholarshipSchema`
 - `updateScholarshipSchema`
 
-Rules:
+### Rules
+
 - `type = PERCENTAGE` requires `percentage` (0–100), forbids `amount`.
 - `type = FIXED` requires `amount`, forbids `percentage`.
 - Uniqueness: one scholarship per (student, academicYear).
 
 ### UI Page
+
 `app/[subdomain]/(school_app)/finance/scholarships/page.jsx` includes:
+
 - Filters: search, academic year, active status.
 - Create modal.
 - Active toggle (optimistic update).
 - Table display with estimated scholarship context.
 
 ### Invoice Enrichment
+
 When `includeScholarship=true` is supplied to invoices listing, each invoice may include:
+
 ```json
 {
-	"scholarship": {
-		"id": "...",
-		"type": "PERCENTAGE|FIXED",
-		"percentage": 50,
-		"amount": null,
-		"estimatedValue": 125.00
-	}
+  "scholarship": {
+    "id": "...",
+    "type": "PERCENTAGE|FIXED",
+    "percentage": 50,
+    "amount": null,
+    "estimatedValue": 125.0
+  }
 }
 ```
+
 `estimatedValue` is a convenience (percentage of `totalAmount` or fixed amount). Final business logic can refine application at payment/statement generation time.
 
 
 ## Student Portal & Grade Publication
 
 Student accounts (`User.role = STUDENT`) are linked 1:1 with `Student` records, enabling secure, read-only academic visibility.
-
-### Capabilities
 
 - View assignments (`/academics/assignments`)
 - View only published grades (dashboard + grades page)
@@ -143,8 +149,6 @@ The system now supports creating a portal login at the moment of student enrollm
 7. Submit. A `User` row (role `STUDENT`) is created and linked to the new `Student` (`student.userId`).
 8. Student signs in via: `/<subdomain>/student-login`.
 
-#### Password Rules
-
 - Minimum 8 characters; maximum 72 (bcrypt safe range).
 - Must contain: at least one uppercase letter, one lowercase letter, and one digit.
 - A generator button creates a 12‑character high-entropy password (includes symbols & avoids ambiguous characters) and auto-fills both password & confirm fields.
@@ -195,8 +199,6 @@ Successful response contains `userCreated: true`:
 | Missing password when `createUserAccount` true | 400 | Email & password are required when creating a user account. |
 | Weak password (regex fail) | 400 | Password must include upper, lower, and a digit. |
 
-#### Editing vs. Enrollment
-
 - Editing a student profile does NOT expose account creation (future enhancement: “Create Account” action for existing students lacking `userId`).
 - Admission number & admission date are immutable in the edit dialog.
 
@@ -204,24 +206,50 @@ Successful response contains `userCreated: true`:
 
 Path: `app/[subdomain]/student-login/page.jsx` (mirrors teacher login UI; now redirects to `/<subdomain>/student/dashboard`).
 
-#### Security Notes
-
 - Passwords hashed with bcrypt (`bcryptjs`, cost 10).
 - No raw password persisted or logged.
 - Encourage future: password reset, forced first-login rotation, rate limiting.
-
-#### Future Enhancements
-
-- Bulk “Generate Accounts” for existing students without logins.
 - Parent/guardian account provisioning.
 - Force password change on first login (`mustChangePassword` flag on `User`).
 - Dedicated student dashboard & navigation constraints.
-
-
-### Additional Roadmap Items
-
 - Parent portal & guardian linking.
 - Batch publish UI & status dashboard.
 - Grade audit logging & immutable history.
 - Caching / denormalized performance metrics.
+
+
+## Hostel Management Module
+
+
+Allocation & Moves:
+
+- POST `/api/schools/{schoolId}/resources/hostels/{hostelId}/rooms/{roomId}/move` body: `{ studentId, toRoomId }`
+- POST `/api/schools/{schoolId}/resources/hostels/{hostelId}/rooms`
+- GET `/api/schools/{schoolId}/people/students?hostelRoomId={roomId}` — to fetch room occupants
+
+Stats:
+
+- Allocation/move/unassign: `SCHOOL_ADMIN` or `HOSTEL_WARDEN`
+- Rooms listing: `SCHOOL_ADMIN`, `HOSTEL_WARDEN`, `TEACHER`
+- Students listing (for allocation): `SCHOOL_ADMIN`, `HOSTEL_WARDEN`, `TEACHER`, `SECRETARY`, `ACCOUNTANT`, `LIBRARIAN`, `PARENT` (parents see only their children)
+- Stats: `SCHOOL_ADMIN`, `HOSTEL_WARDEN`, `TEACHER`, `SECRETARY`
+
+Path: `app/[subdomain]/(school_app)/resources/hostel/page.jsx`
+
+- Hostels view: lists defined hostels; shows overall stats cards (hostels, rooms, capacity, occupancy%).
+- Rooms view (`?hostelId=...`): shows per-hostel stats (rooms, capacity, occupancy%, vacancy, gender split). Includes:
+
+### Business Rules
+
+- Capacity enforced at room level: no over-allocation.
+- Gender preference enforced at hostel level when set (non-Mixed).
+- Duplicate allocation prevented; use the move endpoint.
+
+### Quick Test Steps
+
+1. Create a hostel and a few rooms in it.
+2. Ensure some students exist; set gender where needed.
+3. Open `/<subdomain>/resources/hostel?hostelId=<HOSTEL_ID>`.
+4. Allocation panel: filter (optional) and allocate students to rooms.
+5. Occupants dialog: unassign or move students; confirm occupancy changes in room list and stats cards.
 

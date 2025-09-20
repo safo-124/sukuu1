@@ -10,7 +10,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UserPlus, Edit3, Trash2, UserCog as UserCogIcon, AlertTriangle, Search, CheckSquare, XSquare, Loader2 } from 'lucide-react'; // Added Loader2
+import { UserPlus, Edit3, Trash2, UserCog as UserCogIcon, AlertTriangle, Search, CheckSquare, XSquare, Loader2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'; // Added Loader2 and pagination icons
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose
 } from "@/components/ui/dialog";
@@ -41,6 +41,8 @@ const initialEditFormData = {
   staffIdNumber: '', jobTitle: '', qualification: '', 
   dateOfJoining: '',
   departmentId: '', isActive: true,
+  isHostelWarden: false,
+  hostelId: '',
 };
 
 // ✨ Corrected TeacherFormFields to expect 'formData' prop ✨
@@ -92,7 +94,7 @@ const TeacherFormFields = ({ formData, onFormChange, onSelectChange, onSwitchCha
                 <SelectContent className="bg-white dark:bg-zinc-900"><SelectItem value="none" className="text-zinc-500">No Department</SelectItem>{departmentsList?.map(dept => <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>)}</SelectContent>
             </Select>
         </div>
-        {!isEdit && (
+        {(
           <>
             <div className="sm:col-span-2 text-sm font-medium text-zinc-500 dark:text-zinc-400 pb-2 border-b dark:border-zinc-700 mt-4 mb-2">Hostel Warden (Optional)</div>
             <div className="flex items-center space-x-2 sm:col-span-2">
@@ -293,9 +295,11 @@ export default function ManageTeachersPage() {
             const errData = await response.json().catch(() => ({}));
             throw new Error(errData.error || "Failed to fetch teacher details for editing.");
         }
-        const data = await response.json();
+    const data = await response.json();
         if (data.teacher) {
             const t = data.teacher;
+      // Determine current hostel assignment (if any) where this teacher is a warden
+      const currentHostelId = Array.isArray(t.hostels) && t.hostels.length > 0 ? t.hostels[0].id : '';
             setEditFormData({
                 id: t.id,
                 userId: t.user.id,
@@ -308,7 +312,9 @@ export default function ManageTeachersPage() {
                 jobTitle: t.jobTitle || '',
                 qualification: t.qualification || '',
                 dateOfJoining: t.dateOfJoining ? new Date(t.dateOfJoining).toISOString().split('T')[0] : '',
-                departmentId: t.departmentId || '',
+        departmentId: t.departmentId || '',
+        isHostelWarden: !!currentHostelId,
+        hostelId: currentHostelId || '',
             });
         } else {
             toast.error("Teacher details not found.");
@@ -534,13 +540,14 @@ export default function ManageTeachersPage() {
                      <div className="pt-6 flex justify-end"><Skeleton className="h-10 w-24" /> <Skeleton className="h-10 w-24 ml-2" /></div>
                 </div>
             ) : (
-                <form onSubmit={handleEditSubmit} className="space-y-6 py-1">
+        <form onSubmit={handleEditSubmit} className="space-y-6 py-1">
                     <TeacherFormFields 
                         formData={editFormData} 
                         onFormChange={handleEditFormChange} 
                         onSelectChange={handleEditSelectChange} 
                         onSwitchChange={handleEditSwitchChange}
-                        departmentsList={departments}
+            departmentsList={departments}
+            hostelsList={hostels}
                         isEdit={true}
                         isLoadingDeps={isLoadingDropdowns}
                     />
