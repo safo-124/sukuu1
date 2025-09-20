@@ -42,13 +42,25 @@ export async function GET(request, { params }) {
     const academicYearId = currentYear.id;
 
     // 2. Collect section IDs where teacher has relationship
-    // Class teacher sections
-  const classTeacherSections = await prisma.section.findMany({ where: { schoolId, classTeacherId: staffId }, select: { id: true, classId: true } });
-  const classTeacherSectionIds = classTeacherSections.map(s => s.id);
+    // Class teacher sections (only include when not scoping to a specific subject)
+    const classTeacherSections = await prisma.section.findMany({ where: { schoolId, classTeacherId: staffId }, select: { id: true, classId: true } });
+    let classTeacherSectionIds = classTeacherSections.map(s => s.id);
+    if (subjectIdFilter) {
+      // If filtering by a subject, don't include pure class-teacher sections by default
+      classTeacherSectionIds = [];
+    }
 
     // Sections via timetable entries
     const timetableSectionRows = await prisma.timetableEntry.findMany({
-      where: { schoolId, staffId, academicYearId, ...(subjectIdFilter ? { subjectId: subjectIdFilter } : {}) },
+      where: {
+        schoolId,
+        staffId,
+        ...(subjectIdFilter ? { subjectId: subjectIdFilter } : {}),
+        // TimetableEntry has no academicYearId column; constrain through Section -> Class -> academicYearId
+        section: {
+          class: { academicYearId }
+        }
+      },
       distinct: ['sectionId'],
       select: { sectionId: true }
     });
@@ -160,7 +172,13 @@ export async function GET(request, { params }) {
     if (includeSubjects) {
       // Subjects via timetable
       const timetableSubjects = await prisma.timetableEntry.findMany({
-        where: { schoolId, staffId, academicYearId, sectionId: { in: candidateSectionIds }, ...(subjectIdFilter ? { subjectId: subjectIdFilter } : {}) },
+        where: {
+          schoolId,
+          staffId,
+          sectionId: { in: candidateSectionIds },
+          ...(subjectIdFilter ? { subjectId: subjectIdFilter } : {}),
+          section: { class: { academicYearId } }
+        },
         select: { sectionId: true, subject: { select: { id: true, name: true } } }
       });
       for (const row of timetableSubjects) {

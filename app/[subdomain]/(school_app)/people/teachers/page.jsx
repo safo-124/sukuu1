@@ -127,6 +127,16 @@ export default function ManageTeachersPage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  // If a TEACHER lands here (admin page), redirect them to the teacher staff directory
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (session?.user?.role === 'TEACHER') {
+      const sub = schoolData?.subdomain || pathname.split('/')[1];
+      if (!pathname.includes('/teacher/people/teachers')) {
+        router.replace(`/${sub}/teacher/people/teachers`);
+      }
+    }
+  }, [session?.user?.role, schoolData?.subdomain, pathname, router]);
 
   const [teachers, setTeachers] = useState([]);
   const [pagination, setPagination] = useState({ currentPage: 1, totalPages: 1, totalTeachers: 0, limit: 10 });

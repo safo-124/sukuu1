@@ -137,13 +137,16 @@ export default function ManageStudentsPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   // If a TEACHER lands here (admin page) redirect them to their scoped students page
-  if (typeof window !== 'undefined' && session?.user?.role === 'TEACHER') {
-    const sub = schoolData?.subdomain || pathname.split('/')[1];
-    // Prevent infinite loop by ensuring we're not already on teacher path
-    if (!pathname.includes('/teacher/people/students')) {
-      router.replace(`/${sub}/teacher/people/students`);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (session?.user?.role === 'TEACHER') {
+      const sub = schoolData?.subdomain || pathname.split('/')[1];
+      // Prevent infinite loop by ensuring we're not already on teacher path
+      if (!pathname.includes('/teacher/students')) {
+        router.replace(`/${sub}/teacher/students`);
+      }
     }
-  }
+  }, [session?.user?.role, schoolData?.subdomain, pathname, router]);
 
   const [students, setStudents] = useState([]);
   const [pagination, setPagination] = useState({ currentPage: 1, totalPages: 1, totalStudents: 0, limit: 10 });
@@ -248,7 +251,7 @@ export default function ManageStudentsPage() {
   }, [searchTerm, searchParams, pathname, router]);
   
   useEffect(() => {
-    if (schoolData?.id && session) {
+    if (schoolData?.id && session && session.user?.role !== 'TEACHER') {
       const currentPage = parseInt(searchParams.get('page') || '1', 10);
       const currentSearch = searchParams.get('search') || '';
       fetchStudents(currentPage, currentSearch);

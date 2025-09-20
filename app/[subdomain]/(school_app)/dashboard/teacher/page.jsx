@@ -142,7 +142,7 @@ export default function TeacherDashboardPage() {
           </div>
         </Link>
 
-        <Link href={`/${subdomain}/people/students`} passHref>
+        <Link href={`/${subdomain}/teacher/students`} passHref>
           <div className={`${featureCardClasses}`}>
             <Users className="h-12 w-12 text-orange-600 dark:text-orange-400 mb-3" />
             <h2 className={`text-xl font-semibold ${titleTextClasses} mb-1`}>My Students</h2>

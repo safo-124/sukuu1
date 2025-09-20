@@ -34,8 +34,8 @@ export default function TeacherSidebar({ subdomain, onNavigate, collapsed = fals
     },
     {
       key: 'people', title: 'People', items: [
-        { href: `/${subdomain}/teacher/students`, label: 'My Students', icon: Users },
-        { href: `/${subdomain}/people/teachers`, label: 'Staff Directory', icon: UserCog },
+  { href: `/${subdomain}/teacher/students`, label: 'My Students', icon: Users },
+  { href: `/${subdomain}/teacher/people/teachers`, label: 'Staff Directory', icon: UserCog },
       ]
     },
     {

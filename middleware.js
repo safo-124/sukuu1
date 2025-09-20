@@ -57,6 +57,13 @@ export async function middleware(request) {
         '/dashboard/teacher',
         // Teacher academics live under /teacher/academics/*
         '/teacher/academics',
+        // Canonical teacher students route
+        '/teacher/students',
+        // Teacher-specific people routes
+        '/teacher/people',
+        // Explicit teacher staff directory path
+        '/teacher/people/teachers',
+        // Backwards-compat (legacy teacher access under people/*)
         '/people/students',
         '/people/teachers',
         '/attendance/students',
@@ -193,6 +200,10 @@ export async function middleware(request) {
       const teacherAllowedPrefixes = [
         '/dashboard/teacher',
         '/teacher/academics',
+        // Canonical teacher students route
+        '/teacher/students',
+        '/teacher/people',
+        '/teacher/people/teachers',
         '/people/students',
         '/people/teachers',
         '/attendance/students',
