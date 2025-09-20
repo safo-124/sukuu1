@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { useSchool } from '../../../layout';
+import { useSchool } from '../../../../layout';
 import { useSession } from 'next-auth/react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
