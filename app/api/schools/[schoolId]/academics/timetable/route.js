@@ -25,11 +25,16 @@ export async function GET(request, { params }) {
   const { searchParams } = new URL(request.url);
   const sectionIdFilter = searchParams.get('sectionId');
   const staffIdFilter = searchParams.get('staffId');
+  const roomIdFilter = searchParams.get('roomId');
+  const dayOfWeekFilterRaw = searchParams.get('dayOfWeek');
+  const dayOfWeekFilter = (dayOfWeekFilterRaw !== null && dayOfWeekFilterRaw !== '') ? Number(dayOfWeekFilterRaw) : null;
   
   try {
-    const whereClause = { schoolId: schoolId };
+  const whereClause = { schoolId: schoolId };
     if (sectionIdFilter) whereClause.sectionId = sectionIdFilter;
     if (staffIdFilter) whereClause.staffId = staffIdFilter;
+  if (roomIdFilter) whereClause.roomId = roomIdFilter;
+  if (dayOfWeekFilter !== null && !Number.isNaN(dayOfWeekFilter)) whereClause.dayOfWeek = dayOfWeekFilter;
 
     let timetableEntries = await prisma.timetableEntry.findMany({
       where: whereClause,

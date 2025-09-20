@@ -203,6 +203,12 @@ model School {
   bookLoans               BookLoan[]
   HostelRoom              HostelRoom[]
   inventoryTransactions   InventoryTransaction[]
+  // Advanced Timetable relations
+  sectionSubjectRequirements SectionSubjectRequirement[]
+  staffUnavailabilities      StaffUnavailability[]
+  roomUnavailabilities       RoomUnavailability[]
+  pinnedTimetableSlots       PinnedTimetableSlot[]
+  timetableRuns              TimetableRun[]
 
   @@index([subdomain])
   @@index([customDomain])
@@ -395,6 +401,8 @@ model Section {
 
   studentEnrollments StudentEnrollment[]
   timetableEntries   TimetableEntry[]
+  sectionSubjectRequirements SectionSubjectRequirement[]
+  pinnedTimetableSlots       PinnedTimetableSlot[]
   attendances        Attendance[]        @relation("SectionAttendances")
   assignments        Assignment[]
   createdAt          DateTime            @default(now())
@@ -425,6 +433,8 @@ model Subject {
   grades              Grade[]
   examSchedules       ExamSchedule[]        @relation("SubjectExamSchedules")
   timetableEntries    TimetableEntry[]      @relation("SubjectTimetableSlots")
+  sectionSubjectRequirements SectionSubjectRequirement[]
+  pinnedTimetableSlots       PinnedTimetableSlot[]
   schoolLevelLinks    SubjectSchoolLevel[]
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
@@ -545,6 +555,8 @@ model Staff {
   leaveApplications         LeaveApplication[]
   payrollRecords            PayrollRecord[]
   timetableEntries          TimetableEntry[]
+  staffUnavailabilities     StaffUnavailability[]
+  pinnedTimetableSlots      PinnedTimetableSlot[]
   hostels                   Hostel[]
   drivers                   Driver[]
   maxWeeklyTeachingHours    Float?
@@ -866,6 +878,8 @@ model TimetableEntry {
   room      Room?    @relation("TimetableRoomSlots", fields: [roomId], references: [id], onDelete: SetNull)
   schoolId  String
   school    School   @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  generatedByRunId String?
+  generatedByRun   TimetableRun? @relation(fields: [generatedByRunId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -875,6 +889,136 @@ model TimetableEntry {
   @@index([schoolId, sectionId, dayOfWeek])
   @@index([schoolId, staffId, dayOfWeek])
   @@index([schoolId, roomId, dayOfWeek])
+  @@index([generatedByRunId])
+}
+
+// Advanced timetable: per-section subject requirements (periods per week, duration, spacing)
+model SectionSubjectRequirement {
+  id               String  @id @default(cuid())
+  schoolId         String
+  school           School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  sectionId        String
+  section          Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subjectId        String
+  subject          Subject @relation(fields: [subjectId], references: [id])
+  periodsPerWeek   Int
+  durationMinutes  Int     @default(60)
+  minGapMins       Int     @default(0) // minimum minutes between two sessions of this subject within a section per day
+  allowDouble      Boolean @default(false) // allow back-to-back double periods
+  preferredRoomType String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([schoolId, sectionId, subjectId])
+  @@index([schoolId])
+  @@index([sectionId])
+  @@index([subjectId])
+}
+
+// Teacher unavailability windows (hard constraints)
+model StaffUnavailability {
+  id        String   @id @default(cuid())
+  schoolId  String
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  staffId   String
+  staff     Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  dayOfWeek Int
+  startTime String
+  endTime   String
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([schoolId])
+  @@index([staffId, dayOfWeek])
+}
+
+// Room unavailability windows (maintenance, exams, etc.)
+model RoomUnavailability {
+  id        String   @id @default(cuid())
+  schoolId  String
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  dayOfWeek Int
+  startTime String
+  endTime   String
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([schoolId])
+  @@index([roomId, dayOfWeek])
+}
+
+// Pinned (fixed) slots that the generator must respect
+model PinnedTimetableSlot {
+  id        String   @id @default(cuid())
+  schoolId  String
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  sectionId String
+  section   Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   Subject  @relation(fields: [subjectId], references: [id])
+  staffId   String?
+  staff     Staff?   @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  roomId    String?
+  room      Room?    @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  dayOfWeek Int
+  startTime String
+  endTime   String
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([schoolId])
+  @@index([sectionId, dayOfWeek, startTime])
+}
+
+// Timetable generation runs & placements (draft results before publish)
+enum TimetableRunStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELED
+}
+
+model TimetableRun {
+  id          String               @id @default(cuid())
+  schoolId    String
+  school      School               @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  name        String?
+  status      TimetableRunStatus   @default(PENDING)
+  optionsJson Json?
+  metricsJson Json?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  placements  TimetablePlacement[]
+  generatedEntries TimetableEntry[]
+
+  @@index([schoolId])
+}
+
+model TimetablePlacement {
+  id        String   @id @default(cuid())
+  runId     String
+  run       TimetableRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  schoolId  String
+  sectionId String
+  subjectId String
+  staffId   String
+  roomId    String?
+  dayOfWeek Int
+  startTime String
+  endTime   String
+  score     Float?
+  violations Int? @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([runId])
+  @@index([schoolId])
+  @@unique([runId, sectionId, dayOfWeek, startTime])
 }
 
 // --------------------
@@ -1347,6 +1491,8 @@ model Room {
   schoolId         String
   school           School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   timetableEntries TimetableEntry[] @relation("TimetableRoomSlots")
+  roomUnavailabilities RoomUnavailability[]
+  pinnedTimetableSlots PinnedTimetableSlot[]
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 

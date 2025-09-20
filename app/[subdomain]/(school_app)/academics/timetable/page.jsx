@@ -20,7 +20,10 @@ import {
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Clock, CalendarDays, PlusCircle, Loader2, AlertTriangle, Home, BookOpen, UserCog, Layers, Filter, Maximize, Edit3, Trash2, XCircle, Grid, List, Lightbulb } from 'lucide-react'; // Added icons
+import { Clock, CalendarDays, PlusCircle, Loader2, AlertTriangle, Home, BookOpen, UserCog, Layers, Filter, Maximize, Edit3, Trash2, XCircle, Grid, List, Lightbulb, Rocket } from 'lucide-react'; // Added icons
+
+// Visual constants for the timetable grid
+const GRID_ROW_HEIGHT = 48; // px per 30-minute slot (reduced from 60 to compact the grid)
 
 // Helper function to convert day number to name (JS Date.getDay() standard: Sunday=0, Monday=1, ..., Saturday=6)
 const getDayName = (dayNum) => {
@@ -149,6 +152,7 @@ const TimetableFormFields = ({ formData, onFormChange, onSelectChange, sectionsL
 function AdminTimetablePage() {
   const schoolData = useSchool();
   const { data: session } = useSession();
+  const isAdmin = session?.user?.role === 'SCHOOL_ADMIN';
 
   const [timetableEntries, setTimetableEntries] = useState([]);
   const [sections, setSections] = useState([]);
@@ -177,6 +181,19 @@ function AdminTimetablePage() {
   const [formError, setFormError] = useState('');
 
   const [isGridView, setIsGridView] = useState(true); // New state to toggle view
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isGenOptionsOpen, setIsGenOptionsOpen] = useState(false);
+  const [genOptions, setGenOptions] = useState({ includePinned: true, honorUnavailability: true, preferredStartTime: '', preferredEndTime: '', targetSectionIds: [] });
+
+  // Requirements management state
+  const [isReqDialogOpen, setIsReqDialogOpen] = useState(false);
+  const [requirements, setRequirements] = useState([]);
+  const [reqFilterSectionId, setReqFilterSectionId] = useState('');
+  const initialReqForm = { id: null, sectionId: '', subjectId: '', periodsPerWeek: '1', durationMinutes: '60', minGapMins: '0', allowDouble: false, preferredRoomType: '' };
+  const [reqFormData, setReqFormData] = useState({ ...initialReqForm });
+  const [editingReq, setEditingReq] = useState(null);
+  const [isReqSubmitting, setIsReqSubmitting] = useState(false);
+  const [reqError, setReqError] = useState('');
 
   // State for Timetable Suggestion
   const [isSuggestionDialogOpen, setIsSuggestionDialogOpen] = useState(false);
@@ -184,6 +201,46 @@ function AdminTimetablePage() {
   const [suggestedSlot, setSuggestedSlot] = useState(null);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [suggestionError, setSuggestionError] = useState('');
+
+  // Overlay state for grid (pinned/unavailability)
+  const [overlayPinnedSet, setOverlayPinnedSet] = useState(new Set()); // keys of form `${day}-${time}`
+  const [overlayStaffUnavSet, setOverlayStaffUnavSet] = useState(new Set());
+  const [overlayRoomUnavSet, setOverlayRoomUnavSet] = useState(new Set());
+  const [isOverlayLoading, setIsOverlayLoading] = useState(false);
+  const [overlayShowPinned, setOverlayShowPinned] = useState(true);
+  const [overlayShowStaff, setOverlayShowStaff] = useState(true);
+  const [overlayShowRoom, setOverlayShowRoom] = useState(true);
+
+  // Staff Unavailability management state
+  const [isStaffUnavDialogOpen, setIsStaffUnavDialogOpen] = useState(false);
+  const [staffUnavailability, setStaffUnavailability] = useState([]);
+  const [staffUnavFilterStaffId, setStaffUnavFilterStaffId] = useState('');
+  const initialStaffUnavForm = { id: null, staffId: '', dayOfWeek: '', startTime: '', endTime: '', note: '' };
+  const [staffUnavFormData, setStaffUnavFormData] = useState({ ...initialStaffUnavForm });
+  const [editingStaffUnav, setEditingStaffUnav] = useState(null);
+  const [isStaffUnavSubmitting, setIsStaffUnavSubmitting] = useState(false);
+  const [staffUnavError, setStaffUnavError] = useState('');
+
+  // Room Unavailability management state
+  const [isRoomUnavDialogOpen, setIsRoomUnavDialogOpen] = useState(false);
+  const [roomUnavailability, setRoomUnavailability] = useState([]);
+  const [roomUnavFilterRoomId, setRoomUnavFilterRoomId] = useState('');
+  const initialRoomUnavForm = { id: null, roomId: '', dayOfWeek: '', startTime: '', endTime: '', note: '' };
+  const [roomUnavFormData, setRoomUnavFormData] = useState({ ...initialRoomUnavForm });
+  const [editingRoomUnav, setEditingRoomUnav] = useState(null);
+  const [isRoomUnavSubmitting, setIsRoomUnavSubmitting] = useState(false);
+  const [roomUnavError, setRoomUnavError] = useState('');
+
+  // Pinned Slots management state
+  const [isPinnedDialogOpen, setIsPinnedDialogOpen] = useState(false);
+  const [pinnedSlots, setPinnedSlots] = useState([]);
+  const [pinnedFilterSectionId, setPinnedFilterSectionId] = useState('');
+  const [pinnedFilterStaffId, setPinnedFilterStaffId] = useState('');
+  const initialPinnedForm = { id: null, sectionId: '', subjectId: '', staffId: '', roomId: '', dayOfWeek: '', startTime: '', endTime: '', note: '' };
+  const [pinnedFormData, setPinnedFormData] = useState({ ...initialPinnedForm });
+  const [editingPinned, setEditingPinned] = useState(null);
+  const [isPinnedSubmitting, setIsPinnedSubmitting] = useState(false);
+  const [pinnedError, setPinnedError] = useState('');
 
 
   // Tailwind class constants
@@ -257,8 +314,8 @@ function AdminTimetablePage() {
     const gridStartTimeMins = timeToMinutes(timeSlots[0] || '00:00'); // Time of the very first slot displayed
     const offsetMins = startMins - gridStartTimeMins;
 
-    const topOffsetPx = (offsetMins / 30) * 60; // Assuming 60px height for each 30-minute slot
-    const heightPx = (durationMins / 30) * 60; // Height of the entry card
+    const topOffsetPx = (offsetMins / 30) * GRID_ROW_HEIGHT; // use constant row height
+    const heightPx = (durationMins / 30) * GRID_ROW_HEIGHT; // Height of the entry card
 
     return { topOffsetPx, heightPx };
   }, [timeSlots]);
@@ -460,6 +517,423 @@ function AdminTimetablePage() {
     }
   };
 
+  // --- Automated Generation ---
+  const runAutoGeneration = async () => {
+    if (!schoolData?.id) return;
+    setIsGenerating(true);
+    const toastId = `generate-timetable-${schoolData.id}`;
+    toast.loading('Generating timetable...', { id: toastId });
+    try {
+      const payload = {
+        includePinned: !!genOptions.includePinned,
+        honorUnavailability: !!genOptions.honorUnavailability,
+        ...(genOptions.preferredStartTime ? { preferredStartTime: genOptions.preferredStartTime } : {}),
+        ...(genOptions.preferredEndTime ? { preferredEndTime: genOptions.preferredEndTime } : {}),
+        ...(Array.isArray(genOptions.targetSectionIds) && genOptions.targetSectionIds.length ? { targetSectionIds: genOptions.targetSectionIds } : {}),
+      };
+      const res = await fetch(`/api/schools/${schoolData.id}/academics/timetable/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = data.error || 'Failed to generate timetable.';
+        toast.error('Generation failed', { description: msg, id: toastId });
+      } else {
+        toast.success(`Generated ${data.placed || 0} placements`, { id: toastId, description: 'Timetable updated.' });
+        // Refresh entries
+        await fetchTimetableEntries();
+      }
+    } catch (e) {
+      toast.error('Unexpected error during generation', { id: toastId });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // --- Requirements CRUD ---
+  const fetchRequirements = useCallback(async (sectionId) => {
+    if (!schoolData?.id) return;
+    try {
+      const q = new URLSearchParams();
+      if (sectionId) q.set('sectionId', sectionId);
+      const res = await fetch(`/api/schools/${schoolData.id}/academics/requirements?${q.toString()}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to fetch requirements');
+      setRequirements(Array.isArray(data.requirements) ? data.requirements : []);
+    } catch (e) {
+      toast.error('Failed to fetch requirements', { description: e.message });
+      setRequirements([]);
+    }
+  }, [schoolData?.id]);
+
+  const openAddReqDialog = () => {
+    setEditingReq(null);
+    setReqFormData({ ...initialReqForm });
+    setReqError('');
+    setIsReqDialogOpen(true);
+    fetchRequirements(reqFilterSectionId);
+  };
+  const openEditReqDialog = (req) => {
+    setEditingReq(req);
+    setReqFormData({
+      id: req.id,
+      sectionId: req.sectionId,
+      subjectId: req.subjectId,
+      periodsPerWeek: String(req.periodsPerWeek || '1'),
+      durationMinutes: String(req.durationMinutes || '60'),
+      minGapMins: String(req.minGapMins || '0'),
+      allowDouble: !!req.allowDouble,
+      preferredRoomType: req.preferredRoomType || '',
+    });
+    setReqError('');
+    setIsReqDialogOpen(true);
+  };
+  const handleReqFormChange = (e) => setReqFormData(prev => ({ ...prev, [e.target.name]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
+  const handleReqSelectChange = (name, value) => setReqFormData(prev => ({ ...prev, [name]: value }));
+
+  const handleReqSubmit = async (e) => {
+    e.preventDefault();
+    if (!schoolData?.id) return;
+    setIsReqSubmitting(true);
+    setReqError('');
+    try {
+      const payload = {
+        sectionId: reqFormData.sectionId,
+        subjectId: reqFormData.subjectId,
+        periodsPerWeek: parseInt(reqFormData.periodsPerWeek, 10),
+        durationMinutes: parseInt(reqFormData.durationMinutes, 10),
+        minGapMins: parseInt(reqFormData.minGapMins, 10),
+        allowDouble: !!reqFormData.allowDouble,
+        preferredRoomType: reqFormData.preferredRoomType || null,
+      };
+      const url = editingReq ? `/api/schools/${schoolData.id}/academics/requirements/${editingReq.id}` : `/api/schools/${schoolData.id}/academics/requirements`;
+      const method = editingReq ? 'PUT' : 'POST';
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = data.error || 'Failed to save requirement';
+        setReqError(msg);
+        toast.error('Save failed', { description: msg });
+      } else {
+        toast.success(editingReq ? 'Requirement updated' : 'Requirement created');
+        await fetchRequirements(reqFilterSectionId);
+        setReqFormData({ ...initialReqForm });
+        setEditingReq(null);
+      }
+    } catch (e) {
+      setReqError('Unexpected error');
+    } finally {
+      setIsReqSubmitting(false);
+    }
+  };
+
+  const handleReqDelete = async (id) => {
+    if (!schoolData?.id) return;
+    if (!window.confirm('Delete this requirement?')) return;
+    const toastId = `delete-req-${id}`;
+    toast.loading('Deleting...', { id: toastId });
+    try {
+      const res = await fetch(`/api/schools/${schoolData.id}/academics/requirements/${id}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Delete failed');
+      toast.success('Requirement deleted', { id: toastId });
+      await fetchRequirements(reqFilterSectionId);
+    } catch (e) {
+      toast.error('Delete failed', { description: e.message, id: toastId });
+    }
+  };
+
+  // --- Overlays: fetch + compute sets ---
+  const computeOverlaySets = useCallback((opts) => {
+    const { pinned = [], staffUnav = [], roomUnav = [], restrictDay = '' } = opts || {};
+    const pinnedSet = new Set();
+    const staffSet = new Set();
+    const roomSet = new Set();
+
+    // helper to fill keys for a range
+    const fillKeysForRange = (targetSet, dayOfWeek, startTime, endTime) => {
+      const startM = timeToMinutes(startTime);
+      const endM = timeToMinutes(endTime);
+      getDayOfWeekOptions.forEach(d => {
+        if (d.value !== String(dayOfWeek)) return;
+        timeSlots.forEach(t => {
+          const tM = timeToMinutes(t);
+          if (tM >= startM && tM < endM) {
+            if (!restrictDay || restrictDay === d.value) {
+              targetSet.add(`${d.value}-${t}`);
+            }
+          }
+        });
+      });
+    };
+
+    pinned.forEach(p => fillKeysForRange(pinnedSet, p.dayOfWeek, p.startTime, p.endTime));
+    staffUnav.forEach(u => fillKeysForRange(staffSet, u.dayOfWeek, u.startTime, u.endTime));
+    roomUnav.forEach(u => fillKeysForRange(roomSet, u.dayOfWeek, u.startTime, u.endTime));
+    return { pinnedSet, staffSet, roomSet };
+  }, [getDayOfWeekOptions, timeSlots]);
+
+  const fetchGridOverlays = useCallback(async () => {
+    if (!schoolData?.id) return;
+    setIsOverlayLoading(true);
+    try {
+      // Fetch in parallel when relevant
+      const requests = [];
+      // Pinned: if section or staff filter applied, fetch; otherwise light fetch (skip to avoid heavy list)
+  if ((filterSectionId || filterStaffId) && overlayShowPinned) {
+        const qp = new URLSearchParams();
+        if (filterSectionId) qp.set('sectionId', filterSectionId);
+        if (filterStaffId) qp.set('staffId', filterStaffId);
+        requests.push(fetch(`/api/schools/${schoolData.id}/academics/pinned?${qp.toString()}`).then(r => r.json().then(j => ({ ok: r.ok, data: j, kind: 'pinned' }))));
+      }
+      // Staff unavailability: only if filtering by staff
+  if (filterStaffId && overlayShowStaff) {
+        const qp = new URLSearchParams({ staffId: filterStaffId });
+        requests.push(fetch(`/api/schools/${schoolData.id}/academics/unavailability/staff?${qp.toString()}`).then(r => r.json().then(j => ({ ok: r.ok, data: j, kind: 'staff' }))));
+      }
+      // Room unavailability: only if filtering by room
+  if (filterRoomId && overlayShowRoom) {
+        const qp = new URLSearchParams({ roomId: filterRoomId });
+        requests.push(fetch(`/api/schools/${schoolData.id}/academics/unavailability/rooms?${qp.toString()}`).then(r => r.json().then(j => ({ ok: r.ok, data: j, kind: 'room' }))));
+      }
+
+      const results = await Promise.allSettled(requests);
+      let pinned = [];
+      let staff = [];
+      let room = [];
+      results.forEach(res => {
+        if (res.status === 'fulfilled' && res.value.ok !== false) {
+          if (res.value.kind === 'pinned') pinned = Array.isArray(res.value.data.pinned) ? res.value.data.pinned : [];
+          if (res.value.kind === 'staff') staff = Array.isArray(res.value.data.unavailability) ? res.value.data.unavailability : [];
+          if (res.value.kind === 'room') room = Array.isArray(res.value.data.unavailability) ? res.value.data.unavailability : [];
+        }
+      });
+      const restrictDay = filterDayOfWeek || '';
+      const { pinnedSet, staffSet, roomSet } = computeOverlaySets({ pinned, staffUnav: staff, roomUnav: room, restrictDay });
+      setOverlayPinnedSet(pinnedSet);
+      setOverlayStaffUnavSet(staffSet);
+      setOverlayRoomUnavSet(roomSet);
+    } catch (e) {
+      // Fail silently; overlays are optional
+    } finally {
+      setIsOverlayLoading(false);
+    }
+  }, [schoolData?.id, filterSectionId, filterStaffId, filterRoomId, filterDayOfWeek, overlayShowPinned, overlayShowStaff, overlayShowRoom, computeOverlaySets]);
+
+  useEffect(() => {
+    fetchGridOverlays();
+  }, [fetchGridOverlays]);
+
+  // --- Staff Unavailability CRUD ---
+  const fetchStaffUnavailability = useCallback(async (staffId) => {
+    if (!schoolData?.id) return;
+    try {
+      const q = new URLSearchParams();
+      if (staffId) q.set('staffId', staffId);
+      const res = await fetch(`/api/schools/${schoolData.id}/academics/unavailability/staff?${q.toString()}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to fetch staff unavailability');
+      setStaffUnavailability(Array.isArray(data.unavailability) ? data.unavailability : []);
+    } catch (e) {
+      toast.error('Failed to fetch staff unavailability', { description: e.message });
+      setStaffUnavailability([]);
+    }
+  }, [schoolData?.id]);
+
+  const openAddStaffUnavDialog = () => {
+    setEditingStaffUnav(null);
+    setStaffUnavFormData({ ...initialStaffUnavForm });
+    setStaffUnavError('');
+    setIsStaffUnavDialogOpen(true);
+    fetchStaffUnavailability(staffUnavFilterStaffId);
+  };
+  const openEditStaffUnavDialog = (item) => {
+    setEditingStaffUnav(item);
+    setStaffUnavFormData({ id: item.id, staffId: item.staffId, dayOfWeek: String(item.dayOfWeek), startTime: item.startTime, endTime: item.endTime, note: item.note || '' });
+    setStaffUnavError('');
+    setIsStaffUnavDialogOpen(true);
+  };
+  const handleStaffUnavFormChange = (e) => setStaffUnavFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  const handleStaffUnavSelectChange = (name, value) => setStaffUnavFormData(prev => ({ ...prev, [name]: value }));
+  const handleStaffUnavSubmit = async (e) => {
+    e.preventDefault();
+    if (!schoolData?.id) return;
+    setIsStaffUnavSubmitting(true);
+    setStaffUnavError('');
+    try {
+      const payload = { staffId: staffUnavFormData.staffId, dayOfWeek: parseInt(staffUnavFormData.dayOfWeek, 10), startTime: staffUnavFormData.startTime, endTime: staffUnavFormData.endTime, note: staffUnavFormData.note || null };
+      const url = editingStaffUnav ? `/api/schools/${schoolData.id}/academics/unavailability/staff/${editingStaffUnav.id}` : `/api/schools/${schoolData.id}/academics/unavailability/staff`;
+      const method = editingStaffUnav ? 'PUT' : 'POST';
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to save unavailability');
+      toast.success(editingStaffUnav ? 'Unavailability updated' : 'Unavailability created');
+      await fetchStaffUnavailability(staffUnavFilterStaffId);
+      setStaffUnavFormData({ ...initialStaffUnavForm });
+      setEditingStaffUnav(null);
+    } catch (e) {
+      setStaffUnavError(e.message);
+    } finally {
+      setIsStaffUnavSubmitting(false);
+    }
+  };
+  const handleStaffUnavDelete = async (id) => {
+    if (!schoolData?.id) return;
+    if (!window.confirm('Delete this unavailability?')) return;
+    const toastId = `delete-staff-unav-${id}`;
+    toast.loading('Deleting...', { id: toastId });
+    try {
+      const res = await fetch(`/api/schools/${schoolData.id}/academics/unavailability/staff/${id}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Delete failed');
+      toast.success('Unavailability deleted', { id: toastId });
+      await fetchStaffUnavailability(staffUnavFilterStaffId);
+    } catch (e) {
+      toast.error('Delete failed', { description: e.message, id: toastId });
+    }
+  };
+
+  // --- Room Unavailability CRUD ---
+  const fetchRoomUnavailability = useCallback(async (roomId) => {
+    if (!schoolData?.id) return;
+    try {
+      const q = new URLSearchParams();
+      if (roomId) q.set('roomId', roomId);
+      const res = await fetch(`/api/schools/${schoolData.id}/academics/unavailability/rooms?${q.toString()}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to fetch room unavailability');
+      setRoomUnavailability(Array.isArray(data.unavailability) ? data.unavailability : []);
+    } catch (e) {
+      toast.error('Failed to fetch room unavailability', { description: e.message });
+      setRoomUnavailability([]);
+    }
+  }, [schoolData?.id]);
+
+  const openAddRoomUnavDialog = () => {
+    setEditingRoomUnav(null);
+    setRoomUnavFormData({ ...initialRoomUnavForm });
+    setRoomUnavError('');
+    setIsRoomUnavDialogOpen(true);
+    fetchRoomUnavailability(roomUnavFilterRoomId);
+  };
+  const openEditRoomUnavDialog = (item) => {
+    setEditingRoomUnav(item);
+    setRoomUnavFormData({ id: item.id, roomId: item.roomId, dayOfWeek: String(item.dayOfWeek), startTime: item.startTime, endTime: item.endTime, note: item.note || '' });
+    setRoomUnavError('');
+    setIsRoomUnavDialogOpen(true);
+  };
+  const handleRoomUnavFormChange = (e) => setRoomUnavFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  const handleRoomUnavSelectChange = (name, value) => setRoomUnavFormData(prev => ({ ...prev, [name]: value }));
+  const handleRoomUnavSubmit = async (e) => {
+    e.preventDefault();
+    if (!schoolData?.id) return;
+    setIsRoomUnavSubmitting(true);
+    setRoomUnavError('');
+    try {
+      const payload = { roomId: roomUnavFormData.roomId, dayOfWeek: parseInt(roomUnavFormData.dayOfWeek, 10), startTime: roomUnavFormData.startTime, endTime: roomUnavFormData.endTime, note: roomUnavFormData.note || null };
+      const url = editingRoomUnav ? `/api/schools/${schoolData.id}/academics/unavailability/rooms/${editingRoomUnav.id}` : `/api/schools/${schoolData.id}/academics/unavailability/rooms`;
+      const method = editingRoomUnav ? 'PUT' : 'POST';
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to save unavailability');
+      toast.success(editingRoomUnav ? 'Unavailability updated' : 'Unavailability created');
+      await fetchRoomUnavailability(roomUnavFilterRoomId);
+      setRoomUnavFormData({ ...initialRoomUnavForm });
+      setEditingRoomUnav(null);
+    } catch (e) {
+      setRoomUnavError(e.message);
+    } finally {
+      setIsRoomUnavSubmitting(false);
+    }
+  };
+  const handleRoomUnavDelete = async (id) => {
+    if (!schoolData?.id) return;
+    if (!window.confirm('Delete this unavailability?')) return;
+    const toastId = `delete-room-unav-${id}`;
+    toast.loading('Deleting...', { id: toastId });
+    try {
+      const res = await fetch(`/api/schools/${schoolData.id}/academics/unavailability/rooms/${id}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Delete failed');
+      toast.success('Unavailability deleted', { id: toastId });
+      await fetchRoomUnavailability(roomUnavFilterRoomId);
+    } catch (e) {
+      toast.error('Delete failed', { description: e.message, id: toastId });
+    }
+  };
+
+  // --- Pinned Slots CRUD ---
+  const fetchPinnedSlots = useCallback(async (sectionId, staffId) => {
+    if (!schoolData?.id) return;
+    try {
+      const q = new URLSearchParams();
+      if (sectionId) q.set('sectionId', sectionId);
+      if (staffId) q.set('staffId', staffId);
+      const res = await fetch(`/api/schools/${schoolData.id}/academics/pinned?${q.toString()}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to fetch pinned slots');
+      setPinnedSlots(Array.isArray(data.pinned) ? data.pinned : []);
+    } catch (e) {
+      toast.error('Failed to fetch pinned slots', { description: e.message });
+      setPinnedSlots([]);
+    }
+  }, [schoolData?.id]);
+
+  const openAddPinnedDialog = () => {
+    setEditingPinned(null);
+    setPinnedFormData({ ...initialPinnedForm });
+    setPinnedError('');
+    setIsPinnedDialogOpen(true);
+    fetchPinnedSlots(pinnedFilterSectionId, pinnedFilterStaffId);
+  };
+  const openEditPinnedDialog = (item) => {
+    setEditingPinned(item);
+    setPinnedFormData({ id: item.id, sectionId: item.sectionId, subjectId: item.subjectId, staffId: item.staffId || '', roomId: item.roomId || '', dayOfWeek: String(item.dayOfWeek), startTime: item.startTime, endTime: item.endTime, note: item.note || '' });
+    setPinnedError('');
+    setIsPinnedDialogOpen(true);
+  };
+  const handlePinnedFormChange = (e) => setPinnedFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  const handlePinnedSelectChange = (name, value) => setPinnedFormData(prev => ({ ...prev, [name]: value }));
+  const handlePinnedSubmit = async (e) => {
+    e.preventDefault();
+    if (!schoolData?.id) return;
+    setIsPinnedSubmitting(true);
+    setPinnedError('');
+    try {
+      const payload = { sectionId: pinnedFormData.sectionId, subjectId: pinnedFormData.subjectId, staffId: pinnedFormData.staffId || null, roomId: pinnedFormData.roomId || null, dayOfWeek: parseInt(pinnedFormData.dayOfWeek, 10), startTime: pinnedFormData.startTime, endTime: pinnedFormData.endTime, note: pinnedFormData.note || null };
+      const url = editingPinned ? `/api/schools/${schoolData.id}/academics/pinned/${editingPinned.id}` : `/api/schools/${schoolData.id}/academics/pinned`;
+      const method = editingPinned ? 'PUT' : 'POST';
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to save pinned slot');
+      toast.success(editingPinned ? 'Pinned slot updated' : 'Pinned slot created');
+      await fetchPinnedSlots(pinnedFilterSectionId, pinnedFilterStaffId);
+      setPinnedFormData({ ...initialPinnedForm });
+      setEditingPinned(null);
+    } catch (e) {
+      setPinnedError(e.message);
+    } finally {
+      setIsPinnedSubmitting(false);
+    }
+  };
+  const handlePinnedDelete = async (id) => {
+    if (!schoolData?.id) return;
+    if (!window.confirm('Delete this pinned slot?')) return;
+    const toastId = `delete-pinned-${id}`;
+    toast.loading('Deleting...', { id: toastId });
+    try {
+      const res = await fetch(`/api/schools/${schoolData.id}/academics/pinned/${id}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Delete failed');
+      toast.success('Pinned slot deleted', { id: toastId });
+      await fetchPinnedSlots(pinnedFilterSectionId, pinnedFilterStaffId);
+    } catch (e) {
+      toast.error('Delete failed', { description: e.message, id: toastId });
+    }
+  };
+
   const handleDelete = async (entryId) => {
     if (!schoolData?.id) return;
     if (!window.confirm(`Are you sure you want to DELETE this timetable entry?`)) return;
@@ -623,10 +1097,82 @@ function AdminTimetablePage() {
           <p className={descriptionTextClasses}>Create and manage class schedules for sections, teachers, and rooms.</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
+          {isAdmin && (
+            <>
+              <Button className={primaryButtonClasses} onClick={() => setIsGenOptionsOpen(true)} disabled={isGenerating || isLoadingDeps} title="Configure and Run Generation">
+                <Rocket className="mr-2 h-4 w-4" /> Generate Timetable
+              </Button>
+              <Button variant="outline" className={outlineButtonClasses} onClick={() => { setIsReqDialogOpen(true); fetchRequirements(reqFilterSectionId); }} disabled={isLoadingDeps} title="Manage Subject Requirements">
+                Manage Subject Requirements
+              </Button>
+              <Button variant="outline" className={outlineButtonClasses} onClick={() => { setIsStaffUnavDialogOpen(true); fetchStaffUnavailability(staffUnavFilterStaffId); }} disabled={isLoadingDeps} title="Manage Staff Unavailability">
+                Manage Staff Unavailability
+              </Button>
+              <Button variant="outline" className={outlineButtonClasses} onClick={() => { setIsRoomUnavDialogOpen(true); fetchRoomUnavailability(roomUnavFilterRoomId); }} disabled={isLoadingDeps} title="Manage Room Unavailability">
+                Manage Room Unavailability
+              </Button>
+              <Button variant="outline" className={outlineButtonClasses} onClick={() => { setIsPinnedDialogOpen(true); fetchPinnedSlots(pinnedFilterSectionId, pinnedFilterStaffId); }} disabled={isLoadingDeps} title="Manage Pinned Slots">
+                Manage Pinned Slots
+              </Button>
+              <Dialog open={isGenOptionsOpen} onOpenChange={setIsGenOptionsOpen}>
+                <DialogContent className="sm:max-w-md bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+                  <DialogHeader>
+                    <DialogTitle className={titleTextClasses}>Generation Options</DialogTitle>
+                    <DialogDescription className={descriptionTextClasses}>Set constraints and scope for the automated generator.</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-1">
+                    <div className="flex items-center justify-between">
+                      <Label className={titleTextClasses}>Include Pinned Slots</Label>
+                      <input type="checkbox" checked={!!genOptions.includePinned} onChange={(e) => setGenOptions(o => ({ ...o, includePinned: e.target.checked }))} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label className={titleTextClasses}>Honor Unavailability</Label>
+                      <input type="checkbox" checked={!!genOptions.honorUnavailability} onChange={(e) => setGenOptions(o => ({ ...o, honorUnavailability: e.target.checked }))} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className={titleTextClasses}>Preferred Start</Label>
+                        <Input type="time" value={genOptions.preferredStartTime} onChange={(e) => setGenOptions(o => ({ ...o, preferredStartTime: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label className={titleTextClasses}>Preferred End</Label>
+                        <Input type="time" value={genOptions.preferredEndTime} onChange={(e) => setGenOptions(o => ({ ...o, preferredEndTime: e.target.value }))} />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className={titleTextClasses}>Target Sections</Label>
+                      <div className="max-h-48 overflow-auto border rounded p-2 space-y-1">
+                        {sections.map(sec => {
+                          const checked = genOptions.targetSectionIds?.includes(sec.id);
+                          return (
+                            <label key={sec.id} className="flex items-center gap-2 text-sm">
+                              <input type="checkbox" checked={!!checked} onChange={(e) => {
+                                setGenOptions(o => ({
+                                  ...o,
+                                  targetSectionIds: e.target.checked ? [...(o.targetSectionIds||[]), sec.id] : (o.targetSectionIds||[]).filter(id => id !== sec.id)
+                                }));
+                              }} />
+                              <span>{getSectionFullName(sec.id)}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter className="pt-2">
+                    <DialogClose asChild><Button variant="outline" className={outlineButtonClasses}>Cancel</Button></DialogClose>
+                    <Button className={primaryButtonClasses} onClick={() => { setIsGenOptionsOpen(false); runAutoGeneration(); }} disabled={isGenerating}>
+                      {isGenerating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Generating...</> : 'Run Generation'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </>
+          )}
           {/* Add Timetable Entry Button */}
           <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setFormError(''); }}>
             <DialogTrigger asChild>
-              <Button className={primaryButtonClasses} onClick={openAddDialog}> <PlusCircle className="mr-2 h-4 w-4" /> Add Timetable Entry </Button>
+              <Button className={primaryButtonClasses} onClick={openAddDialog} disabled={!isAdmin}> <PlusCircle className="mr-2 h-4 w-4" /> Add Timetable Entry </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-lg md:max-w-2xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
               <DialogHeader>
@@ -649,7 +1195,7 @@ function AdminTimetablePage() {
                 {formError && ( <p className="text-sm text-red-600 dark:text-red-400 md:col-span-full">{formError}</p> )}
                 <DialogFooter className="pt-6">
                   <DialogClose asChild><Button type="button" variant="outline" className={outlineButtonClasses}>Cancel</Button></DialogClose>
-                  <Button type="submit" className={primaryButtonClasses} disabled={isSubmitting || isLoadingDeps}>
+                  <Button type="submit" className={primaryButtonClasses} disabled={!isAdmin || isSubmitting || isLoadingDeps}>
                     {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>{editingEntry ? 'Saving...' : 'Creating...'}</> : editingEntry ? 'Save Changes' : 'Create Entry'}
                   </Button>
                 </DialogFooter>
@@ -676,6 +1222,451 @@ function AdminTimetablePage() {
           </Button>
         </div>
       </div>
+
+      {/* Requirements Management Dialog */}
+      <Dialog open={isReqDialogOpen} onOpenChange={(open) => { setIsReqDialogOpen(open); if (!open) { setEditingReq(null); setReqFormData({ ...initialReqForm }); setReqError(''); } }}>
+        <DialogContent className="sm:max-w-3xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+          <DialogHeader>
+            <DialogTitle className={titleTextClasses}>Subject Requirements</DialogTitle>
+            <DialogDescription className={descriptionTextClasses}>Define weekly periods for each section-subject and session options.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <Label className={titleTextClasses}>Filter by Section</Label>
+              <Select value={reqFilterSectionId || 'all'} onValueChange={(v) => { const val = v === 'all' ? '' : v; setReqFilterSectionId(val); fetchRequirements(val); }}>
+                <SelectTrigger className={`${filterInputClasses} w-[220px]`}>
+                  <SelectValue placeholder="Select section" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sections</SelectItem>
+                  {sections.map(s => (<SelectItem key={s.id} value={s.id}>{getSectionFullName(s.id)}</SelectItem>))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Section</TableHead>
+                    <TableHead>Subject</TableHead>
+                    <TableHead>Periods/Week</TableHead>
+                    <TableHead>Duration</TableHead>
+                    <TableHead>Double</TableHead>
+                    <TableHead>Min Gap</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {requirements.length === 0 ? (
+                    <TableRow><TableCell colSpan="7" className={descriptionTextClasses}>No requirements found.</TableCell></TableRow>
+                  ) : (
+                    requirements.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell className={descriptionTextClasses}>{getSectionFullName(r.sectionId)}</TableCell>
+                        <TableCell className={descriptionTextClasses}>{getSubjectNameDisplay(r.subjectId)}</TableCell>
+                        <TableCell className={descriptionTextClasses}>{r.periodsPerWeek}</TableCell>
+                        <TableCell className={descriptionTextClasses}>{r.durationMinutes} mins</TableCell>
+                        <TableCell className={descriptionTextClasses}>{r.allowDouble ? 'Yes' : 'No'}</TableCell>
+                        <TableCell className={descriptionTextClasses}>{r.minGapMins} mins</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button variant="outline" size="sm" className={outlineButtonClasses} onClick={() => openEditReqDialog(r)}>Edit</Button>
+                            <Button variant="outline" size="sm" className={`${outlineButtonClasses} border-red-300 text-red-600 dark:border-red-700 dark:text-red-400`} onClick={() => handleReqDelete(r.id)}>Delete</Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800">
+              <h3 className={`text-md font-semibold ${titleTextClasses}`}>{editingReq ? 'Edit Requirement' : 'Add Requirement'}</h3>
+              <form onSubmit={handleReqSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                <div>
+                  <Label className={titleTextClasses}>Section</Label>
+                  <Select value={reqFormData.sectionId || ''} onValueChange={(v) => handleReqSelectChange('sectionId', v)}>
+                    <SelectTrigger className={`${filterInputClasses} mt-1`}><SelectValue placeholder="Select section"/></SelectTrigger>
+                    <SelectContent>
+                      {sections.map(s => (<SelectItem key={s.id} value={s.id}>{getSectionFullName(s.id)}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className={titleTextClasses}>Subject</Label>
+                  <Select value={reqFormData.subjectId || ''} onValueChange={(v) => handleReqSelectChange('subjectId', v)}>
+                    <SelectTrigger className={`${filterInputClasses} mt-1`}><SelectValue placeholder="Select subject"/></SelectTrigger>
+                    <SelectContent>
+                      {subjects.map(sub => (<SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className={titleTextClasses}>Periods per Week</Label>
+                  <Input name="periodsPerWeek" type="number" min="1" step="1" value={reqFormData.periodsPerWeek} onChange={handleReqFormChange} className={`${filterInputClasses} mt-1`} />
+                </div>
+                <div>
+                  <Label className={titleTextClasses}>Duration (minutes)</Label>
+                  <Input name="durationMinutes" type="number" min="15" step="5" value={reqFormData.durationMinutes} onChange={handleReqFormChange} className={`${filterInputClasses} mt-1`} />
+                </div>
+                <div>
+                  <Label className={titleTextClasses}>Min Gap (minutes)</Label>
+                  <Input name="minGapMins" type="number" min="0" step="5" value={reqFormData.minGapMins} onChange={handleReqFormChange} className={`${filterInputClasses} mt-1`} />
+                </div>
+                <div className="flex items-center gap-2 pt-6">
+                  <input id="allowDouble" name="allowDouble" type="checkbox" checked={!!reqFormData.allowDouble} onChange={handleReqFormChange} />
+                  <Label htmlFor="allowDouble" className={titleTextClasses}>Allow Double Periods</Label>
+                </div>
+                <div className="md:col-span-2">
+                  <Label className={titleTextClasses}>Preferred Room Type (optional)</Label>
+                  <Input name="preferredRoomType" type="text" value={reqFormData.preferredRoomType} onChange={handleReqFormChange} className={`${filterInputClasses} mt-1`} placeholder="e.g., SCIENCE_LAB" />
+                </div>
+                {reqError && (<p className="md:col-span-2 text-sm text-red-600 dark:text-red-400">{reqError}</p>)}
+                <div className="md:col-span-2 flex justify-end gap-2">
+                  <DialogClose asChild><Button type="button" variant="outline" className={outlineButtonClasses}>Close</Button></DialogClose>
+                  <Button type="submit" className={primaryButtonClasses} disabled={isReqSubmitting}>{isReqSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Saving...</> : (editingReq ? 'Save Changes' : 'Add Requirement')}</Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Staff Unavailability Management Dialog */}
+      <Dialog open={isStaffUnavDialogOpen} onOpenChange={(open) => { setIsStaffUnavDialogOpen(open); if (!open) { setEditingStaffUnav(null); setStaffUnavFormData({ ...initialStaffUnavForm }); setStaffUnavError(''); } }}>
+        <DialogContent className="sm:max-w-3xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+          <DialogHeader>
+            <DialogTitle className={titleTextClasses}>Staff Unavailability</DialogTitle>
+            <DialogDescription className={descriptionTextClasses}>Block times when teachers are unavailable.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <Label className={titleTextClasses}>Filter by Teacher</Label>
+              <Select value={staffUnavFilterStaffId || 'all'} onValueChange={(v) => { const val = v === 'all' ? '' : v; setStaffUnavFilterStaffId(val); fetchStaffUnavailability(val); }}>
+                <SelectTrigger className={`${filterInputClasses} w-[240px]`}>
+                  <SelectValue placeholder="Select teacher" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Teachers</SelectItem>
+                  {teachers.map(t => (<SelectItem key={t.id} value={t.id}>{getTeacherFullName(t.id)}</SelectItem>))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Teacher</TableHead>
+                    <TableHead>Day</TableHead>
+                    <TableHead>Time</TableHead>
+                    <TableHead>Note</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {staffUnavailability.length === 0 ? (
+                    <TableRow><TableCell colSpan="5" className={descriptionTextClasses}>No unavailability found.</TableCell></TableRow>
+                  ) : (
+                    staffUnavailability.map((u) => (
+                      <TableRow key={u.id}>
+                        <TableCell className={descriptionTextClasses}>{getTeacherFullName(u.staffId)}</TableCell>
+                        <TableCell className={descriptionTextClasses}>{getDayNameDisplay(u.dayOfWeek)}</TableCell>
+                        <TableCell className={descriptionTextClasses}>{u.startTime} - {u.endTime}</TableCell>
+                        <TableCell className={descriptionTextClasses}>{u.note || '-'}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button variant="outline" size="sm" className={outlineButtonClasses} onClick={() => openEditStaffUnavDialog(u)}>Edit</Button>
+                            <Button variant="outline" size="sm" className={`${outlineButtonClasses} border-red-300 text-red-600 dark:border-red-700 dark:text-red-400`} onClick={() => handleStaffUnavDelete(u.id)}>Delete</Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800">
+              <h3 className={`text-md font-semibold ${titleTextClasses}`}>{editingStaffUnav ? 'Edit Unavailability' : 'Add Unavailability'}</h3>
+              <form onSubmit={handleStaffUnavSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                <div>
+                  <Label className={titleTextClasses}>Teacher</Label>
+                  <Select value={staffUnavFormData.staffId || ''} onValueChange={(v) => handleStaffUnavSelectChange('staffId', v)}>
+                    <SelectTrigger className={`${filterInputClasses} mt-1`}><SelectValue placeholder="Select teacher"/></SelectTrigger>
+                    <SelectContent>
+                      {teachers.map(t => (<SelectItem key={t.id} value={t.id}>{getTeacherFullName(t.id)}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className={titleTextClasses}>Day of Week</Label>
+                  <Select value={staffUnavFormData.dayOfWeek || ''} onValueChange={(v) => handleStaffUnavSelectChange('dayOfWeek', v)}>
+                    <SelectTrigger className={`${filterInputClasses} mt-1`}><SelectValue placeholder="Select day"/></SelectTrigger>
+                    <SelectContent>
+                      {getDayOfWeekOptions.map(d => (<SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className={titleTextClasses}>Start Time</Label>
+                  <Input name="startTime" type="time" value={staffUnavFormData.startTime} onChange={handleStaffUnavFormChange} className={`${filterInputClasses} mt-1`} />
+                </div>
+                <div>
+                  <Label className={titleTextClasses}>End Time</Label>
+                  <Input name="endTime" type="time" value={staffUnavFormData.endTime} onChange={handleStaffUnavFormChange} className={`${filterInputClasses} mt-1`} />
+                </div>
+                <div className="md:col-span-2">
+                  <Label className={titleTextClasses}>Note (optional)</Label>
+                  <Input name="note" type="text" value={staffUnavFormData.note} onChange={handleStaffUnavFormChange} className={`${filterInputClasses} mt-1`} />
+                </div>
+                {staffUnavError && (<p className="md:col-span-2 text-sm text-red-600 dark:text-red-400">{staffUnavError}</p>)}
+                <div className="md:col-span-2 flex justify-end gap-2">
+                  <DialogClose asChild><Button type="button" variant="outline" className={outlineButtonClasses}>Close</Button></DialogClose>
+                  <Button type="submit" className={primaryButtonClasses} disabled={isStaffUnavSubmitting}>{isStaffUnavSubmitting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Saving...</>) : (editingStaffUnav ? 'Save Changes' : 'Add Unavailability')}</Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Room Unavailability Management Dialog */}
+      <Dialog open={isRoomUnavDialogOpen} onOpenChange={(open) => { setIsRoomUnavDialogOpen(open); if (!open) { setEditingRoomUnav(null); setRoomUnavFormData({ ...initialRoomUnavForm }); setRoomUnavError(''); } }}>
+        <DialogContent className="sm:max-w-3xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+          <DialogHeader>
+            <DialogTitle className={titleTextClasses}>Room Unavailability</DialogTitle>
+            <DialogDescription className={descriptionTextClasses}>Block times when rooms are unavailable.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <Label className={titleTextClasses}>Filter by Room</Label>
+              <Select value={roomUnavFilterRoomId || 'all'} onValueChange={(v) => { const val = v === 'all' ? '' : v; setRoomUnavFilterRoomId(val); fetchRoomUnavailability(val); }}>
+                <SelectTrigger className={`${filterInputClasses} w-[240px]`}>
+                  <SelectValue placeholder="Select room" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Rooms</SelectItem>
+                  {rooms.map(r => (<SelectItem key={r.id} value={r.id}>{getRoomNameDisplay(r.id)}</SelectItem>))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Room</TableHead>
+                    <TableHead>Day</TableHead>
+                    <TableHead>Time</TableHead>
+                    <TableHead>Note</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {roomUnavailability.length === 0 ? (
+                    <TableRow><TableCell colSpan="5" className={descriptionTextClasses}>No unavailability found.</TableCell></TableRow>
+                  ) : (
+                    roomUnavailability.map((u) => (
+                      <TableRow key={u.id}>
+                        <TableCell className={descriptionTextClasses}>{getRoomNameDisplay(u.roomId)}</TableCell>
+                        <TableCell className={descriptionTextClasses}>{getDayNameDisplay(u.dayOfWeek)}</TableCell>
+                        <TableCell className={descriptionTextClasses}>{u.startTime} - {u.endTime}</TableCell>
+                        <TableCell className={descriptionTextClasses}>{u.note || '-'}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button variant="outline" size="sm" className={outlineButtonClasses} onClick={() => openEditRoomUnavDialog(u)}>Edit</Button>
+                            <Button variant="outline" size="sm" className={`${outlineButtonClasses} border-red-300 text-red-600 dark:border-red-700 dark:text-red-400`} onClick={() => handleRoomUnavDelete(u.id)}>Delete</Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800">
+              <h3 className={`text-md font-semibold ${titleTextClasses}`}>{editingRoomUnav ? 'Edit Unavailability' : 'Add Unavailability'}</h3>
+              <form onSubmit={handleRoomUnavSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                <div>
+                  <Label className={titleTextClasses}>Room</Label>
+                  <Select value={roomUnavFormData.roomId || ''} onValueChange={(v) => handleRoomUnavSelectChange('roomId', v)}>
+                    <SelectTrigger className={`${filterInputClasses} mt-1`}><SelectValue placeholder="Select room"/></SelectTrigger>
+                    <SelectContent>
+                      {rooms.map(r => (<SelectItem key={r.id} value={r.id}>{getRoomNameDisplay(r.id)}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className={titleTextClasses}>Day of Week</Label>
+                  <Select value={roomUnavFormData.dayOfWeek || ''} onValueChange={(v) => handleRoomUnavSelectChange('dayOfWeek', v)}>
+                    <SelectTrigger className={`${filterInputClasses} mt-1`}><SelectValue placeholder="Select day"/></SelectTrigger>
+                    <SelectContent>
+                      {getDayOfWeekOptions.map(d => (<SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className={titleTextClasses}>Start Time</Label>
+                  <Input name="startTime" type="time" value={roomUnavFormData.startTime} onChange={handleRoomUnavFormChange} className={`${filterInputClasses} mt-1`} />
+                </div>
+                <div>
+                  <Label className={titleTextClasses}>End Time</Label>
+                  <Input name="endTime" type="time" value={roomUnavFormData.endTime} onChange={handleRoomUnavFormChange} className={`${filterInputClasses} mt-1`} />
+                </div>
+                <div className="md:col-span-2">
+                  <Label className={titleTextClasses}>Note (optional)</Label>
+                  <Input name="note" type="text" value={roomUnavFormData.note} onChange={handleRoomUnavFormChange} className={`${filterInputClasses} mt-1`} />
+                </div>
+                {roomUnavError && (<p className="md:col-span-2 text-sm text-red-600 dark:text-red-400">{roomUnavError}</p>)}
+                <div className="md:col-span-2 flex justify-end gap-2">
+                  <DialogClose asChild><Button type="button" variant="outline" className={outlineButtonClasses}>Close</Button></DialogClose>
+                  <Button type="submit" className={primaryButtonClasses} disabled={isRoomUnavSubmitting}>{isRoomUnavSubmitting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Saving...</>) : (editingRoomUnav ? 'Save Changes' : 'Add Unavailability')}</Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pinned Slots Management Dialog */}
+      <Dialog open={isPinnedDialogOpen} onOpenChange={(open) => { setIsPinnedDialogOpen(open); if (!open) { setEditingPinned(null); setPinnedFormData({ ...initialPinnedForm }); setPinnedError(''); } }}>
+        <DialogContent className="sm:max-w-4xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+          <DialogHeader>
+            <DialogTitle className={titleTextClasses}>Pinned Slots</DialogTitle>
+            <DialogDescription className={descriptionTextClasses}>Force certain lessons to fixed times; the generator will respect these.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <Label className={titleTextClasses}>Filter by Section</Label>
+              <Select value={pinnedFilterSectionId || 'all'} onValueChange={(v) => { const val = v === 'all' ? '' : v; setPinnedFilterSectionId(val); fetchPinnedSlots(val, pinnedFilterStaffId); }}>
+                <SelectTrigger className={`${filterInputClasses} w-[220px]`}>
+                  <SelectValue placeholder="Select section" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sections</SelectItem>
+                  {sections.map(s => (<SelectItem key={s.id} value={s.id}>{getSectionFullName(s.id)}</SelectItem>))}
+                </SelectContent>
+              </Select>
+              <Label className={titleTextClasses}>Filter by Teacher</Label>
+              <Select value={pinnedFilterStaffId || 'all'} onValueChange={(v) => { const val = v === 'all' ? '' : v; setPinnedFilterStaffId(val); fetchPinnedSlots(pinnedFilterSectionId, val); }}>
+                <SelectTrigger className={`${filterInputClasses} w-[220px]`}>
+                  <SelectValue placeholder="Select teacher" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Teachers</SelectItem>
+                  {teachers.map(t => (<SelectItem key={t.id} value={t.id}>{getTeacherFullName(t.id)}</SelectItem>))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Section</TableHead>
+                    <TableHead>Subject</TableHead>
+                    <TableHead>Teacher</TableHead>
+                    <TableHead>Day</TableHead>
+                    <TableHead>Time</TableHead>
+                    <TableHead>Room</TableHead>
+                    <TableHead>Note</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pinnedSlots.length === 0 ? (
+                    <TableRow><TableCell colSpan="8" className={descriptionTextClasses}>No pinned slots found.</TableCell></TableRow>
+                  ) : (
+                    pinnedSlots.map((p) => (
+                      <TableRow key={p.id}>
+                        <TableCell className={descriptionTextClasses}>{getSectionFullName(p.sectionId)}</TableCell>
+                        <TableCell className={descriptionTextClasses}>{getSubjectNameDisplay(p.subjectId)}</TableCell>
+                        <TableCell className={descriptionTextClasses}>{p.staffId ? getTeacherFullName(p.staffId) : '-'}</TableCell>
+                        <TableCell className={descriptionTextClasses}>{getDayNameDisplay(p.dayOfWeek)}</TableCell>
+                        <TableCell className={descriptionTextClasses}>{p.startTime} - {p.endTime}</TableCell>
+                        <TableCell className={descriptionTextClasses}>{p.roomId ? getRoomNameDisplay(p.roomId) : '-'}</TableCell>
+                        <TableCell className={descriptionTextClasses}>{p.note || '-'}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button variant="outline" size="sm" className={outlineButtonClasses} onClick={() => openEditPinnedDialog(p)}>Edit</Button>
+                            <Button variant="outline" size="sm" className={`${outlineButtonClasses} border-red-300 text-red-600 dark:border-red-700 dark:text-red-400`} onClick={() => handlePinnedDelete(p.id)}>Delete</Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800">
+              <h3 className={`text-md font-semibold ${titleTextClasses}`}>{editingPinned ? 'Edit Pinned Slot' : 'Add Pinned Slot'}</h3>
+              <form onSubmit={handlePinnedSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                <div>
+                  <Label className={titleTextClasses}>Section</Label>
+                  <Select value={pinnedFormData.sectionId || ''} onValueChange={(v) => handlePinnedSelectChange('sectionId', v)}>
+                    <SelectTrigger className={`${filterInputClasses} mt-1`}><SelectValue placeholder="Select section"/></SelectTrigger>
+                    <SelectContent>
+                      {sections.map(s => (<SelectItem key={s.id} value={s.id}>{getSectionFullName(s.id)}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className={titleTextClasses}>Subject</Label>
+                  <Select value={pinnedFormData.subjectId || ''} onValueChange={(v) => handlePinnedSelectChange('subjectId', v)}>
+                    <SelectTrigger className={`${filterInputClasses} mt-1`}><SelectValue placeholder="Select subject"/></SelectTrigger>
+                    <SelectContent>
+                      {subjects.map(sub => (<SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className={titleTextClasses}>Teacher (optional)</Label>
+                  <Select value={pinnedFormData.staffId || ''} onValueChange={(v) => handlePinnedSelectChange('staffId', v)}>
+                    <SelectTrigger className={`${filterInputClasses} mt-1`}><SelectValue placeholder="Select teacher (optional)"/></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">None</SelectItem>
+                      {teachers.map(t => (<SelectItem key={t.id} value={t.id}>{getTeacherFullName(t.id)}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className={titleTextClasses}>Room (optional)</Label>
+                  <Select value={pinnedFormData.roomId || ''} onValueChange={(v) => handlePinnedSelectChange('roomId', v)}>
+                    <SelectTrigger className={`${filterInputClasses} mt-1`}><SelectValue placeholder="Select room (optional)"/></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">None</SelectItem>
+                      {rooms.map(r => (<SelectItem key={r.id} value={r.id}>{getRoomNameDisplay(r.id)}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className={titleTextClasses}>Day of Week</Label>
+                  <Select value={pinnedFormData.dayOfWeek || ''} onValueChange={(v) => handlePinnedSelectChange('dayOfWeek', v)}>
+                    <SelectTrigger className={`${filterInputClasses} mt-1`}><SelectValue placeholder="Select day"/></SelectTrigger>
+                    <SelectContent>
+                      {getDayOfWeekOptions.map(d => (<SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className={titleTextClasses}>Start Time</Label>
+                  <Input name="startTime" type="time" value={pinnedFormData.startTime} onChange={handlePinnedFormChange} className={`${filterInputClasses} mt-1`} />
+                </div>
+                <div>
+                  <Label className={titleTextClasses}>End Time</Label>
+                  <Input name="endTime" type="time" value={pinnedFormData.endTime} onChange={handlePinnedFormChange} className={`${filterInputClasses} mt-1`} />
+                </div>
+                <div className="md:col-span-2">
+                  <Label className={titleTextClasses}>Note (optional)</Label>
+                  <Input name="note" type="text" value={pinnedFormData.note} onChange={handlePinnedFormChange} className={`${filterInputClasses} mt-1`} />
+                </div>
+                {pinnedError && (<p className="md:col-span-2 text-sm text-red-600 dark:text-red-400">{pinnedError}</p>)}
+                <div className="md:col-span-2 flex justify-end gap-2">
+                  <DialogClose asChild><Button type="button" variant="outline" className={outlineButtonClasses}>Close</Button></DialogClose>
+                  <Button type="submit" className={primaryButtonClasses} disabled={isPinnedSubmitting}>{isPinnedSubmitting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Saving...</>) : (editingPinned ? 'Save Changes' : 'Add Pinned Slot')}</Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {error && ( <Alert variant="destructive" className="bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300 dark:border-red-700/50"> <AlertTriangle className="h-4 w-4" /> <AlertTitle>Error</AlertTitle> <AlertDescription>{error}</AlertDescription> </Alert> )}
 
@@ -849,18 +1840,36 @@ function AdminTimetablePage() {
         <>
           {isGridView ? (
             /* Timetable Grid Display */
-            <div className={`${glassCardClasses} overflow-x-auto custom-scrollbar`}>
+            <div className={`${glassCardClasses} overflow-auto max-h-[70vh] custom-scrollbar relative`}> {/* Make grid scroll within card */}
+              {/* Legend for overlays */}
+              <div className="flex flex-wrap items-center gap-4 mb-3 text-xs">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" checked={overlayShowPinned} onChange={(e) => setOverlayShowPinned(e.target.checked)} />
+                  <span className="inline-block h-3 w-3 rounded-sm bg-amber-300/60 dark:bg-amber-500/40 border border-amber-500/50"></span>
+                  <span className={descriptionTextClasses}>Pinned</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" checked={overlayShowStaff} onChange={(e) => setOverlayShowStaff(e.target.checked)} />
+                  <span className="inline-block h-3 w-3 rounded-sm bg-red-300/50 dark:bg-red-500/30 border border-red-500/40"></span>
+                  <span className={descriptionTextClasses}>Staff Unavailable</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" checked={overlayShowRoom} onChange={(e) => setOverlayShowRoom(e.target.checked)} />
+                  <span className="inline-block h-3 w-3 rounded-sm bg-purple-300/50 dark:bg-purple-500/30 border border-purple-500/40"></span>
+                  <span className={descriptionTextClasses}>Room Unavailable</span>
+                </label>
+              </div>
               {/* Note: This grid is fixed height per 30-min slot. Cards span visually using absolute positioning. */}
               <div
-                className="grid grid-cols-[auto_repeat(7,minmax(120px,1fr))] text-sm border-t border-l border-zinc-200 dark:border-zinc-700"
-                style={{ gridAutoRows: '60px' }} // 30 minutes per 60px height
+                className="grid grid-cols-[100px_repeat(7,minmax(140px,1fr))] text-sm border-t border-l border-zinc-200 dark:border-zinc-700 min-w-max"
+                style={{ gridAutoRows: `${GRID_ROW_HEIGHT}px` }} // 30 minutes per GRID_ROW_HEIGHT height
                 onMouseLeave={handleDragLeave} // Clear dragged over cell on mouse leave
               >
                 {/* Corner for empty space */}
-                <div className="sticky left-0 bg-white dark:bg-zinc-950 z-20 p-2 border-b border-r border-zinc-200 dark:border-zinc-700"></div>
+                <div className="sticky top-0 left-0 bg-white dark:bg-zinc-950 z-40 p-2 border-b border-r border-zinc-200 dark:border-zinc-700"></div>
                 {/* Day Headers */}
                 {getDayOfWeekOptions.map(day => (
-                  <div key={day.value} className="text-center font-bold p-2 bg-zinc-100 dark:bg-zinc-800 border-b border-r border-zinc-200 dark:border-zinc-700">
+                  <div key={day.value} className="sticky top-0 z-30 text-center font-bold p-2 bg-zinc-100 dark:bg-zinc-800 border-b border-r border-zinc-200 dark:border-zinc-700">
                     {day.label}
                   </div>
                 ))}
@@ -869,19 +1878,31 @@ function AdminTimetablePage() {
                 {timeSlots.map((time, timeIndex) => (
                   <React.Fragment key={time}>
                     {/* Time Slot Header */}
-                    <div className="sticky left-0 bg-white dark:bg-zinc-950 z-20 p-2 font-bold border-b border-r border-zinc-200 dark:border-zinc-700 min-h-[60px] flex items-center justify-center">
+                    <div className="sticky left-0 bg-white dark:bg-zinc-950 z-20 p-2 font-bold border-b border-r border-zinc-200 dark:border-zinc-700 min-h-[48px] flex items-center justify-center">
                       {time}
                     </div>
                     {/* Cells for each day */}
                     {getDayOfWeekOptions.map(day => (
                       <div
                         key={`${day.value}-${time}`}
-                        className={`relative p-0 border-b border-r border-zinc-200 dark:border-zinc-700 min-h-[60px]
+                        className={`relative p-0 border-b border-r border-zinc-200 dark:border-zinc-700 min-h-[48px]
                           ${draggedOverCell?.day === day.value && draggedOverCell?.time === time ? 'bg-sky-200/50 dark:bg-sky-800/50' : ''}`}
                         onDragOver={(e) => handleDragOver(e, day.value, time)}
                         onDrop={(e) => handleDrop(e, day.value, time)}
                         onDragLeave={handleDragLeave}
                       >
+                        {/* Overlays background layers (optional, based on filters) */}
+                        <div className="absolute inset-0 -z-10 pointer-events-none">
+                          {overlayShowPinned && overlayPinnedSet.has(`${day.value}-${time}`) && (
+                            <div className="absolute inset-0 bg-amber-300/30 dark:bg-amber-500/20" />
+                          )}
+                          {overlayShowStaff && overlayStaffUnavSet.has(`${day.value}-${time}`) && (
+                            <div className="absolute inset-0 bg-red-300/30 dark:bg-red-500/20" />
+                          )}
+                          {overlayShowRoom && overlayRoomUnavSet.has(`${day.value}-${time}`) && (
+                            <div className="absolute inset-0 bg-purple-300/30 dark:bg-purple-500/20" />
+                          )}
+                        </div>
                         {/* Render timetable entries that START EXACTLY at this time slot */}
                         {positionedTimetableEntries
                           .filter(entry => entry.dayOfWeek.toString() === day.value && entry.startTime === time)
@@ -895,35 +1916,37 @@ function AdminTimetablePage() {
                             return (
                               <div
                                 key={entry.id}
-                                draggable="true" // Make the card draggable
+                                draggable={isAdmin} // Only admins can drag
                                 onDragStart={(e) => handleDragStart(e, entry)}
                                 onDragEnd={handleDragEnd}
-                                className="group absolute bg-sky-100 dark:bg-sky-900 border border-sky-300 dark:border-sky-700 text-sky-800 dark:text-sky-200 rounded p-1 text-xs cursor-pointer hover:bg-sky-200 dark:hover:bg-sky-800 transition-colors z-10 overflow-hidden break-words"
+                                className="group absolute bg-sky-100 dark:bg-sky-900 border border-sky-300 dark:border-sky-700 text-sky-800 dark:text-sky-200 rounded p-1 text-[11px] leading-tight cursor-pointer hover:bg-sky-200 dark:hover:bg-sky-800 transition-colors z-10 overflow-hidden break-words shadow-sm"
                                 style={{
                                   top: `${relativeTopInCell}px`,
                                   height: `${entryHeight}px`,
-                                  left: '2px',
-                                  right: '2px',
+                                  left: '3px',
+                                  right: '3px',
                                 }}
                                 onClick={(e) => {
                                     e.stopPropagation(); // Prevent opening Add dialog when clicking on an existing entry
-                                    openEditDialog(entry);
+                                    if (isAdmin) openEditDialog(entry);
                                 }}
                               >
-                                <strong className="block truncate">{getSubjectNameDisplay(entry.subjectId)}</strong>
+                                <strong className="block truncate pr-10">{getSubjectNameDisplay(entry.subjectId)}</strong>
                                 <span className="block truncate text-zinc-700 dark:text-zinc-300">{getSectionFullName(entry.sectionId)}</span>
-                                <span className="block truncate text-zinc-600 dark:text-zinc-400 text-xs">{getTeacherFullName(entry.staffId)}</span>
-                                <span className="block truncate text-zinc-600 dark:text-zinc-400 text-xs">({getRoomNameDisplay(entry.roomId)})</span>
+                                <span className="block truncate text-zinc-600 dark:text-zinc-400">{getTeacherFullName(entry.staffId)}</span>
+                                <span className="block truncate text-zinc-600 dark:text-zinc-400">({getRoomNameDisplay(entry.roomId)})</span>
 
                                 {/* Edit/Delete buttons on hover */}
-                                <div className="absolute bottom-1 right-1 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto z-20">
-                                    <Button variant="ghost" size="icon" className="h-6 w-6 p-0.5 text-sky-700 dark:text-sky-300 hover:bg-sky-200 dark:hover:bg-sky-800/70" onClick={(e) => { e.stopPropagation(); openEditDialog(entry); }} title="Edit">
+                {isAdmin && (
+        <div className="absolute bottom-1 right-1 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto z-20">
+                  <Button variant="ghost" size="icon" className="h-6 w-6 p-0.5 text-sky-700 dark:text-sky-300 hover:bg-sky-200 dark:hover:bg-sky-800/70" onClick={(e) => { e.stopPropagation(); openEditDialog(entry); }} title="Edit">
                                         <Edit3 className="h-4 w-4" />
                                     </Button>
                                     <Button variant="ghost" size="icon" className="h-6 w-6 p-0.5 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800/70" onClick={(e) => { e.stopPropagation(); handleDelete(entry.id); }} title="Delete">
                                         <Trash2 className="h-4 w-4" />
                                     </Button>
-                                </div>
+                </div>
+                )}
                               </div>
                             );
                           })}
@@ -969,8 +1992,12 @@ function AdminTimetablePage() {
                         <TableCell className={`${descriptionTextClasses} hidden md:table-cell`}>{getRoomNameDisplay(entry.roomId)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1 md:gap-2">
-                            <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} onClick={() => openEditDialog(entry)} title="Edit Timetable Entry"> <Edit3 className="h-4 w-4" /> </Button>
-                            <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8 border-red-300 text-red-600 hover:bg-red-100 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/50`} onClick={() => handleDelete(entry.id)} title="Delete Timetable Entry"> <Trash2 className="h-4 w-4" /> </Button>
+                            {isAdmin && (
+                              <>
+                                <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} onClick={() => openEditDialog(entry)} title="Edit Timetable Entry"> <Edit3 className="h-4 w-4" /> </Button>
+                                <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8 border-red-300 text-red-600 hover:bg-red-100 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/50`} onClick={() => handleDelete(entry.id)} title="Delete Timetable Entry"> <Trash2 className="h-4 w-4" /> </Button>
+                              </>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>

@@ -9,6 +9,15 @@
 			"problemMatcher": [
 				"$tsc"
 			]
+		},
+		{
+			"label": "Prisma migrate dev",
+			"type": "shell",
+			"command": "npx prisma migrate dev --name library_loans",
+			"problemMatcher": [
+				"$eslint-stylish"
+			],
+			"group": "build"
 		}
 	]
 }

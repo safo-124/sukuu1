@@ -364,6 +364,65 @@ export const updateSchoolProfileSchema = z.object({
   path: ["timetableEndTime"],
 });
 
+// --- Timetable Requirements & Constraints Schemas ---
+export const sectionSubjectRequirementSchema = z.object({
+  sectionId: z.string().min(1),
+  subjectId: z.string().min(1),
+  periodsPerWeek: z.coerce.number().int().positive(),
+  durationMinutes: z.coerce.number().int().min(15).max(240).default(60).optional(),
+  minGapMins: z.coerce.number().int().min(0).default(0).optional(),
+  allowDouble: z.boolean().default(false).optional(),
+  preferredRoomType: z.string().max(100).nullable().optional(),
+});
+export const updateSectionSubjectRequirementSchema = sectionSubjectRequirementSchema.partial();
+export const sectionSubjectRequirementIdSchema = z.string().min(1);
+
+// Use a base object for partial() since refine() returns ZodEffects without .partial()
+const baseStaffUnavailabilitySchema = z.object({
+  staffId: z.string().min(1),
+  dayOfWeek: z.coerce.number().int().min(0).max(6),
+  startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/),
+  endTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/),
+  note: z.string().nullable().optional(),
+});
+export const staffUnavailabilitySchema = baseStaffUnavailabilitySchema.refine(
+  d => new Date(`2000-01-01T${d.startTime}:00`) < new Date(`2000-01-01T${d.endTime}:00`),
+  { message: 'endTime must be after startTime', path: ['endTime'] }
+);
+export const updateStaffUnavailabilitySchema = baseStaffUnavailabilitySchema.partial();
+export const staffUnavailabilityIdSchema = z.string().min(1);
+
+const baseRoomUnavailabilitySchema = z.object({
+  roomId: z.string().min(1),
+  dayOfWeek: z.coerce.number().int().min(0).max(6),
+  startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/),
+  endTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/),
+  note: z.string().nullable().optional(),
+});
+export const roomUnavailabilitySchema = baseRoomUnavailabilitySchema.refine(
+  d => new Date(`2000-01-01T${d.startTime}:00`) < new Date(`2000-01-01T${d.endTime}:00`),
+  { message: 'endTime must be after startTime', path: ['endTime'] }
+);
+export const updateRoomUnavailabilitySchema = baseRoomUnavailabilitySchema.partial();
+export const roomUnavailabilityIdSchema = z.string().min(1);
+
+const basePinnedTimetableSlotSchema = z.object({
+  sectionId: z.string().min(1),
+  subjectId: z.string().min(1),
+  staffId: z.string().min(1).nullable().optional(),
+  roomId: z.string().min(1).nullable().optional(),
+  dayOfWeek: z.coerce.number().int().min(0).max(6),
+  startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/),
+  endTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/),
+  note: z.string().nullable().optional(),
+});
+export const pinnedTimetableSlotSchema = basePinnedTimetableSlotSchema.refine(
+  d => new Date(`2000-01-01T${d.startTime}:00`) < new Date(`2000-01-01T${d.endTime}:00`),
+  { message: 'endTime must be after startTime', path: ['endTime'] }
+);
+export const updatePinnedTimetableSlotSchema = basePinnedTimetableSlotSchema.partial();
+export const pinnedTimetableSlotIdSchema = z.string().min(1);
+
 // --- Timetable Suggestion Schema ---
 export const generateTimetableSuggestionSchema = z.object({
   sectionId: z.string().min(1).optional(),
@@ -372,6 +431,25 @@ export const generateTimetableSuggestionSchema = z.object({
   dayOfWeek: z.coerce.number().int().min(0).max(6).optional(),
   durationMinutes: z.coerce.number().int().min(15).max(240),
   preferredRoomId: z.string().nullable().optional(),
+});
+
+// --- Automated Timetable Run Schema (options) ---
+export const generateTimetableRunSchema = z.object({
+  targetSectionIds: z.array(z.string().min(1)).nonempty().optional(),
+  includePinned: z.boolean().default(true).optional(),
+  honorUnavailability: z.boolean().default(true).optional(),
+  allowDoublePeriods: z.boolean().default(false).optional(),
+  preferredStartTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
+  preferredEndTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
+  maxIterations: z.coerce.number().int().min(100).max(20000).default(5000).optional(),
+}).refine(d => {
+  if (d.preferredStartTime && d.preferredEndTime) {
+    return new Date(`2000-01-01T${d.preferredStartTime}:00`) < new Date(`2000-01-01T${d.preferredEndTime}:00`);
+  }
+  return true;
+}, {
+  message: 'preferredEndTime must be after preferredStartTime',
+  path: ['preferredEndTime']
 });
 
 // --- Payroll Schemas (FIXED) ---
