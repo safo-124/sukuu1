@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import { useSchool } from '../../../../layout';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,9 @@ import { Loader2, BookPlus } from 'lucide-react';
 export default function NewBookPage() {
   const schoolData = useSchool();
   const router = useRouter();
+  const params = useParams();
   const { data: session } = useSession();
+  const effectiveSubdomain = schoolData?.subdomain || params?.subdomain;
 
   const [form, setForm] = useState({ title: '', author: '', isbn: '', publicationYear: '', genre: '', copiesAvailable: 1 });
   const [loading, setLoading] = useState(false);
@@ -36,8 +38,8 @@ export default function NewBookPage() {
       const res = await fetch(`/api/schools/${schoolData.id}/resources/books`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to create book');
-      toast.success(`Book "${data.book?.title}" created`);
-      router.push(`/${schoolData.subdomain}/resources/library`);
+  toast.success(`Book "${data.book?.title}" created`);
+  router.push(`/${effectiveSubdomain}/resources/library`);
     } catch (err) { toast.error('Create failed', { description: err.message }); }
     finally { setLoading(false); }
   };

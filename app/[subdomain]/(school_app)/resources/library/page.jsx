@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useParams } from 'next/navigation';
 import { useSchool } from '../../layout';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
@@ -73,6 +74,8 @@ const BookFormFields = ({ formData, onFormChange, isEdit = false }) => {
 export default function ManageLibraryPage() {
   const schoolData = useSchool();
   const { data: session } = useSession();
+  const params = useParams();
+  const effectiveSubdomain = schoolData?.subdomain || params?.subdomain;
 
   const [books, setBooks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -375,10 +378,10 @@ export default function ManageLibraryPage() {
           <ClipboardList className='mr-2 h-6 w-6 opacity-80'/>Loans
         </h2>
         <div className='flex gap-2'>
-          <Link href={`/${schoolData?.subdomain}/resources/library/loans`}>
+          <Link href={`/${effectiveSubdomain}/resources/library/loans`}>
             <Button variant='outline' className={outlineButtonClasses}>View Loans</Button>
           </Link>
-          <Link href={`/${schoolData?.subdomain}/resources/library/loans/new`}>
+          <Link href={`/${effectiveSubdomain}/resources/library/loans/new`}>
             <Button className={primaryButtonClasses}><PlusCircle className='h-4 w-4 mr-2'/>New Loan</Button>
           </Link>
         </div>

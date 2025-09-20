@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSchool } from '../../../../layout';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,9 @@ import { Loader2, ClipboardList, BookOpen } from 'lucide-react';
 export default function NewLoanPage() {
   const schoolData = useSchool();
   const router = useRouter();
+  const params = useParams();
   const { data: session } = useSession();
+  const effectiveSubdomain = schoolData?.subdomain || params?.subdomain;
 
   const [students, setStudents] = useState([]);
   const [books, setBooks] = useState([]);
@@ -52,8 +54,8 @@ export default function NewLoanPage() {
       const res = await fetch(`/api/schools/${schoolData.id}/resources/loans`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to create loan');
-      toast.success('Loan created');
-      router.push(`/${schoolData.subdomain}/resources/library/loans`);
+  toast.success('Loan created');
+  router.push(`/${effectiveSubdomain}/resources/library/loans`);
     } catch (err) { toast.error('Create failed', { description: err.message }); }
     finally { setSubmitting(false); }
   };

@@ -218,8 +218,10 @@ function getNavigationSections(schoolSubdomain, role) {
       }
       case 'TRANSPORT_MANAGER':
         return [ { items: commonItems }, { title: 'Resources', items: [ { href: `/${schoolSubdomain}/resources/transport`, label: 'Transport', icon: Bus } ] } ];
-      case 'HOSTEL_WARDEN':
-        return [ { items: commonItems }, { title: 'Resources', items: [ { href: `/${schoolSubdomain}/resources/hostel`, label: 'Hostel', icon: Home } ] } ];
+      case 'HOSTEL_WARDEN': {
+        const wardenCommon = [ { href: `/${schoolSubdomain}/dashboard/hostel`, label: 'Dashboard', icon: LayoutDashboard } ];
+        return [ { items: wardenCommon }, { title: 'Resources', items: [ { href: `/${schoolSubdomain}/resources/hostel`, label: 'Hostel', icon: Home } ] } ];
+      }
       case 'STUDENT':
         return [
           { items: commonItems },
@@ -404,6 +406,13 @@ export default function SchoolAppLayout({ children }) {
         if (userRole === 'LIBRARIAN') {
           if (currentPath === `/${subdomain}/dashboard`) {
             router.push(`/${subdomain}/dashboard/librarian`);
+            return;
+          }
+        }
+        // Hostel Warden: land on hostel dashboard from generic dashboard
+        if (userRole === 'HOSTEL_WARDEN') {
+          if (currentPath === `/${subdomain}/dashboard`) {
+            router.push(`/${subdomain}/dashboard/hostel`);
             return;
           }
         }

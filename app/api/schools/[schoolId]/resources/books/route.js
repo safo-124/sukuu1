@@ -5,7 +5,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { z } from 'zod';
 import { schoolIdSchema, createBookSchema } from '@/validators/resources.validators'; // Import schemas
-import { exportBooksToExcel } from '@/lib/excel';
+import { tryWriteBooksExport } from '@/lib/excel';
 
 // GET /api/schools/[schoolId]/resources/books
 // Fetches all books for a specific school
@@ -95,8 +95,8 @@ export async function POST(request, { params }) {
       },
     });
     // Regenerate Excel export after change
-    const allBooks = await prisma.book.findMany({ where: { schoolId }, orderBy: { title: 'asc' } })
-    await exportBooksToExcel(schoolId, allBooks)
+  const allBooks = await prisma.book.findMany({ where: { schoolId }, orderBy: { title: 'asc' } })
+  tryWriteBooksExport(schoolId, allBooks).catch(() => {})
 
     return NextResponse.json({ book: newBook, message: 'Book created successfully.' }, { status: 201 });
   } catch (error) {

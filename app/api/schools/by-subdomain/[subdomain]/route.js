@@ -8,10 +8,16 @@ export async function GET(request, { params }) {
         return NextResponse.json({ error: 'Subdomain is required' }, { status: 400 });
     }
     try {
-        const school = await prisma.school.findUnique({
-            where: { subdomain },
-            select: { id: true, name: true, isActive: true /* other relevant fields */ }
-        });
+                const school = await prisma.school.findUnique({
+                        where: { subdomain },
+                        select: {
+                            id: true,
+                            name: true,
+                            subdomain: true,
+                            isActive: true,
+                            logoUrl: true,
+                        }
+                });
         if (!school || !school.isActive) { // Also check if school is active
             return NextResponse.json({ error: 'School not found or inactive' }, { status: 404 });
         }

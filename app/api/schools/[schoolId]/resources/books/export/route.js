@@ -3,8 +3,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { exportBooksToExcel } from '@/lib/excel';
-import fs from 'fs';
+import { exportBooksToBuffer, tryWriteBooksExport } from '@/lib/excel';
 
 export async function GET(request, { params }) {
   const { schoolId } = params
@@ -14,8 +13,9 @@ export async function GET(request, { params }) {
   }
   try {
     const books = await prisma.book.findMany({ where: { schoolId }, orderBy: { title: 'asc' } })
-    const filePath = await exportBooksToExcel(schoolId, books)
-    const fileBuffer = fs.readFileSync(filePath)
+    const fileBuffer = await exportBooksToBuffer(books)
+    // Fire-and-forget: persist to public/exports when possible
+    tryWriteBooksExport(schoolId, books).catch(() => {})
     const res = new NextResponse(fileBuffer, {
       status: 200,
       headers: {

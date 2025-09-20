@@ -6,7 +6,7 @@ import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { BookOpen, Users, ClipboardList, PlusCircle } from 'lucide-react'
+import { BookOpen, Users, ClipboardList, PlusCircle, Library as LibraryIcon } from 'lucide-react'
 
 function StatCard({ title, value, hint, icon: Icon }) {
   return (
@@ -26,7 +26,7 @@ function StatCard({ title, value, hint, icon: Icon }) {
 export default function LibrarianDashboard() {
   const schoolData = useSchool()
   const { data: session } = useSession()
-  const [stats, setStats] = useState({ books: 0, borrowed: 0, activeBorrowers: 0 })
+  const [stats, setStats] = useState({ available: 0, borrowed: 0, activeBorrowers: 0, titles: 0, totalCopies: 0 })
 
   useEffect(() => {
     let cancelled = false
@@ -36,9 +36,15 @@ export default function LibrarianDashboard() {
         const res = await fetch(`/api/schools/${schoolData.id}/resources/library/stats`)
         if (!res.ok) throw new Error('Failed to load stats')
         const data = await res.json()
-        if (!cancelled) setStats({ books: data.books ?? 0, borrowed: data.borrowed ?? 0, activeBorrowers: data.activeBorrowers ?? 0 })
+        if (!cancelled) setStats({
+          available: data.available ?? 0,
+          borrowed: data.borrowed ?? 0,
+          activeBorrowers: data.activeBorrowers ?? 0,
+          titles: data.titles ?? 0,
+          totalCopies: data.totalCopies ?? ((data.available ?? 0) + (data.borrowed ?? 0))
+        })
       } catch (e) {
-        if (!cancelled) setStats({ books: 0, borrowed: 0, activeBorrowers: 0 })
+        if (!cancelled) setStats({ available: 0, borrowed: 0, activeBorrowers: 0, titles: 0, totalCopies: 0 })
       }
     }
     load()
@@ -52,8 +58,9 @@ export default function LibrarianDashboard() {
         <p className="text-muted-foreground">Overview of library resources and activity.</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatCard title="Total Books" value={stats.books} hint="Catalog size" icon={BookOpen} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard title="Titles" value={stats.titles} hint="Distinct books in catalog" icon={LibraryIcon} />
+        <StatCard title="Copies (Avail/Total)" value={`${stats.available}/${stats.totalCopies}`} hint="Available vs all copies" icon={BookOpen} />
         <StatCard title="Books Borrowed" value={stats.borrowed} hint="Currently checked out" icon={ClipboardList} />
         <StatCard title="Active Borrowers" value={stats.activeBorrowers} hint="Students & staff" icon={Users} />
       </div>

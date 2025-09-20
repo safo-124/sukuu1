@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
-import { parseBooksFromExcel, exportBooksToExcel } from '@/lib/excel'
+import { parseBooksFromExcel, tryWriteBooksExport } from '@/lib/excel'
 
 export async function POST(request, { params }) {
   const { schoolId } = params
@@ -35,8 +35,8 @@ export async function POST(request, { params }) {
 
     const results = await prisma.$transaction(ops)
     // Regenerate export file after import
-    const allBooks = await prisma.book.findMany({ where: { schoolId }, orderBy: { title: 'asc' } })
-    await exportBooksToExcel(schoolId, allBooks)
+  const allBooks = await prisma.book.findMany({ where: { schoolId }, orderBy: { title: 'asc' } })
+  tryWriteBooksExport(schoolId, allBooks).catch(() => {})
 
     return NextResponse.json({ message: 'Import completed', count: results.length }, { status: 200 })
   } catch (e) {

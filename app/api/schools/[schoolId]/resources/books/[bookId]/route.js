@@ -5,7 +5,7 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { z } from 'zod'
 import { schoolIdSchema, bookIdSchema, updateBookSchema } from '@/validators/resources.validators'
-import { exportBooksToExcel } from '@/lib/excel'
+import { tryWriteBooksExport } from '@/lib/excel'
 
 // Helpers
 function isViewer(role) {
@@ -69,8 +69,8 @@ export async function PUT(request, { params }) {
     })
 
     // Regenerate Excel on update
-    const allBooks = await prisma.book.findMany({ where: { schoolId }, orderBy: { title: 'asc' } })
-    await exportBooksToExcel(schoolId, allBooks)
+  const allBooks = await prisma.book.findMany({ where: { schoolId }, orderBy: { title: 'asc' } })
+  tryWriteBooksExport(schoolId, allBooks).catch(() => {})
 
     return NextResponse.json({ book: updated, message: 'Book updated successfully.' }, { status: 200 })
   } catch (error) {
@@ -106,8 +106,8 @@ export async function DELETE(request, { params }) {
     await prisma.book.delete({ where: { id: bookId } })
 
     // Regenerate Excel on delete
-    const allBooks = await prisma.book.findMany({ where: { schoolId }, orderBy: { title: 'asc' } })
-    await exportBooksToExcel(schoolId, allBooks)
+  const allBooks = await prisma.book.findMany({ where: { schoolId }, orderBy: { title: 'asc' } })
+  tryWriteBooksExport(schoolId, allBooks).catch(() => {})
 
     return NextResponse.json({ message: 'Book deleted successfully.' }, { status: 200 })
   } catch (error) {
