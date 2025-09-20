@@ -68,6 +68,8 @@ export async function middleware(request) {
         '/people/teachers',
         '/attendance/students',
         '/attendance/staff',
+        // Allow teachers to manage/view hostel resources
+        '/resources/hostel',
         '/communication/announcements',
         '/hr/payroll',
         '/teacher-login',
@@ -208,6 +210,8 @@ export async function middleware(request) {
         '/people/teachers',
         '/attendance/students',
         '/attendance/staff',
+        // Allow teachers to manage/view hostel resources
+        '/resources/hostel',
         '/communication/announcements',
         '/hr/payroll',
         '/teacher-login',

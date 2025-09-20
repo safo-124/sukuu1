@@ -253,3 +253,28 @@ Path: `app/[subdomain]/(school_app)/resources/hostel/page.jsx`
 4. Allocation panel: filter (optional) and allocate students to rooms.
 5. Occupants dialog: unassign or move students; confirm occupancy changes in room list and stats cards.
 
+
+## Mobile Integration (Parents App)
+
+We support a Flutter mobile app for Parents using the same backend.
+
+Auth flow:
+
+- POST `POST /api/auth/mobile-login` with JSON `{ email, password, subdomain }`
+- Response `{ token, user }` where `token` is a JWT (HS256, `NEXTAUTH_SECRET`) suitable for `Authorization: Bearer <token>`
+
+Headers for mobile API calls:
+
+- `Authorization: Bearer <token>`
+- All parent endpoints accept either a NextAuth session cookie (web) or Bearer token (mobile).
+
+Key parent endpoints:
+
+- GET `/api/schools/{schoolId}/parents/me` → profile and children list
+- GET `/api/schools/{schoolId}/parents/me/children/grades` → children’s published grades with remarks
+
+Notes:
+
+- Ensure `NEXTAUTH_SECRET` is set in environments used by the mobile app.
+- Tokens default to 30 days validity.
+

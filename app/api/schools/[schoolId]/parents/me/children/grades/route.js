@@ -1,12 +1,11 @@
 // app/api/schools/[schoolId]/parents/me/children/grades/route.js
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
+import { getApiSession } from '@/lib/apiAuth';
 import prisma from '@/lib/prisma';
 
 export async function GET(request, { params }) {
   const { schoolId } = params;
-  const session = await getServerSession(authOptions);
+  const session = await getApiSession(request);
   if (!session || session.user?.schoolId !== schoolId || session.user?.role !== 'PARENT') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
