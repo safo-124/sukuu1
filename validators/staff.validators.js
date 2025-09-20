@@ -21,7 +21,8 @@ export const createTeacherSchema = z.object({
 
   // Hostel warden (optional) — only teachers can be wardens
   isHostelWarden: z.boolean().optional().default(false),
-  hostelId: z.string().cuid({ message: 'Invalid Hostel ID.' }).optional().nullable(),
+  // Hostel may be omitted; when provided must be a valid CUID
+  hostelId: z.string().cuid({ message: 'Invalid Hostel ID.' }).nullable().optional(),
 });
 
 export const updateTeacherSchema = z.object({
@@ -42,5 +43,5 @@ export const updateTeacherSchema = z.object({
 
   // Hostel warden fields (optional updates)
   isHostelWarden: z.boolean().optional(),
-  hostelId: z.string().cuid({ message: 'Invalid Hostel ID.' }).optional().nullable(),
+  hostelId: z.string().cuid({ message: 'Invalid Hostel ID.' }).nullable().optional(),
 });

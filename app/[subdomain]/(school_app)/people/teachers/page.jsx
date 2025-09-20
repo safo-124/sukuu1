@@ -265,8 +265,16 @@ export default function ManageTeachersPage() {
     if (!schoolData?.id) return;
     setIsSubmittingAdd(true); setAddFormError('');
     try {
+      // sanitize payload: drop optional fields when not set
+      const payload = { ...addFormData };
+      if (!payload.isHostelWarden || !payload.hostelId || payload.hostelId === 'none' || payload.hostelId === '') {
+        delete payload.hostelId;
+      }
+      if (!payload.departmentId || payload.departmentId === 'none' || payload.departmentId === '') {
+        delete payload.departmentId;
+      }
       const response = await fetch(`/api/schools/${schoolData.id}/staff/teachers`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(addFormData),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
       });
       const result = await response.json();
       if (!response.ok) {
@@ -346,6 +354,13 @@ export default function ManageTeachersPage() {
     const dataToSubmit = { ...editFormData };
     if (!dataToSubmit.password || dataToSubmit.password.trim() === '') {
       delete dataToSubmit.password;
+    }
+    // sanitize optional fields
+    if (!dataToSubmit.isHostelWarden || !dataToSubmit.hostelId || dataToSubmit.hostelId === 'none' || dataToSubmit.hostelId === '') {
+      delete dataToSubmit.hostelId;
+    }
+    if (!dataToSubmit.departmentId || dataToSubmit.departmentId === 'none' || dataToSubmit.departmentId === '') {
+      delete dataToSubmit.departmentId;
     }
     delete dataToSubmit.id; 
     delete dataToSubmit.userId;
