@@ -15,6 +15,7 @@ export default function TeacherDashboardPage() {
   const [stats, setStats] = useState({ subjectsCount: 0, assignmentsCount: 0, todayLessons: [], nextLesson: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [wardenHostel, setWardenHostel] = useState(null);
 
   const titleTextClasses = "text-black dark:text-white";
   const descriptionTextClasses = "text-zinc-600 dark:text-zinc-400";
@@ -45,6 +46,14 @@ export default function TeacherDashboardPage() {
           todayLessons: Array.isArray(data.todayLessons) ? data.todayLessons : [],
           nextLesson: data.nextLesson || null,
         });
+        // Also check if this teacher is assigned as a hostel warden (API limits for teacher already)
+        const hRes = await fetch(`/api/schools/${schoolData.id}/resources/hostels`);
+        const hData = await hRes.json().catch(() => ({ hostels: [] }));
+        if (hRes.ok && Array.isArray(hData.hostels) && hData.hostels.length > 0) {
+          setWardenHostel(hData.hostels[0]);
+        } else {
+          setWardenHostel(null);
+        }
       } catch (e) {
         setError(e.message);
       } finally {
@@ -100,6 +109,15 @@ export default function TeacherDashboardPage() {
 
       {/* Quick Actions / Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {wardenHostel && (
+          <Link href={`/${subdomain}/resources/hostel`} passHref>
+            <div className={`${featureCardClasses}`}>
+              <Users className="h-12 w-12 text-emerald-600 dark:text-emerald-400 mb-3" />
+              <h2 className={`text-xl font-semibold ${titleTextClasses} mb-1`}>My Hostel</h2>
+              <p className={`text-sm ${descriptionTextClasses}`}>Manage hostel "{wardenHostel.name}" as assigned warden.</p>
+            </div>
+          </Link>
+        )}
         <Link href={`/${subdomain}/academics/assignments`} passHref>
           <div className={`${featureCardClasses}`}>
             <CheckSquare className="h-12 w-12 text-sky-600 dark:text-sky-400 mb-3" />

@@ -114,7 +114,8 @@ function getNavigationSections(schoolSubdomain, role) {
       { href: `/${schoolSubdomain}/people/teachers`, label: 'Manage Teachers', icon: UserCog },
       { href: `/${schoolSubdomain}/people/accountants`, label: 'Manage Accountants', icon: DollarSign },
       { href: `/${schoolSubdomain}/people/procurement`, label: 'Manage Procurement', icon: Briefcase },
-      { href: `/${schoolSubdomain}/people/librarians`, label: 'Manage Librarians', icon: Library },
+  { href: `/${schoolSubdomain}/people/librarians`, label: 'Manage Librarians', icon: Library },
+  { href: `/${schoolSubdomain}/people/wardens`, label: 'Manage Wardens', icon: Home },
       { href: `/${schoolSubdomain}/people/hr-staff`, label: 'Manage HR Staff', icon: Briefcase },
     ];
     const attendanceItems = [

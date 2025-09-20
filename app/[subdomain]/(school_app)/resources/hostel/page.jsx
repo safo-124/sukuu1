@@ -215,13 +215,19 @@ export default function ManageHostelPage() {
     let overallError = null;
     try {
       const [staffRes] = await Promise.allSettled([
-        fetch(`/api/schools/${schoolData.id}/people/teachers`), // Fetch all staff for warden dropdown
+  // Restrict to TEACHER only for assigning wardens
+  fetch(`/api/schools/${schoolData.id}/people/staff?roles=TEACHER&limit=1000`),
       ]);
 
       if (staffRes.status === 'fulfilled' && staffRes.value.ok) {
         const staffData = await staffRes.value.json();
-        // Assuming your teachers API returns staff members with user data
-        setStaffList(Array.isArray(staffData.teachers) ? staffData.teachers : []);
+        const users = Array.isArray(staffData.users) ? staffData.users : [];
+        // Map unified user rows to simplified items with id and display fields
+        setStaffList(users.map(u => ({
+          id: u.id,
+          user: { firstName: u.firstName, lastName: u.lastName },
+          jobTitle: u.role?.replace(/_/g,' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()) || 'Staff'
+        })));
       } else {
         const errorData = staffRes.status === 'rejected' ? staffRes.reason : await staffRes.value.json().catch(() => ({}));
         console.error("Staff list fetch failed:", errorData);

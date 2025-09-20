@@ -30,6 +30,8 @@ const initialAddFormData = {
   staffIdNumber: '', jobTitle: '', qualification: '', 
   dateOfJoining: new Date().toISOString().split('T')[0],
   departmentId: '', isActive: true,
+  isHostelWarden: false,
+  hostelId: '',
 };
 
 const initialEditFormData = {
@@ -42,7 +44,7 @@ const initialEditFormData = {
 };
 
 // ✨ Corrected TeacherFormFields to expect 'formData' prop ✨
-const TeacherFormFields = ({ formData, onFormChange, onSelectChange, onSwitchChange, departmentsList, isEdit = false, isLoadingDeps }) => {
+const TeacherFormFields = ({ formData, onFormChange, onSelectChange, onSwitchChange, departmentsList, isEdit = false, isLoadingDeps, hostelsList = [] }) => {
   // Tailwind class constants (can be defined here or passed as props if they vary more)
   const titleTextClasses = "text-black dark:text-white";
   const labelTextClasses = `${titleTextClasses} block text-sm font-medium mb-1 text-left`;
@@ -90,6 +92,24 @@ const TeacherFormFields = ({ formData, onFormChange, onSelectChange, onSwitchCha
                 <SelectContent className="bg-white dark:bg-zinc-900"><SelectItem value="none" className="text-zinc-500">No Department</SelectItem>{departmentsList?.map(dept => <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>)}</SelectContent>
             </Select>
         </div>
+        {!isEdit && (
+          <>
+            <div className="sm:col-span-2 text-sm font-medium text-zinc-500 dark:text-zinc-400 pb-2 border-b dark:border-zinc-700 mt-4 mb-2">Hostel Warden (Optional)</div>
+            <div className="flex items-center space-x-2 sm:col-span-2">
+              <Switch id="isHostelWarden" name="isHostelWarden" checked={!!formData.isHostelWarden} onCheckedChange={(checked) => onSwitchChange('isHostelWarden', checked)} />
+              <Label htmlFor="isHostelWarden" className={`text-sm font-medium ${titleTextClasses}`}>Mark this teacher as a Hostel Warden</Label>
+            </div>
+            {formData.isHostelWarden && (
+              <div>
+                <Label htmlFor="hostelId" className={labelTextClasses}>Assign Hostel (optional)</Label>
+                <Select name="hostelId" value={formData.hostelId || 'none'} onValueChange={(value) => onSelectChange('hostelId', value)} disabled={isLoadingDeps}>
+                  <SelectTrigger className={`${inputTextClasses} mt-1`}><SelectValue placeholder="Select hostel (optional)" /></SelectTrigger>
+                  <SelectContent className="bg-white dark:bg-zinc-900"><SelectItem value="none" className="text-zinc-500">No Hostel</SelectItem>{hostelsList?.map(h => <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            )}
+          </>
+        )}
         <div className="flex items-center space-x-2 pt-2 sm:col-span-2">
             <Switch id={isEdit ? "editIsActive" : "isActive"} name="isActive" checked={formData.isActive} onCheckedChange={(checked) => onSwitchChange('isActive', checked)} />
             <Label htmlFor={isEdit ? "editIsActive" : "isActive"} className={`text-sm font-medium ${titleTextClasses}`}>Set Account as Active</Label>
@@ -109,6 +129,7 @@ export default function ManageTeachersPage() {
   const [teachers, setTeachers] = useState([]);
   const [pagination, setPagination] = useState({ currentPage: 1, totalPages: 1, totalTeachers: 0, limit: 10 });
   const [departments, setDepartments] = useState([]);
+  const [hostels, setHostels] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(''); // For general page errors
 
@@ -172,6 +193,17 @@ export default function ManageTeachersPage() {
     }
   }, [schoolData?.id]);
 
+  const fetchHostels = useCallback(async () => {
+    if (!schoolData?.id) return;
+    try {
+      const response = await fetch(`/api/schools/${schoolData.id}/resources/hostels`);
+      if (response.ok) {
+        const data = await response.json();
+        setHostels(Array.isArray(data.hostels) ? data.hostels : []);
+      }
+    } catch (_) {}
+  }, [schoolData?.id]);
+
   useEffect(() => {
     const handler = setTimeout(() => {
         setDebouncedSearchTerm(searchTerm);
@@ -190,8 +222,9 @@ export default function ManageTeachersPage() {
       const currentSearch = searchParams.get('search') || '';
       fetchTeachers(currentPage, currentSearch);
       fetchDepartments();
+      fetchHostels();
     }
-  }, [schoolData, session, fetchTeachers, fetchDepartments, searchParams]);
+  }, [schoolData, session, fetchTeachers, fetchDepartments, fetchHostels, searchParams]);
 
   const handleAddFormChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -396,6 +429,7 @@ export default function ManageTeachersPage() {
                 onSelectChange={handleAddSelectChange} 
                 onSwitchChange={handleAddSwitchChange} 
                 departmentsList={departments} 
+                hostelsList={hostels}
                 isEdit={false}
                 isLoadingDeps={isLoadingDropdowns}
               />

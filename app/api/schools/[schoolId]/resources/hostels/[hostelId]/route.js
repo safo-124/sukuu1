@@ -84,13 +84,17 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: 'Hostel not found or does not belong to this school.' }, { status: 404 });
     }
 
-    // Validate wardenId if provided and not null
+    // Validate wardenId if provided and not null — ensure user role is TEACHER
     if (validation.data.wardenId !== undefined && validation.data.wardenId !== null) {
-      const wardenExists = await prisma.staff.findUnique({
+      const wardenStaff = await prisma.staff.findFirst({
         where: { id: validation.data.wardenId, schoolId: schoolId },
+        include: { user: { select: { role: true } } }
       });
-      if (!wardenExists) {
+      if (!wardenStaff) {
         return NextResponse.json({ error: 'Provided warden does not exist or does not belong to this school.' }, { status: 400 });
+      }
+      if (wardenStaff.user?.role !== 'TEACHER') {
+        return NextResponse.json({ error: 'Only teachers can be assigned as hostel wardens.' }, { status: 400 });
       }
     }
 

@@ -18,6 +18,10 @@ export const createTeacherSchema = z.object({
   
   // For user record
   isActive: z.boolean().default(true).optional(), // User account active status
+
+  // Hostel warden (optional) — only teachers can be wardens
+  isHostelWarden: z.boolean().optional().default(false),
+  hostelId: z.string().cuid({ message: 'Invalid Hostel ID.' }).optional().nullable(),
 });
 
 export const updateTeacherSchema = z.object({

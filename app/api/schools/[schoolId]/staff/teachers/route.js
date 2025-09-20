@@ -81,7 +81,7 @@ export async function POST(request, { params }) {
     if (!validation.success) {
       return NextResponse.json({ error: 'Invalid input.', issues: validation.error.issues }, { status: 400 });
     }
-    const { firstName, lastName, email, password, staffIdNumber, jobTitle, qualification, dateOfJoining, departmentId, isActive } = validation.data;
+  const { firstName, lastName, email, password, staffIdNumber, jobTitle, qualification, dateOfJoining, departmentId, isActive, isHostelWarden, hostelId } = validation.data;
 
     const newTeacherStaffRecord = await prisma.$transaction(async (tx) => {
       const existingUser = await tx.user.findUnique({ where: { email } });
@@ -94,6 +94,10 @@ export async function POST(request, { params }) {
         const department = await tx.department.findFirst({ where: { id: departmentId, schoolId }});
         if (!department) throw new Error('Selected department is invalid.');
       }
+      if (hostelId) {
+        const hostel = await tx.hostel.findFirst({ where: { id: hostelId, schoolId }});
+        if (!hostel) throw new Error('Selected hostel is invalid.');
+      }
       const hashedPassword = await bcrypt.hash(password, 10);
       const newUser = await tx.user.create({
         data: { email, hashedPassword, firstName, lastName, role: 'TEACHER', schoolId, isActive: isActive !== undefined ? isActive : true }
@@ -101,6 +105,10 @@ export async function POST(request, { params }) {
       const newStaff = await tx.staff.create({
         data: { userId: newUser.id, schoolId, staffIdNumber: staffIdNumber || null, jobTitle, qualification: qualification || null, dateOfJoining, departmentId: departmentId || null }
       });
+      // If marked as hostel warden, optionally assign this teacher as the hostel warden
+      if (isHostelWarden && hostelId) {
+        await tx.hostel.update({ where: { id: hostelId }, data: { wardenId: newStaff.id } });
+      }
       return tx.staff.findUnique({
           where: { id: newStaff.id },
           include: { user: { select: { id: true, firstName: true, lastName: true, email: true, isActive: true }}}
@@ -110,7 +118,8 @@ export async function POST(request, { params }) {
   } catch (error) {
     console.error(`Failed to create teacher for school ${schoolId}:`, error);
     if (error.type === 'UniqueConstraintError') return NextResponse.json({ error: error.message, field: error.field }, { status: 409 });
-    if (error.message.startsWith('Selected department is invalid')) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error.message?.startsWith?.('Selected department is invalid')) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error.message === 'Selected hostel is invalid.') return NextResponse.json({ error: error.message }, { status: 400 });
     if (error.code === 'P2002') {
       let field = "detail";
       if (error.meta?.target?.includes('email')) field = "email";

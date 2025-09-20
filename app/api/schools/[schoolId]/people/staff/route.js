@@ -36,7 +36,7 @@ export async function GET(request, { params }) {
     const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 1000);
     const skip = (page - 1) * limit;
 
-    const defaultRoles = ['TEACHER', 'ACCOUNTANT', 'PROCUREMENT_OFFICER', 'HR_MANAGER', 'SECRETARY'];
+  const defaultRoles = ['TEACHER', 'ACCOUNTANT', 'PROCUREMENT_OFFICER', 'HR_MANAGER', 'SECRETARY', 'HOSTEL_WARDEN'];
     const roles = (rolesParam ? rolesParam.split(',') : defaultRoles).map(r => r.trim()).filter(Boolean);
 
     // Fetch staff-based users by roles

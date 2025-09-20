@@ -12,16 +12,25 @@ export async function GET(request, { params }) {
   const { schoolId } = params;
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'HOSTEL_WARDEN')) {
-    // Restrict access to School Admin and Hostel Warden
+  if (!session || session.user?.schoolId !== schoolId || !['SCHOOL_ADMIN','HOSTEL_WARDEN','TEACHER'].includes(session.user?.role)) {
+    // Restrict access to School Admin, Hostel Warden; TEACHER allowed for their assigned hostel view
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
     schoolIdSchema.parse(schoolId);
 
+    // Teachers can only see hostels where they are the assigned warden
+    let whereClause = { schoolId };
+    if (session.user.role === 'TEACHER') {
+      // find staffId of this user
+      const staff = await prisma.staff.findFirst({ where: { userId: session.user.id, schoolId }, select: { id: true } });
+      if (!staff) return NextResponse.json({ hostels: [] }, { status: 200 });
+      whereClause = { schoolId, wardenId: staff.id };
+    }
+
     const hostels = await prisma.hostel.findMany({
-      where: { schoolId: schoolId },
+      where: whereClause,
       orderBy: { name: 'asc' },
       // TEMPORARILY REMOVING INCLUDE BLOCK FOR DEBUGGING
       // include: {
@@ -32,7 +41,7 @@ export async function GET(request, { params }) {
       // }
     });
 
-    return NextResponse.json({ hostels }, { status: 200 });
+  return NextResponse.json({ hostels }, { status: 200 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Validation Error', issues: error.issues }, { status: 400 });
@@ -73,13 +82,17 @@ export async function POST(request, { params }) {
 
     const { name, genderPreference, capacity, wardenId } = validation.data;
 
-    // Validate wardenId if provided
+    // Validate wardenId if provided — and ensure it's a TEACHER
     if (wardenId) {
-      const wardenExists = await prisma.staff.findUnique({
+      const wardenStaff = await prisma.staff.findFirst({
         where: { id: wardenId, schoolId: schoolId },
+        include: { user: { select: { role: true } } }
       });
-      if (!wardenExists) {
+      if (!wardenStaff) {
         return NextResponse.json({ error: 'Provided warden does not exist or does not belong to this school.' }, { status: 400 });
+      }
+      if (wardenStaff.user?.role !== 'TEACHER') {
+        return NextResponse.json({ error: 'Only teachers can be assigned as hostel wardens.' }, { status: 400 });
       }
     }
 
