@@ -85,6 +85,7 @@ export async function POST(request, { params }) {
           },
           update: {
             marksObtained: g.marksObtained,
+            comments: g.comments ?? undefined,
             termId,
             academicYearId,
             sectionId,
@@ -96,6 +97,7 @@ export async function POST(request, { params }) {
             termId,
             academicYearId,
             marksObtained: g.marksObtained,
+            comments: g.comments ?? undefined,
             schoolId,
             sectionId,
           },

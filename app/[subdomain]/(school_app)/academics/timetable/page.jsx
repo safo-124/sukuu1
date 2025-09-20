@@ -153,6 +153,8 @@ function AdminTimetablePage() {
   const schoolData = useSchool();
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === 'SCHOOL_ADMIN';
+  const isTeacher = session?.user?.role === 'TEACHER';
+  const teacherStaffId = session?.user?.staffProfileId || '';
 
   const [timetableEntries, setTimetableEntries] = useState([]);
   const [sections, setSections] = useState([]);
@@ -340,6 +342,13 @@ function AdminTimetablePage() {
     } finally { setIsLoading(false); }
   }, [schoolData?.id, filterSectionId, filterStaffId, filterDayOfWeek, filterRoomId]);
 
+  // If user is a teacher, force the staff filter to their own staffProfileId
+  useEffect(() => {
+    if (isTeacher && teacherStaffId && filterStaffId !== teacherStaffId) {
+      setFilterStaffId(teacherStaffId);
+    }
+  }, [isTeacher, teacherStaffId, filterStaffId]);
+
 
   const fetchDropdownDependencies = useCallback(async () => {
     if (!schoolData?.id) return;
@@ -409,11 +418,13 @@ function AdminTimetablePage() {
 
 
   useEffect(() => {
-    if (schoolData?.id && session) {
+    // For teachers, wait until their staff filter is applied before fetching
+    const canFetch = schoolData?.id && session && (!isTeacher || !!filterStaffId);
+    if (canFetch) {
       fetchTimetableEntries();
       fetchDropdownDependencies();
     }
-  }, [schoolData, session, fetchTimetableEntries, fetchDropdownDependencies]);
+  }, [schoolData, session, isTeacher, filterStaffId, fetchTimetableEntries, fetchDropdownDependencies]);
 
 
   // --- Timetable Submission Logic ---
@@ -1092,9 +1103,11 @@ function AdminTimetablePage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className={`text-2xl md:text-3xl font-bold ${titleTextClasses} flex items-center`}>
-            <CalendarDays className="mr-3 h-8 w-8 opacity-80"/>Manage Timetable
+            <CalendarDays className="mr-3 h-8 w-8 opacity-80"/>{isTeacher ? 'My Timetable' : 'Manage Timetable'}
           </h1>
-          <p className={descriptionTextClasses}>Create and manage class schedules for sections, teachers, and rooms.</p>
+          <p className={descriptionTextClasses}>
+            {isTeacher ? 'View your scheduled lessons.' : 'Create and manage class schedules for sections, teachers, and rooms.'}
+          </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
           {isAdmin && (
@@ -1169,10 +1182,11 @@ function AdminTimetablePage() {
               </Dialog>
             </>
           )}
-          {/* Add Timetable Entry Button */}
+          {/* Add Timetable Entry Button (admin only) */}
+          {isAdmin && (
           <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setFormError(''); }}>
             <DialogTrigger asChild>
-              <Button className={primaryButtonClasses} onClick={openAddDialog} disabled={!isAdmin}> <PlusCircle className="mr-2 h-4 w-4" /> Add Timetable Entry </Button>
+              <Button className={primaryButtonClasses} onClick={openAddDialog}> <PlusCircle className="mr-2 h-4 w-4" /> Add Timetable Entry </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-lg md:max-w-2xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
               <DialogHeader>
@@ -1195,13 +1209,14 @@ function AdminTimetablePage() {
                 {formError && ( <p className="text-sm text-red-600 dark:text-red-400 md:col-span-full">{formError}</p> )}
                 <DialogFooter className="pt-6">
                   <DialogClose asChild><Button type="button" variant="outline" className={outlineButtonClasses}>Cancel</Button></DialogClose>
-                  <Button type="submit" className={primaryButtonClasses} disabled={!isAdmin || isSubmitting || isLoadingDeps}>
+                  <Button type="submit" className={primaryButtonClasses} disabled={isSubmitting || isLoadingDeps}>
                     {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>{editingEntry ? 'Saving...' : 'Creating...'}</> : editingEntry ? 'Save Changes' : 'Create Entry'}
                   </Button>
                 </DialogFooter>
               </form>
             </DialogContent>
           </Dialog>
+          )}
 
           {/* View Toggle Buttons */}
           <Button
@@ -1697,6 +1712,12 @@ function AdminTimetablePage() {
       {/* Timetable Filters */}
       <div className={`${glassCardClasses} flex flex-wrap items-center gap-4`}>
         <h3 className={`text-md font-semibold ${titleTextClasses} mr-2`}>Filters:</h3>
+        {/* Teacher context badge */}
+        {isTeacher && (
+          <span className="text-xs px-2 py-1 rounded-full bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300 border border-sky-300/50">
+            Viewing: Me
+          </span>
+        )}
         <Select value={filterSectionId} onValueChange={(value) => setFilterSectionId(value === 'all' ? '' : value)} disabled={isLoadingDeps}>
           <SelectTrigger className={`${filterInputClasses} w-[180px]`}> <SelectValue placeholder="Filter by Section" /> </SelectTrigger>
           <SelectContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700">
@@ -1705,11 +1726,15 @@ function AdminTimetablePage() {
           </SelectContent>
         </Select>
 
-        <Select value={filterStaffId} onValueChange={(value) => setFilterStaffId(value === 'all' ? '' : value)} disabled={isLoadingDeps}>
-          <SelectTrigger className={`${filterInputClasses} w-[180px]`}> <SelectValue placeholder="Filter by Teacher" /> </SelectTrigger>
+        <Select value={filterStaffId || (isTeacher ? teacherStaffId : '')} onValueChange={(value) => setFilterStaffId(value === 'all' ? '' : value)} disabled={isLoadingDeps || isTeacher}>
+          <SelectTrigger className={`${filterInputClasses} w-[180px]`}> <SelectValue placeholder={isTeacher ? 'Me' : 'Filter by Teacher'} /> </SelectTrigger>
           <SelectContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700">
-            <SelectItem value="all">All Teachers</SelectItem>
-            {Array.isArray(teachers) && teachers.map(teach => <SelectItem key={teach.id} value={teach.id}>{getTeacherFullName(teach.id)}</SelectItem>)}
+            {!isTeacher && <SelectItem value="all">All Teachers</SelectItem>}
+            {Array.isArray(teachers) && teachers.map(teach => (
+              <SelectItem key={teach.id} value={teach.id} disabled={isTeacher && teach.id !== teacherStaffId}>
+                {getTeacherFullName(teach.id)} {isTeacher && teach.id === teacherStaffId ? '(Me)' : ''}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
 
@@ -1729,13 +1754,16 @@ function AdminTimetablePage() {
           </SelectContent>
         </Select>
 
-        <Button onClick={() => { setFilterSectionId(''); setFilterStaffId(''); setFilterDayOfWeek(''); setFilterRoomId(''); }} variant="outline" className={outlineButtonClasses}>
-          Reset Filters
-        </Button>
+        {!isTeacher && (
+          <Button onClick={() => { setFilterSectionId(''); setFilterStaffId(''); setFilterDayOfWeek(''); setFilterRoomId(''); }} variant="outline" className={outlineButtonClasses}>
+            Reset Filters
+          </Button>
+        )}
       </div>
 
       {/* Suggest API Button & Dialog */}
-      <Dialog open={isSuggestionDialogOpen} onOpenChange={setIsSuggestionDialogOpen}>
+        {!isTeacher && (
+        <Dialog open={isSuggestionDialogOpen} onOpenChange={setIsSuggestionDialogOpen}>
         <DialogTrigger asChild>
           <Button variant="outline" className="w-fit" onClick={() => {
             setSuggestionFormData({ ...initialSuggestionFormData });
@@ -1828,7 +1856,8 @@ function AdminTimetablePage() {
             </Alert>
           )}
         </DialogContent>
-      </Dialog>
+  </Dialog>
+  )}
 
 
       {/* Timetable Grid Display */}

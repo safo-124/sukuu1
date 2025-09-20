@@ -20,11 +20,25 @@ export async function GET(request, { params }) {
       },
       include: {
         subject: { select: { id: true, name: true } },
-        examSchedule: { select: { id: true, date: true } },
+        examSchedule: { select: { id: true, date: true, name: true } },
+        term: { select: { id: true, name: true } },
+        academicYear: { select: { id: true, name: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
-    return NextResponse.json({ grades });
+    // Ensure comments and createdAt are present in the response
+    const withMeta = grades.map(g => ({
+      id: g.id,
+      marksObtained: g.marksObtained,
+      comments: g.comments ?? null,
+      createdAt: g.createdAt,
+      subject: g.subject,
+      examSchedule: g.examSchedule,
+      term: g.term,
+      academicYear: g.academicYear,
+      isPublished: true,
+    }));
+    return NextResponse.json({ grades: withMeta });
   } catch (e) {
     console.error('Student self grades error', e);
     return NextResponse.json({ error: 'Failed to fetch grades', details: e?.message || null }, { status: 500 });

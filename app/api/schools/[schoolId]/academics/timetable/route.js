@@ -24,7 +24,10 @@ export async function GET(request, { params }) {
 
   const { searchParams } = new URL(request.url);
   const sectionIdFilter = searchParams.get('sectionId');
-  const staffIdFilter = searchParams.get('staffId');
+  // For teachers, force staff filter to their own staffProfileId regardless of query
+  const staffIdFilter = (session.user?.role === 'TEACHER')
+    ? (session.user?.staffProfileId || null)
+    : searchParams.get('staffId');
   const roomIdFilter = searchParams.get('roomId');
   const dayOfWeekFilterRaw = searchParams.get('dayOfWeek');
   const dayOfWeekFilter = (dayOfWeekFilterRaw !== null && dayOfWeekFilterRaw !== '') ? Number(dayOfWeekFilterRaw) : null;
@@ -32,7 +35,7 @@ export async function GET(request, { params }) {
   try {
   const whereClause = { schoolId: schoolId };
     if (sectionIdFilter) whereClause.sectionId = sectionIdFilter;
-    if (staffIdFilter) whereClause.staffId = staffIdFilter;
+  if (staffIdFilter) whereClause.staffId = staffIdFilter;
   if (roomIdFilter) whereClause.roomId = roomIdFilter;
   if (dayOfWeekFilter !== null && !Number.isNaN(dayOfWeekFilter)) whereClause.dayOfWeek = dayOfWeekFilter;
 

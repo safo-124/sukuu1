@@ -22,6 +22,7 @@ export default function TeacherExamGradesPage() {
 	const [me, setMe] = useState(null);
 	const [allowedSubjectsForSection, setAllowedSubjectsForSection] = useState(null);
 	const [marks, setMarks] = useState({});
+	const [remarks, setRemarks] = useState({});
 
 	const inputRefs = useRef({});
 	const dirtyIdsRef = useRef(new Set());
@@ -85,11 +86,34 @@ export default function TeacherExamGradesPage() {
 			const url = `/api/schools/${school.id}/academics/grades/students?sectionId=${selected.sectionId}${selected.subjectId ? `&subjectId=${selected.subjectId}` : ''}`;
 			const res = await fetch(url);
 			if (!res.ok) throw new Error('Failed to load students');
-			const d = await res.json(); setStudents(d.students || []); setMarks({});
+			const d = await res.json(); setStudents(d.students || []); setMarks({}); setRemarks({});
 		} catch (e) { toast.error(e.message); }
 	}, [school?.id, selected.sectionId, selected.subjectId, isTeacher, me?.classTeacherSections]);
 
 	useEffect(() => { loadStudents(); }, [loadStudents]);
+
+	// Prefill marks and remarks from existing grades for the chosen exam schedule
+	useEffect(() => {
+		const run = async () => {
+			if (!school?.id || !selected.examScheduleId || !selected.sectionId) return;
+			try {
+				const res = await fetch(`/api/schools/${school.id}/academics/exam-schedules/${selected.examScheduleId}/grade-entry-data`);
+				if (!res.ok) return; // ignore silently
+				const d = await res.json();
+				const nextMarks = {};
+				const nextRemarks = {};
+				(d.students || []).forEach(st => {
+					if (st.marksObtained !== null && st.marksObtained !== undefined) nextMarks[st.id] = st.marksObtained;
+					if (st.comments) nextRemarks[st.id] = st.comments;
+				});
+				setMarks(nextMarks);
+				setRemarks(nextRemarks);
+			} catch (e) {
+				// best-effort prefill; no toast to avoid noise
+			}
+		};
+		run();
+	}, [school?.id, selected.examScheduleId, selected.sectionId]);
 
 	// Filter exam schedules to subject/section class match
 	const filteredExamSchedules = useMemo(() => {
@@ -104,6 +128,12 @@ export default function TeacherExamGradesPage() {
 		setSaving('idle');
 	};
 
+	const onChangeRemark = (studentId, value) => {
+		setRemarks(prev => ({ ...prev, [studentId]: value }));
+		dirtyIdsRef.current.add(studentId);
+		setSaving('idle');
+	};
+
 	const handleKeyDown = (e, idx) => {
 		if (e.key === 'ArrowDown') { e.preventDefault(); const n = students[idx + 1]; if (n && inputRefs.current[n.id]) inputRefs.current[n.id].focus(); }
 		else if (e.key === 'ArrowUp') { e.preventDefault(); const p = students[idx - 1]; if (p && inputRefs.current[p.id]) inputRefs.current[p.id].focus(); }
@@ -113,7 +143,7 @@ export default function TeacherExamGradesPage() {
 
 	const buildPayload = () => {
 		const dirtyIds = Array.from(dirtyIdsRef.current); if (!dirtyIds.length) return null;
-		const gradesArr = dirtyIds.map(id => ({ studentId: id, marksObtained: toNum(marks[id]) }));
+		const gradesArr = dirtyIds.map(id => ({ studentId: id, marksObtained: toNum(marks[id]), comments: (remarks[id] ?? '')?.toString().trim() || null }));
 		const es = examSchedules.find(e => e.id === selected.examScheduleId);
 		if (!es || !selected.sectionId) return null;
 		return {
@@ -202,6 +232,7 @@ export default function TeacherExamGradesPage() {
 						<tr className="text-left border-b">
 							<th className="py-2 pr-4">Student</th>
 							<th className="py-2">Marks</th>
+							<th className="py-2 pl-4">Remarks</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -216,6 +247,13 @@ export default function TeacherExamGradesPage() {
 										onChange={(e) => onChangeMark(st.id, e.target.value)}
 										onKeyDown={(e) => handleKeyDown(e, idx)}
 										placeholder="e.g., 78"
+									/>
+								</td>
+								<td className="py-2 pl-4">
+									<Input
+										value={remarks[st.id] ?? ''}
+										onChange={(e) => onChangeRemark(st.id, e.target.value)}
+										placeholder="Optional notes"
 									/>
 								</td>
 							</tr>

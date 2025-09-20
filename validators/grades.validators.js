@@ -34,6 +34,8 @@ export const gradingWeightConfigIdSchema = z.string().min(1, "Grading weight con
 const singleGradeEntrySchema = z.object({
   studentId: z.string().cuid({ message: "Invalid Student ID." }),
   marksObtained: z.coerce.number({ invalid_type_error: "Marks must be a number." }).min(0).nullable(),
+  // Optional teacher remarks per student during exam grade entry (no length cap)
+  comments: z.string().trim().optional().nullable(),
 });
 
 export const batchGradeSubmissionSchema = z.object({

@@ -72,7 +72,7 @@ export async function GET(request, { params }) {
     
     // 3. Fetch any existing grades for these students for this specific exam schedule
     const studentIds = enrollments.map(e => e.student.id);
-    const existingGrades = await prisma.grade.findMany({
+  const existingGrades = await prisma.grade.findMany({
         where: {
             schoolId: schoolId,
             examScheduleId: scheduleId,
@@ -80,7 +80,8 @@ export async function GET(request, { params }) {
         },
         select: {
             studentId: true,
-            marksObtained: true
+      marksObtained: true,
+      comments: true
         }
     });
 
@@ -88,10 +89,11 @@ export async function GET(request, { params }) {
     const gradeEntryList = enrollments.map(enrollment => {
         const student = enrollment.student;
         const existingGrade = existingGrades.find(g => g.studentId === student.id);
-        return {
+    return {
             ...student,
             sectionName: enrollment.section.name,
-            marksObtained: existingGrade?.marksObtained ?? null
+      marksObtained: existingGrade?.marksObtained ?? null,
+      comments: existingGrade?.comments ?? null
         }
     });
 

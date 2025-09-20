@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Percent, Filter, Trophy } from 'lucide-react';
+import { Percent, Filter, Trophy, Printer } from 'lucide-react';
 import RequireRole from '@/components/auth/RequireRole';
 
 // ---------------- STUDENT LIGHTWEIGHT VIEW ----------------
@@ -22,6 +22,7 @@ function StudentGradesLite() {
   const [error, setError] = useState(null);
   const [grades, setGrades] = useState([]);
   const [subjectFilter, setSubjectFilter] = useState('all');
+  const handlePrint = () => { window.print(); };
 
   useEffect(() => {
     let ignore = false;
@@ -61,7 +62,7 @@ function StudentGradesLite() {
           <Percent className="h-5 w-5 text-sky-600" />
           <h1 className="text-xl font-semibold tracking-tight">My Grades</h1>
         </div>
-        <div className="flex items-center gap-3">
+  <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 text-sm">
             <Filter className="h-4 w-4 text-zinc-500" />
             <Select value={subjectFilter} onValueChange={setSubjectFilter}>
@@ -78,6 +79,9 @@ function StudentGradesLite() {
               {stats.best && <span className="flex items-center gap-1"><Trophy className="h-3.5 w-3.5 text-amber-500" /> {stats.best.subject?.name}: {stats.best.score ?? stats.best.marksObtained ?? stats.best.value}</span>}
             </div>
           )}
+          <button onClick={handlePrint} className="hidden print:hidden md:inline-flex items-center gap-2 px-3 py-1.5 rounded-md border text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900">
+            <Printer className="h-4 w-4" /> Print
+          </button>
         </div>
       </div>
       {loading && (
@@ -98,6 +102,7 @@ function StudentGradesLite() {
                 <TableHead>Date</TableHead>
                 <TableHead>Exam</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Remarks</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -112,6 +117,7 @@ function StudentGradesLite() {
                     <TableCell>{dateStr}</TableCell>
                     <TableCell>{g.examSchedule ? (g.examSchedule.name || 'Exam') : '—'}</TableCell>
                     <TableCell><Badge variant="secondary" className="text-[10px]">Published</Badge></TableCell>
+                    <TableCell className="max-w-[300px] whitespace-pre-wrap">{g.comments || '—'}</TableCell>
                   </TableRow>
                 );
               })}
