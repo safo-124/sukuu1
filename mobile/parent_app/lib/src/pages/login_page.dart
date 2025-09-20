@@ -17,8 +17,7 @@ class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _subdomainController = TextEditingController();
-  final _baseUrlController =
-    TextEditingController(text: kDefaultApiBaseUrl);
+  final _baseUrlController = TextEditingController(text: kDefaultApiBaseUrl);
   bool _loading = false;
   String? _error;
   bool _obscurePassword = true;
@@ -48,7 +47,8 @@ class _LoginPageState extends State<LoginPage> {
       // If a user previously saved 10.0.2.2 (emulator), override with kDefaultApiBaseUrl
       if (savedBaseUrl == null || savedBaseUrl.isEmpty) {
         _baseUrlController.text = kDefaultApiBaseUrl;
-      } else if (savedBaseUrl.contains('10.0.2.2') && savedBaseUrl != kDefaultApiBaseUrl) {
+      } else if (savedBaseUrl.contains('10.0.2.2') &&
+          savedBaseUrl != kDefaultApiBaseUrl) {
         _baseUrlController.text = kDefaultApiBaseUrl;
         // Persist the safer default so subsequent launches use it
         await _storage.write(key: _kBaseUrlKey, value: kDefaultApiBaseUrl);
@@ -297,7 +297,7 @@ class _LoginPageState extends State<LoginPage> {
                                   controller: _baseUrlController,
                                   decoration: const InputDecoration(
                                     labelText: 'Base URL',
-                  hintText:
+                                    hintText:
                                         'e.g., $kDefaultApiBaseUrl or http://192.168.x.x:3000',
                                     prefixIcon: Icon(Icons.link_outlined),
                                   ),
@@ -310,15 +310,22 @@ class _LoginPageState extends State<LoginPage> {
                                   alignment: Alignment.centerRight,
                                   child: TextButton.icon(
                                     onPressed: () async {
-                                      _baseUrlController.text = kDefaultApiBaseUrl;
-                                      await _storage.write(key: _kBaseUrlKey, value: kDefaultApiBaseUrl);
+                                      _baseUrlController.text =
+                                          kDefaultApiBaseUrl;
+                                      await _storage.write(
+                                          key: _kBaseUrlKey,
+                                          value: kDefaultApiBaseUrl);
                                       if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('Base URL reset to default')),
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                              content: Text(
+                                                  'Base URL reset to default')),
                                         );
                                       }
                                     },
-                                    icon: const Icon(Icons.restart_alt, size: 18),
+                                    icon:
+                                        const Icon(Icons.restart_alt, size: 18),
                                     label: const Text('Reset to default'),
                                   ),
                                 ),

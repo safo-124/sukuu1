@@ -30,7 +30,10 @@ class _MessagesPageState extends State<MessagesPage> {
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       _baseUrl = await _storage.read(key: 'baseUrl');
       _token = await _storage.read(key: 'token');
@@ -39,19 +42,30 @@ class _MessagesPageState extends State<MessagesPage> {
         throw Exception('Missing credentials. Please login again.');
       }
       final res = await http.get(
-        Uri.parse('$_baseUrl/api/schools/$_schoolId/parents/me/messages?publishedOnly=true&limit=50'),
-        headers: { 'Authorization': 'Bearer $_token', 'Accept': 'application/json' },
+        Uri.parse(
+            '$_baseUrl/api/schools/$_schoolId/parents/me/messages?publishedOnly=true&limit=50'),
+        headers: {
+          'Authorization': 'Bearer $_token',
+          'Accept': 'application/json'
+        },
       );
       if (res.statusCode != 200) {
         throw Exception('Failed to load messages (${res.statusCode})');
       }
       final json = jsonDecode(res.body) as Map<String, dynamic>;
-      final msgs = (json['messages'] as List? ?? []).cast<Map<String, dynamic>>();
-      setState(() { _messages = msgs; });
+      final msgs =
+          (json['messages'] as List? ?? []).cast<Map<String, dynamic>>();
+      setState(() {
+        _messages = msgs;
+      });
     } catch (e) {
-      setState(() { _error = e.toString(); });
+      setState(() {
+        _error = e.toString();
+      });
     } finally {
-      setState(() { _loading = false; });
+      setState(() {
+        _loading = false;
+      });
     }
   }
 
@@ -59,13 +73,16 @@ class _MessagesPageState extends State<MessagesPage> {
     try {
       final res = await http.post(
         Uri.parse('$_baseUrl/api/schools/$_schoolId/parents/me/messages'),
-        headers: { 'Authorization': 'Bearer $_token', 'Content-Type': 'application/json' },
-        body: jsonEncode({ 'messageId': id }),
+        headers: {
+          'Authorization': 'Bearer $_token',
+          'Content-Type': 'application/json'
+        },
+        body: jsonEncode({'messageId': id}),
       );
       if (res.statusCode == 200) {
         setState(() {
           final idx = _messages.indexWhere((m) => m['id'] == id);
-          if (idx != -1) _messages[idx] = { ..._messages[idx], 'isRead': true };
+          if (idx != -1) _messages[idx] = {..._messages[idx], 'isRead': true};
         });
         widget.onAnyRead?.call();
       }
@@ -73,9 +90,11 @@ class _MessagesPageState extends State<MessagesPage> {
   }
 
   void _openMessage(Map<String, dynamic> m) {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => _MessageDetailPage(message: m),
-    )).then((_) => _markRead(m['id'].toString()));
+    Navigator.of(context)
+        .push(MaterialPageRoute(
+          builder: (_) => _MessageDetailPage(message: m),
+        ))
+        .then((_) => _markRead(m['id'].toString()));
   }
 
   @override
@@ -84,7 +103,9 @@ class _MessagesPageState extends State<MessagesPage> {
       appBar: AppBar(
         title: const Text('Messages'),
         actions: [
-          IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh)),
+          IconButton(
+              onPressed: _loading ? null : _load,
+              icon: const Icon(Icons.refresh)),
         ],
       ),
       body: _loading
@@ -98,21 +119,31 @@ class _MessagesPageState extends State<MessagesPage> {
                     itemBuilder: (context, index) {
                       final m = _messages[index];
                       final isRead = m['isRead'] == true;
-                      final dtStr = (m['publishedAt'] ?? m['createdAt'])?.toString();
-                      final dt = dtStr != null ? DateTime.tryParse(dtStr) : null;
+                      final dtStr =
+                          (m['publishedAt'] ?? m['createdAt'])?.toString();
+                      final dt =
+                          dtStr != null ? DateTime.tryParse(dtStr) : null;
                       return Card(
                         child: ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: isRead ? Colors.grey.shade200 : Colors.indigo.shade50,
+                            backgroundColor: isRead
+                                ? Colors.grey.shade200
+                                : Colors.indigo.shade50,
                             child: Icon(
                               isRead ? Icons.mark_email_read : Icons.markunread,
                               color: isRead ? Colors.grey : Colors.indigo,
                             ),
                           ),
                           title: Text(m['title']?.toString() ?? 'Message',
-                              style: TextStyle(fontWeight: isRead ? FontWeight.w500 : FontWeight.w700)),
+                              style: TextStyle(
+                                  fontWeight: isRead
+                                      ? FontWeight.w500
+                                      : FontWeight.w700)),
                           subtitle: Text(dt != null ? _df.format(dt) : ''),
-                          trailing: isRead ? null : const Icon(Icons.fiber_manual_record, size: 12, color: Colors.indigo),
+                          trailing: isRead
+                              ? null
+                              : const Icon(Icons.fiber_manual_record,
+                                  size: 12, color: Colors.indigo),
                           onTap: () => _openMessage(m),
                         ),
                       );
@@ -139,11 +170,16 @@ class _MessageDetailPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(message['title']?.toString() ?? 'Message', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text(message['title']?.toString() ?? 'Message',
+                style:
+                    const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            if (dt != null) Text(df.format(dt), style: const TextStyle(color: Colors.black54)),
+            if (dt != null)
+              Text(df.format(dt),
+                  style: const TextStyle(color: Colors.black54)),
             const Divider(height: 24),
-            Text(message['content']?.toString() ?? '', style: const TextStyle(fontSize: 16)),
+            Text(message['content']?.toString() ?? '',
+                style: const TextStyle(fontSize: 16)),
           ],
         ),
       ),
@@ -166,9 +202,14 @@ class _ErrorView extends StatelessWidget {
           children: [
             const Icon(Icons.error_outline, color: Colors.red, size: 32),
             const SizedBox(height: 8),
-            Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
+            Text(message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.red)),
             const SizedBox(height: 12),
-            FilledButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh), label: const Text('Retry')),
+            FilledButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry')),
           ],
         ),
       ),
