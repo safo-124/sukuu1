@@ -2,7 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
-import '../pages/children_page.dart';
+import 'main_tabs_page.dart';
+import '../config.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -17,7 +18,7 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController();
   final _subdomainController = TextEditingController();
   final _baseUrlController =
-      TextEditingController(text: 'http://10.0.2.2:3000');
+    TextEditingController(text: kDefaultApiBaseUrl);
   bool _loading = false;
   String? _error;
   bool _obscurePassword = true;
@@ -43,7 +44,15 @@ class _LoginPageState extends State<LoginPage> {
       final savedSub = await _storage.read(key: _kSubdomainKey);
       final savedEmail = await _storage.read(key: _kEmailKey);
       final remember = await _storage.read(key: _kRememberKey);
-      if (savedBaseUrl != null && savedBaseUrl.isNotEmpty) {
+      // Prefer runtime-provided base URL over an old emulator-only value
+      // If a user previously saved 10.0.2.2 (emulator), override with kDefaultApiBaseUrl
+      if (savedBaseUrl == null || savedBaseUrl.isEmpty) {
+        _baseUrlController.text = kDefaultApiBaseUrl;
+      } else if (savedBaseUrl.contains('10.0.2.2') && savedBaseUrl != kDefaultApiBaseUrl) {
+        _baseUrlController.text = kDefaultApiBaseUrl;
+        // Persist the safer default so subsequent launches use it
+        await _storage.write(key: _kBaseUrlKey, value: kDefaultApiBaseUrl);
+      } else {
         _baseUrlController.text = savedBaseUrl;
       }
       if (savedSub != null && savedSub.isNotEmpty) {
@@ -116,7 +125,7 @@ class _LoginPageState extends State<LoginPage> {
 
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const ChildrenPage()),
+        MaterialPageRoute(builder: (_) => const MainTabsPage()),
       );
     } catch (e) {
       setState(() {
@@ -288,13 +297,30 @@ class _LoginPageState extends State<LoginPage> {
                                   controller: _baseUrlController,
                                   decoration: const InputDecoration(
                                     labelText: 'Base URL',
-                                    hintText:
-                                        'e.g., http://10.0.2.2:3000 or http://localhost:3000',
+                  hintText:
+                                        'e.g., $kDefaultApiBaseUrl or http://192.168.x.x:3000',
                                     prefixIcon: Icon(Icons.link_outlined),
                                   ),
                                   validator: (v) => (v == null || v.isEmpty)
                                       ? 'Base URL required'
                                       : null,
+                                ),
+                                const SizedBox(height: 8),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton.icon(
+                                    onPressed: () async {
+                                      _baseUrlController.text = kDefaultApiBaseUrl;
+                                      await _storage.write(key: _kBaseUrlKey, value: kDefaultApiBaseUrl);
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Base URL reset to default')),
+                                        );
+                                      }
+                                    },
+                                    icon: const Icon(Icons.restart_alt, size: 18),
+                                    label: const Text('Reset to default'),
+                                  ),
                                 ),
                               ],
                             ),

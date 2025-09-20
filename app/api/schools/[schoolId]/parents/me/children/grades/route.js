@@ -1,49 +1,92 @@
 // app/api/schools/[schoolId]/parents/me/children/grades/route.js
 import { NextResponse } from 'next/server';
-import { getApiSession } from '@/lib/apiAuth';
 import prisma from '@/lib/prisma';
+import { getApiSession } from '@/lib/apiAuth';
 
+// Returns children with their published grades for the authenticated parent
+// Shape:
+// { children: [ { studentId, name, grades: [ { marksObtained, comments, subject, examSchedule, term, academicYear } ] } ] }
 export async function GET(request, { params }) {
-  const { schoolId } = params;
-  const session = await getApiSession(request);
-  if (!session || session.user?.schoolId !== schoolId || session.user?.role !== 'PARENT') {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
   try {
-    // Find children (students) for this parent user
-    const parent = await prisma.parent.findFirst({ where: { schoolId, userId: session.user.id }, select: { id: true } });
-    if (!parent) return NextResponse.json({ children: [] });
-    const links = await prisma.parentStudent.findMany({ where: { parentId: parent.id }, select: { studentId: true } });
-    const studentIds = links.map(l => l.studentId);
-    if (!studentIds.length) return NextResponse.json({ children: [] });
+    const session = await getApiSession(request);
+    const schoolId = params?.schoolId?.toString();
 
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (session.user.role !== 'PARENT') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    if (!schoolId || session.user.schoolId !== schoolId) {
+      return NextResponse.json({ error: 'Wrong school' }, { status: 403 });
+    }
+
+    // Locate the parent profile
+    const parent = await prisma.parent.findFirst({
+      where: { userId: session.user.id, schoolId },
+      select: { id: true },
+    });
+    if (!parent) return NextResponse.json({ children: [] });
+
+    // Get linked student IDs
+    const links = await prisma.parentStudent.findMany({
+      where: { parentId: parent.id },
+      select: { studentId: true },
+    });
+    const studentIds = links.map((l) => l.studentId);
+    if (studentIds.length === 0) return NextResponse.json({ children: [] });
+
+    // Get student names for display
+    const students = await prisma.student.findMany({
+      where: { id: { in: studentIds }, schoolId },
+      select: { id: true, firstName: true, lastName: true },
+    });
+
+    // Fetch published grades for those students
     const grades = await prisma.grade.findMany({
-      where: { schoolId, isPublished: true, studentId: { in: studentIds } },
+      where: { studentId: { in: studentIds }, schoolId, isPublished: true },
       select: {
-        id: true,
         studentId: true,
         marksObtained: true,
         comments: true,
-        createdAt: true,
         subject: { select: { id: true, name: true } },
-        examSchedule: { select: { id: true, name: true, date: true } },
+        examSchedule: {
+          select: {
+            id: true,
+            date: true,
+            startTime: true,
+            endTime: true,
+            maxMarks: true,
+            class: { select: { id: true, name: true } },
+            exam: { select: { id: true, name: true } },
+            subject: { select: { id: true, name: true } },
+          },
+        },
         term: { select: { id: true, name: true } },
         academicYear: { select: { id: true, name: true } },
-        student: { select: { firstName: true, lastName: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    // Group by student
+    // Assemble response grouped by student
     const byStudent = new Map();
+    for (const s of students) {
+      byStudent.set(s.id, {
+        studentId: s.id,
+        name: `${s.firstName || ''} ${s.lastName || ''}`.trim(),
+        grades: [],
+      });
+    }
     for (const g of grades) {
-      if (!byStudent.has(g.studentId)) byStudent.set(g.studentId, { studentId: g.studentId, name: `${g.student.firstName ?? ''} ${g.student.lastName ?? ''}`.trim(), grades: [] });
-  byStudent.get(g.studentId).grades.push({ id: g.id, subject: g.subject, examSchedule: g.examSchedule, marksObtained: g.marksObtained, comments: g.comments ?? null, createdAt: g.createdAt, term: g.term, academicYear: g.academicYear });
+      const entry = byStudent.get(g.studentId);
+      if (entry) entry.grades.push(g);
     }
 
     return NextResponse.json({ children: Array.from(byStudent.values()) });
   } catch (e) {
-    console.error('Parent children grades error', e);
-    return NextResponse.json({ error: 'Failed to fetch children grades' }, { status: 500 });
+    console.error('parents/me/children/grades error', e);
+    return NextResponse.json({ error: 'Failed to load grades' }, { status: 500 });
   }
+
 }
+

@@ -177,6 +177,10 @@ export async function POST(request, ctx) {
       return NextResponse.json({ error: error.message }, { status: 409 });
     }
     const isZod = error instanceof z.ZodError;
+    if (error.code === 'P2002') {
+      // Prisma unique constraint violation (User.email is globally unique)
+      return NextResponse.json({ error: 'A user with this email already exists.' }, { status: 409 });
+    }
     console.error('Parents POST error', { message: error.message, issues: isZod ? error.issues : undefined });
     return NextResponse.json({ error: isZod ? 'Validation Error' : 'Failed to create parent.' }, { status: isZod ? 400 : 500 });
   }

@@ -65,7 +65,7 @@ class _GradesPageState extends State<GradesPage> {
                   itemBuilder: (context, index) {
                     final g = _records[index] as Map<String, dynamic>;
                     final subject = (g['subject'] as Map?)?['name'] ?? 'Subject';
-                    final exam = (g['examSchedule'] as Map?)?['name'] ?? 'Exam';
+                    final exam = (((g['examSchedule'] as Map?)?['exam']) as Map?)?['name'] ?? 'Exam';
                     final date = (g['examSchedule'] as Map?)?['date'];
                     final comments = g['comments'] ?? '';
                     final marks = g['marksObtained']?.toString() ?? '-';

@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'children_page.dart';
+import 'main_tabs_page.dart';
 import 'login_page.dart';
 
 class LandingPage extends StatefulWidget {
@@ -32,7 +32,7 @@ class _LandingPageState extends State<LandingPage> {
           schoolId != null) {
         if (!mounted) return;
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const ChildrenPage()),
+          MaterialPageRoute(builder: (_) => const MainTabsPage()),
         );
         return;
       }

@@ -127,6 +127,9 @@ export async function PUT(request, ctx) {
     return NextResponse.json({ success: true, parent: refreshed }, { status: 200 });
   } catch (error) {
     const isZod = error instanceof z.ZodError;
+    if (error.code === 'P2002') {
+      return NextResponse.json({ error: 'A user with this email already exists.' }, { status: 409 });
+    }
     console.error('Parents PUT error', { message: error.message, issues: isZod ? error.issues : undefined });
     return NextResponse.json({ error: isZod ? 'Validation Error' : 'Failed to update parent.' }, { status: isZod ? 400 : 500 });
   }

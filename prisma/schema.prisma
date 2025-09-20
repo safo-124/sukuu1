@@ -153,6 +153,7 @@ model School {
   students      Student[]
   departments   Department[]
   announcements Announcement[]
+  announcementReads AnnouncementRead[]
 
   events                  Event[]
   gradingScales           GradingScale[]
@@ -241,6 +242,7 @@ model User {
   expensesPaid            Expense[]         @relation("PaidByExpense")
   gradesPublished         Grade[]           @relation("GradePublishedBy")
   inventoryTransactionsPerformed InventoryTransaction[] @relation("InventoryTransactionsPerformed")
+  announcementReads AnnouncementRead[]
 
   @@index([email])
   @@index([schoolId])
@@ -257,6 +259,7 @@ model Parent {
   students ParentStudent[] // Link to students
   schoolId String
   school   School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  announcementReads AnnouncementRead[]
 
   @@index([userId])
   @@index([schoolId])
@@ -1036,6 +1039,7 @@ model Announcement {
   authorId    String
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  reads       AnnouncementRead[]
 
   @@index([schoolId, publishedAt])
 }
@@ -1054,6 +1058,26 @@ model Event {
   updatedAt   DateTime  @updatedAt
 
   @@index([schoolId, startDate])
+}
+
+// Track which users (parents) have read an announcement
+model AnnouncementRead {
+  id             String       @id @default(cuid())
+  announcementId String
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentId       String?
+  parent         Parent?      @relation(fields: [parentId], references: [id], onDelete: SetNull)
+  schoolId       String
+  school         School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  readAt         DateTime     @default(now())
+  createdAt      DateTime     @default(now())
+
+  @@unique([announcementId, userId])
+  @@index([schoolId])
+  @@index([userId])
+  @@index([parentId])
 }
 
 // --------------------
