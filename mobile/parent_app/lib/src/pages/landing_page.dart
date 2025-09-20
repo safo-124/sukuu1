@@ -26,7 +26,10 @@ class _LandingPageState extends State<LandingPage> {
       final token = await _storage.read(key: 'token');
       final baseUrl = await _storage.read(key: 'baseUrl');
       final schoolId = await _storage.read(key: 'schoolId');
-      if (token != null && token.isNotEmpty && baseUrl != null && schoolId != null) {
+      if (token != null &&
+          token.isNotEmpty &&
+          baseUrl != null &&
+          schoolId != null) {
         if (!mounted) return;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const ChildrenPage()),
@@ -63,7 +66,8 @@ class _LandingPageState extends State<LandingPage> {
                   gradient: LinearGradient(
                     colors: [
                       const Color(0xFFEEF2FF),
-                      Color.lerp(const Color(0xFFE0E7FF), const Color(0xFFDBEAFE), value)!,
+                      Color.lerp(const Color(0xFFE0E7FF),
+                          const Color(0xFFDBEAFE), value)!,
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -77,12 +81,16 @@ class _LandingPageState extends State<LandingPage> {
           Positioned(
             top: -size.width * 0.2,
             left: -size.width * 0.1,
-            child: _BlobCircle(diameter: size.width * 0.6, colors: const [Color(0xFF6366F1), Color(0xFF818CF8)]),
+            child: _BlobCircle(
+                diameter: size.width * 0.6,
+                colors: const [Color(0xFF6366F1), Color(0xFF818CF8)]),
           ),
           Positioned(
             bottom: -size.width * 0.15,
             right: -size.width * 0.2,
-            child: _BlobCircle(diameter: size.width * 0.7, colors: const [Color(0xFF22C55E), Color(0xFF86EFAC)]),
+            child: _BlobCircle(
+                diameter: size.width * 0.7,
+                colors: const [Color(0xFF22C55E), Color(0xFF86EFAC)]),
           ),
 
           // Content
@@ -108,14 +116,20 @@ class _LandingPageState extends State<LandingPage> {
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 // Logo + Gradient Title
-                                const Icon(Icons.school, size: 64, color: Colors.indigo),
+                                const Icon(Icons.school,
+                                    size: 64, color: Colors.indigo),
                                 const SizedBox(height: 12),
                                 _GradientText(
                                   'Welcome to Sukuu',
                                   gradient: const LinearGradient(
-                                    colors: [Color(0xFF4338CA), Color(0xFF2563EB)],
+                                    colors: [
+                                      Color(0xFF4338CA),
+                                      Color(0xFF2563EB)
+                                    ],
                                   ),
-                                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                                  style: const TextStyle(
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.bold),
                                 ),
                                 const SizedBox(height: 8),
                                 const Text(
@@ -133,9 +147,15 @@ class _LandingPageState extends State<LandingPage> {
                                       spacing: 12,
                                       runSpacing: 8,
                                       children: const [
-                                        _FeatureChip(icon: Icons.leaderboard_outlined, label: 'Grades & Reports'),
-                                        _FeatureChip(icon: Icons.chat_bubble_outline, label: 'Teacher Remarks'),
-                                        _FeatureChip(icon: Icons.calendar_month_outlined, label: 'Schedules'),
+                                        _FeatureChip(
+                                            icon: Icons.leaderboard_outlined,
+                                            label: 'Grades & Reports'),
+                                        _FeatureChip(
+                                            icon: Icons.chat_bubble_outline,
+                                            label: 'Teacher Remarks'),
+                                        _FeatureChip(
+                                            icon: Icons.calendar_month_outlined,
+                                            label: 'Schedules'),
                                       ],
                                     );
                                   },

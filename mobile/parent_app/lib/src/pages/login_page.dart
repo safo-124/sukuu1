@@ -91,7 +91,7 @@ class _LoginPageState extends State<LoginPage> {
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(_error ?? 'Login failed')), 
+            SnackBar(content: Text(_error ?? 'Login failed')),
           );
         }
         return;
@@ -106,7 +106,8 @@ class _LoginPageState extends State<LoginPage> {
           key: _kSubdomainKey, value: user['schoolSubdomain'] ?? subdomain);
       await _storage.write(key: _kBaseUrlKey, value: baseUrl);
       // Remember email preference
-      await _storage.write(key: _kRememberKey, value: _rememberEmail.toString());
+      await _storage.write(
+          key: _kRememberKey, value: _rememberEmail.toString());
       if (_rememberEmail) {
         await _storage.write(key: _kEmailKey, value: email);
       } else {
@@ -158,7 +159,8 @@ class _LoginPageState extends State<LoginPage> {
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 24),
                     child: Form(
                       key: _formKey,
                       child: Column(
@@ -168,11 +170,16 @@ class _LoginPageState extends State<LoginPage> {
                           Column(
                             children: const [
                               SizedBox(height: 8),
-                              Icon(Icons.school, size: 56, color: Colors.indigo),
+                              Icon(Icons.school,
+                                  size: 56, color: Colors.indigo),
                               SizedBox(height: 12),
-                              Text('Sukuu Parent', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+                              Text('Sukuu Parent',
+                                  style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w700)),
                               SizedBox(height: 6),
-                              Text('Sign in to view your child\'s progress', style: TextStyle(color: Colors.black54)),
+                              Text('Sign in to view your child\'s progress',
+                                  style: TextStyle(color: Colors.black54)),
                               SizedBox(height: 16),
                             ],
                           ),
@@ -186,7 +193,9 @@ class _LoginPageState extends State<LoginPage> {
                               prefixIcon: Icon(Icons.apartment_outlined),
                             ),
                             textInputAction: TextInputAction.next,
-                            validator: (v) => (v == null || v.isEmpty) ? 'Subdomain required' : null,
+                            validator: (v) => (v == null || v.isEmpty)
+                                ? 'Subdomain required'
+                                : null,
                           ),
                           const SizedBox(height: 12),
                           TextFormField(
@@ -197,7 +206,9 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             keyboardType: TextInputType.emailAddress,
                             textInputAction: TextInputAction.next,
-                            validator: (v) => (v == null || v.isEmpty) ? 'Email required' : null,
+                            validator: (v) => (v == null || v.isEmpty)
+                                ? 'Email required'
+                                : null,
                           ),
                           const SizedBox(height: 12),
                           TextFormField(
@@ -206,13 +217,18 @@ class _LoginPageState extends State<LoginPage> {
                               labelText: 'Password',
                               prefixIcon: const Icon(Icons.lock_outline),
                               suffixIcon: IconButton(
-                                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                                icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+                                onPressed: () => setState(
+                                    () => _obscurePassword = !_obscurePassword),
+                                icon: Icon(_obscurePassword
+                                    ? Icons.visibility
+                                    : Icons.visibility_off),
                               ),
                             ),
                             obscureText: _obscurePassword,
                             textInputAction: TextInputAction.done,
-                            validator: (v) => (v == null || v.isEmpty) ? 'Password required' : null,
+                            validator: (v) => (v == null || v.isEmpty)
+                                ? 'Password required'
+                                : null,
                           ),
 
                           const SizedBox(height: 8),
@@ -220,7 +236,8 @@ class _LoginPageState extends State<LoginPage> {
                             children: [
                               Checkbox(
                                 value: _rememberEmail,
-                                onChanged: (v) => setState(() => _rememberEmail = v ?? true),
+                                onChanged: (v) =>
+                                    setState(() => _rememberEmail = v ?? true),
                               ),
                               const SizedBox(width: 4),
                               const Expanded(
@@ -239,20 +256,30 @@ class _LoginPageState extends State<LoginPage> {
                           // Advanced settings (Base URL)
                           const SizedBox(height: 4),
                           InkWell(
-                            onTap: () => setState(() => _showAdvanced = !_showAdvanced),
+                            onTap: () =>
+                                setState(() => _showAdvanced = !_showAdvanced),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(vertical: 6),
                               child: Row(
                                 children: [
-                                  Icon(_showAdvanced ? Icons.expand_less : Icons.expand_more, color: Colors.indigo),
+                                  Icon(
+                                      _showAdvanced
+                                          ? Icons.expand_less
+                                          : Icons.expand_more,
+                                      color: Colors.indigo),
                                   const SizedBox(width: 6),
-                                  const Text('Advanced settings', style: TextStyle(color: Colors.indigo, fontWeight: FontWeight.w600)),
+                                  const Text('Advanced settings',
+                                      style: TextStyle(
+                                          color: Colors.indigo,
+                                          fontWeight: FontWeight.w600)),
                                 ],
                               ),
                             ),
                           ),
                           AnimatedCrossFade(
-                            crossFadeState: _showAdvanced ? CrossFadeState.showFirst : CrossFadeState.showSecond,
+                            crossFadeState: _showAdvanced
+                                ? CrossFadeState.showFirst
+                                : CrossFadeState.showSecond,
                             duration: const Duration(milliseconds: 200),
                             firstChild: Column(
                               children: [
@@ -261,10 +288,13 @@ class _LoginPageState extends State<LoginPage> {
                                   controller: _baseUrlController,
                                   decoration: const InputDecoration(
                                     labelText: 'Base URL',
-                                    hintText: 'e.g., http://10.0.2.2:3000 or http://localhost:3000',
+                                    hintText:
+                                        'e.g., http://10.0.2.2:3000 or http://localhost:3000',
                                     prefixIcon: Icon(Icons.link_outlined),
                                   ),
-                                  validator: (v) => (v == null || v.isEmpty) ? 'Base URL required' : null,
+                                  validator: (v) => (v == null || v.isEmpty)
+                                      ? 'Base URL required'
+                                      : null,
                                 ),
                               ],
                             ),
@@ -275,13 +305,18 @@ class _LoginPageState extends State<LoginPage> {
                           if (_error != null)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 8),
-                              child: Text(_error!, style: const TextStyle(color: Colors.red)),
+                              child: Text(_error!,
+                                  style: const TextStyle(color: Colors.red)),
                             ),
                           SizedBox(
                             width: double.infinity,
                             child: FilledButton.icon(
                               icon: _loading
-                                  ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                  ? const SizedBox(
+                                      height: 18,
+                                      width: 18,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2, color: Colors.white))
                                   : const Icon(Icons.login),
                               label: Text(_loading ? 'Signing in…' : 'Sign In'),
                               onPressed: _loading ? null : _login,
