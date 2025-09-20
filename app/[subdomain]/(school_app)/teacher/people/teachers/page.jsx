@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import Link from 'next/link';
 
 export default function TeacherStaffDirectoryPage() {
   const school = useSchool();
@@ -146,7 +147,7 @@ export default function TeacherStaffDirectoryPage() {
               ))
             ) : teachers.length ? (
               teachers.map(t => (
-                <TableRow key={t.id} className="cursor-pointer" onClick={()=>{ setSelectedTeacher(t); setShowDetails(true); }}>
+                <TableRow key={t.id} className="cursor-pointer" onClick={()=>{ router.push(`/${school?.subdomain}/teacher/people/teachers/${t.id}`); }}>
                   <TableCell className="text-sm">
                     {t.user?.firstName} {t.user?.lastName}
                   </TableCell>
