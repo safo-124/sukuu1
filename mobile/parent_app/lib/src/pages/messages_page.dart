@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'profile_page.dart';
+import '../ui/glass.dart';
 
 class MessagesPage extends StatefulWidget {
   final VoidCallback? onAnyRead;
@@ -101,8 +103,20 @@ class _MessagesPageState extends State<MessagesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        flexibleSpace: const GlassAppBarFlex(),
         title: const Text('Messages'),
         actions: [
+          IconButton(
+            tooltip: 'Profile',
+            icon: const Icon(Icons.person_outline),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ProfilePage(),
+                ),
+              );
+            },
+          ),
           IconButton(
               onPressed: _loading ? null : _load,
               icon: const Icon(Icons.refresh)),

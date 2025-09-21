@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -8,6 +9,8 @@ import 'timetable_page.dart';
 import 'grades_page.dart';
 import 'attendance_page.dart';
 import 'fees_page.dart';
+import 'profile_page.dart'; // used for AppBar actions navigation
+import '../ui/glass.dart';
 
 class _PlaceholderPage extends StatelessWidget {
   final String title;
@@ -33,7 +36,7 @@ class MainTabsPage extends StatefulWidget {
 }
 
 class _MainTabsPageState extends State<MainTabsPage> {
-  int _index = 0;
+  int _currentIndex = 0;
   late final List<Widget> _pages;
   final _storage = const FlutterSecureStorage();
   int _unread = 0;
@@ -42,12 +45,10 @@ class _MainTabsPageState extends State<MainTabsPage> {
   void initState() {
     super.initState();
     _pages = [
-      HomePage(goToTab: (i) => setState(() => _index = i)),
-      const _GradesTab(),
-      const _AttendanceTab(),
-      const _FeesTab(),
+      HomePage(goToTab: (i) => setState(() => _currentIndex = i)),
       MessagesPage(onAnyRead: _loadUnreadCount),
-      const _TimetableTab(),
+      const _FeesTab(),
+      const _MoreTab(),
     ];
     _loadUnreadCount();
   }
@@ -78,62 +79,74 @@ class _MainTabsPageState extends State<MainTabsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: _index, children: _pages),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: [
+      body: IndexedStack(index: _currentIndex, children: _pages),
+      bottomNavigationBar: GlassBottomBar(
+        child: Theme(
+          data: Theme.of(context).copyWith(
+            navigationBarTheme: Theme.of(context).navigationBarTheme.copyWith(
+                  backgroundColor: Colors.transparent,
+                  surfaceTintColor: Colors.transparent,
+                ),
+          ),
+          child: NavigationBar(
+            selectedIndex: _currentIndex,
+            onDestinationSelected: (i) => setState(() => _currentIndex = i),
+              labelBehavior: (Theme.of(context).platform == TargetPlatform.iOS)
+                  ? NavigationDestinationLabelBehavior.alwaysHide
+                  : NavigationDestinationLabelBehavior.onlyShowSelected,
+            destinations: [
           const NavigationDestination(
               icon: Icon(Icons.home_outlined),
               selectedIcon: Icon(Icons.home),
               label: 'Home'),
-          const NavigationDestination(
-              icon: Icon(Icons.leaderboard_outlined),
-              selectedIcon: Icon(Icons.leaderboard),
-              label: 'Grades'),
-          const NavigationDestination(
-              icon: Icon(Icons.calendar_month_outlined),
-              selectedIcon: Icon(Icons.calendar_month),
-              label: 'Attendance'),
-          const NavigationDestination(
-              icon: Icon(Icons.receipt_long_outlined),
-              selectedIcon: Icon(Icons.receipt_long),
-              label: 'Fees'),
           NavigationDestination(
-            icon: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                const Icon(Icons.chat_bubble_outline),
-                if (_unread > 0)
-                  Positioned(
-                    right: -2,
-                    top: -2,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 5, vertical: 1),
-                      decoration: const BoxDecoration(
-                          color: Colors.red,
-                          borderRadius: BorderRadius.all(Radius.circular(10))),
-                      constraints: const BoxConstraints(minWidth: 16),
-                      child: Text('${_unread > 99 ? 99 : _unread}',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-              ],
-            ),
-            selectedIcon: const Icon(Icons.chat_bubble),
-            label: 'Messages',
+              icon: _badgeIcon(Icons.mail_outline, _unread),
+              selectedIcon: _badgeIcon(Icons.mail, _unread),
+              label: 'Messages'),
+              const NavigationDestination(
+                  icon: Icon(Icons.receipt_long_outlined),
+                  selectedIcon: Icon(Icons.receipt_long),
+                  label: 'Fees'),
+              const NavigationDestination(
+                  icon: Icon(Icons.more_horiz),
+                  selectedIcon: Icon(Icons.more_horiz),
+                  label: 'More'),
+            ],
           ),
-          const NavigationDestination(
-              icon: Icon(Icons.schedule_outlined),
-              selectedIcon: Icon(Icons.schedule),
-              label: 'Timetable'),
-        ],
+        ),
       ),
+    );
+  }
+
+  static Widget _badgeIcon(IconData icon, int count) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Icon(icon),
+        if (count > 0)
+          Positioned(
+            right: -6,
+            top: -4,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+              decoration: BoxDecoration(
+                color: Colors.redAccent,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              constraints: const BoxConstraints(minWidth: 18),
+              child: Text(
+                count > 99 ? '99+' : '$count',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  height: 1.1,
+                ),
+              ),
+            ),
+          )
+      ],
     );
   }
 }
@@ -199,20 +212,50 @@ class _GradesTabState extends State<_GradesTab> {
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Grades')),
+        appBar: AppBar(title: const Text('Grades'), actions: [
+          IconButton(
+            tooltip: 'Profile',
+            icon: const Icon(Icons.person_outline),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ProfilePage()),
+              );
+            },
+          )
+        ]),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
     if (_error != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Grades')),
+        appBar: AppBar(title: const Text('Grades'), actions: [
+          IconButton(
+            tooltip: 'Profile',
+            icon: const Icon(Icons.person_outline),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ProfilePage()),
+              );
+            },
+          )
+        ]),
         body: Center(
             child: Text(_error!, style: const TextStyle(color: Colors.red))),
       );
     }
     if (_selectedChild == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Grades')),
+        appBar: AppBar(title: const Text('Grades'), actions: [
+          IconButton(
+            tooltip: 'Profile',
+            icon: const Icon(Icons.person_outline),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ProfilePage()),
+              );
+            },
+          )
+        ]),
         body: const Center(child: Text('No linked children')),
       );
     }
@@ -221,7 +264,17 @@ class _GradesTabState extends State<_GradesTab> {
             .trim();
     final sid = _selectedChild!['id'].toString();
     return Scaffold(
-      appBar: AppBar(title: const Text('Grades')),
+      appBar: AppBar(title: const Text('Grades'), actions: [
+        IconButton(
+          tooltip: 'Profile',
+          icon: const Icon(Icons.person_outline),
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ProfilePage()),
+            );
+          },
+        )
+      ]),
       body: Column(
         children: [
           Padding(
@@ -278,6 +331,142 @@ class _TimetableTab extends StatefulWidget {
   State<_TimetableTab> createState() => _TimetableTabState();
 }
 
+class _MoreTab extends StatelessWidget {
+  const _MoreTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        flexibleSpace: const GlassAppBarFlex(),
+        title: const Text('More'),
+        actions: [
+          IconButton(
+            tooltip: 'Profile',
+            icon: const Icon(Icons.person_outline),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ProfilePage()),
+              );
+            },
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(12),
+        children: [
+          GlassContainer(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            child: Row(
+              children: const [
+                Icon(Icons.widgets_outlined),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Quick links',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(4, 8, 4, 4),
+            child: Text('Student',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+          ),
+          const _MoreItem(
+            icon: Icons.school_outlined,
+            title: 'Grades',
+            subtitle: 'View recent grades and report cards',
+            target: _MoreTarget.grades,
+          ),
+          const _MoreItem(
+            icon: Icons.fact_check_outlined,
+            title: 'Attendance',
+            subtitle: 'Check attendance and explain absences',
+            target: _MoreTarget.attendance,
+          ),
+          const _MoreItem(
+            icon: Icons.calendar_month_outlined,
+            title: 'Timetable',
+            subtitle: 'Daily subjects and teachers',
+            target: _MoreTarget.timetable,
+          ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(4, 12, 4, 4),
+            child: Text('Account',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+          ),
+          const _MoreItem(
+            icon: Icons.person_outline,
+            title: 'Profile & Settings',
+            subtitle: null,
+            target: _MoreTarget.profile,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+enum _MoreTarget { grades, attendance, timetable, profile }
+
+class _MoreItem extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final _MoreTarget target;
+  const _MoreItem({
+    required this.icon,
+    required this.title,
+    required this.target,
+    this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassContainer(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        leading: Icon(icon),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: subtitle == null ? null : Text(subtitle!),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () {
+          switch (target) {
+            case _MoreTarget.grades:
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const _GradesTab()),
+              );
+              break;
+            case _MoreTarget.attendance:
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const _AttendanceTab()),
+              );
+              break;
+            case _MoreTarget.timetable:
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const _TimetableTab()),
+              );
+              break;
+            case _MoreTarget.profile:
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ProfilePage()),
+              );
+              break;
+          }
+        },
+      ),
+    );
+  }
+}
+
+// (fixed broken _MoreItem by redefining above)
+
 class _AttendanceTab extends StatefulWidget {
   const _AttendanceTab();
 
@@ -331,29 +520,58 @@ class _AttendanceTabState extends State<_AttendanceTab> {
     } finally {
       setState(() {
         _loading = false;
-        _contentKey = UniqueKey();
       });
     }
-  }
+}
 
   @override
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Attendance')),
+        appBar: AppBar(title: const Text('Attendance'), actions: [
+          IconButton(
+            tooltip: 'Profile',
+            icon: const Icon(Icons.person_outline),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ProfilePage()),
+              );
+            },
+          )
+        ]),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
     if (_error != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Attendance')),
+        appBar: AppBar(title: const Text('Attendance'), actions: [
+          IconButton(
+            tooltip: 'Profile',
+            icon: const Icon(Icons.person_outline),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ProfilePage()),
+              );
+            },
+          )
+        ]),
         body: Center(
             child: Text(_error!, style: const TextStyle(color: Colors.red))),
       );
     }
     if (_selectedChild == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Attendance')),
+        appBar: AppBar(title: const Text('Attendance'), actions: [
+          IconButton(
+            tooltip: 'Profile',
+            icon: const Icon(Icons.person_outline),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ProfilePage()),
+              );
+            },
+          )
+        ]),
         body: const Center(child: Text('No linked children')),
       );
     }
@@ -362,7 +580,17 @@ class _AttendanceTabState extends State<_AttendanceTab> {
             .trim();
     final sid = _selectedChild!['id'].toString();
     return Scaffold(
-      appBar: AppBar(title: const Text('Attendance')),
+      appBar: AppBar(title: const Text('Attendance'), actions: [
+        IconButton(
+          tooltip: 'Profile',
+          icon: const Icon(Icons.person_outline),
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ProfilePage()),
+            );
+          },
+        )
+      ]),
       body: Column(
         children: [
           Padding(
@@ -409,6 +637,7 @@ class _AttendanceTabState extends State<_AttendanceTab> {
       ),
     );
   }
+
 }
 
 class _FeesTab extends StatefulWidget {
@@ -472,18 +701,48 @@ class _FeesTabState extends State<_FeesTab> {
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-          appBar: AppBar(title: const Text('Fees')),
+          appBar: AppBar(title: const Text('Fees'), actions: [
+            IconButton(
+              tooltip: 'Profile',
+              icon: const Icon(Icons.person_outline),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ProfilePage()),
+                );
+              },
+            )
+          ]),
           body: const Center(child: CircularProgressIndicator()));
     }
     if (_error != null) {
       return Scaffold(
-          appBar: AppBar(title: const Text('Fees')),
+          appBar: AppBar(title: const Text('Fees'), actions: [
+            IconButton(
+              tooltip: 'Profile',
+              icon: const Icon(Icons.person_outline),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ProfilePage()),
+                );
+              },
+            )
+          ]),
           body: Center(
               child: Text(_error!, style: const TextStyle(color: Colors.red))));
     }
     if (_selectedChild == null) {
       return Scaffold(
-          appBar: AppBar(title: const Text('Fees')),
+          appBar: AppBar(title: const Text('Fees'), actions: [
+            IconButton(
+              tooltip: 'Profile',
+              icon: const Icon(Icons.person_outline),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ProfilePage()),
+                );
+              },
+            )
+          ]),
           body: const Center(child: Text('No linked children')));
     }
     final name =
@@ -491,7 +750,17 @@ class _FeesTabState extends State<_FeesTab> {
             .trim();
     final sid = _selectedChild!['id'].toString();
     return Scaffold(
-      appBar: AppBar(title: const Text('Fees')),
+      appBar: AppBar(title: const Text('Fees'), actions: [
+        IconButton(
+          tooltip: 'Profile',
+          icon: const Icon(Icons.person_outline),
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ProfilePage()),
+            );
+          },
+        )
+      ]),
       body: Column(
         children: [
           Padding(
@@ -635,7 +904,17 @@ class _TimetableTabState extends State<_TimetableTab> {
       grouped[d]!.add(e);
     }
     return Scaffold(
-      appBar: AppBar(title: const Text('Timetable')),
+      appBar: AppBar(title: const Text('Timetable'), flexibleSpace: const GlassAppBarFlex(), actions: [
+        IconButton(
+          tooltip: 'Profile',
+          icon: const Icon(Icons.person_outline),
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ProfilePage()),
+            );
+          },
+        )
+      ]),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
