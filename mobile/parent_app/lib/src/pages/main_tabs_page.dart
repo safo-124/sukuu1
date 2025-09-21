@@ -91,18 +91,18 @@ class _MainTabsPageState extends State<MainTabsPage> {
           child: NavigationBar(
             selectedIndex: _currentIndex,
             onDestinationSelected: (i) => setState(() => _currentIndex = i),
-              labelBehavior: (Theme.of(context).platform == TargetPlatform.iOS)
-                  ? NavigationDestinationLabelBehavior.alwaysHide
-                  : NavigationDestinationLabelBehavior.onlyShowSelected,
+            labelBehavior: (Theme.of(context).platform == TargetPlatform.iOS)
+                ? NavigationDestinationLabelBehavior.alwaysHide
+                : NavigationDestinationLabelBehavior.onlyShowSelected,
             destinations: [
-          const NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home),
-              label: 'Home'),
-          NavigationDestination(
-              icon: _badgeIcon(Icons.mail_outline, _unread),
-              selectedIcon: _badgeIcon(Icons.mail, _unread),
-              label: 'Messages'),
+              const NavigationDestination(
+                  icon: Icon(Icons.home_outlined),
+                  selectedIcon: Icon(Icons.home),
+                  label: 'Home'),
+              NavigationDestination(
+                  icon: _badgeIcon(Icons.mail_outline, _unread),
+                  selectedIcon: _badgeIcon(Icons.mail, _unread),
+                  label: 'Messages'),
               const NavigationDestination(
                   icon: Icon(Icons.receipt_long_outlined),
                   selectedIcon: Icon(Icons.receipt_long),
@@ -522,7 +522,7 @@ class _AttendanceTabState extends State<_AttendanceTab> {
         _loading = false;
       });
     }
-}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -637,7 +637,6 @@ class _AttendanceTabState extends State<_AttendanceTab> {
       ),
     );
   }
-
 }
 
 class _FeesTab extends StatefulWidget {
@@ -904,17 +903,20 @@ class _TimetableTabState extends State<_TimetableTab> {
       grouped[d]!.add(e);
     }
     return Scaffold(
-      appBar: AppBar(title: const Text('Timetable'), flexibleSpace: const GlassAppBarFlex(), actions: [
-        IconButton(
-          tooltip: 'Profile',
-          icon: const Icon(Icons.person_outline),
-          onPressed: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ProfilePage()),
-            );
-          },
-        )
-      ]),
+      appBar: AppBar(
+          title: const Text('Timetable'),
+          flexibleSpace: const GlassAppBarFlex(),
+          actions: [
+            IconButton(
+              tooltip: 'Profile',
+              icon: const Icon(Icons.person_outline),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ProfilePage()),
+                );
+              },
+            )
+          ]),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null

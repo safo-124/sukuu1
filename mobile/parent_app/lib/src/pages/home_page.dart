@@ -101,22 +101,35 @@ class _HomePageState extends State<HomePage> {
     setState(() => _loadingGrades = true);
     try {
       final res = await http.get(
-        Uri.parse('$_baseUrl/api/schools/$_schoolId/parents/me/children/grades'),
-        headers: {'Authorization': 'Bearer $_token', 'Accept': 'application/json'},
+        Uri.parse(
+            '$_baseUrl/api/schools/$_schoolId/parents/me/children/grades'),
+        headers: {
+          'Authorization': 'Bearer $_token',
+          'Accept': 'application/json'
+        },
       );
       if (res.statusCode != 200) {
         throw Exception('Failed to load grades (${res.statusCode})');
       }
       final data = jsonDecode(res.body) as Map<String, dynamic>;
-      final children = (data['children'] as List? ?? []).cast<Map<String, dynamic>>();
-      final match = children.where((c) => c['studentId'].toString() == _selectedChild!['id'].toString()).toList();
+      final children =
+          (data['children'] as List? ?? []).cast<Map<String, dynamic>>();
+      final match = children
+          .where((c) =>
+              c['studentId'].toString() == _selectedChild!['id'].toString())
+          .toList();
       final grades = match.isNotEmpty
-          ? ((match.first['grades'] as List? ?? []).cast<Map<String, dynamic>>())
+          ? ((match.first['grades'] as List? ?? [])
+              .cast<Map<String, dynamic>>())
           : <Map<String, dynamic>>[];
       grades.sort((a, b) {
-        final da = DateTime.tryParse(((a['examSchedule'] as Map?)?['date'] ?? '') as String? ?? '') ??
+        final da = DateTime.tryParse(
+                ((a['examSchedule'] as Map?)?['date'] ?? '') as String? ??
+                    '') ??
             DateTime.fromMillisecondsSinceEpoch(0);
-        final db = DateTime.tryParse(((b['examSchedule'] as Map?)?['date'] ?? '') as String? ?? '') ??
+        final db = DateTime.tryParse(
+                ((b['examSchedule'] as Map?)?['date'] ?? '') as String? ??
+                    '') ??
             DateTime.fromMillisecondsSinceEpoch(0);
         return db.compareTo(da);
       });
@@ -136,27 +149,41 @@ class _HomePageState extends State<HomePage> {
     setState(() => _loadingAttendance = true);
     try {
       final res = await http.get(
-        Uri.parse('$_baseUrl/api/schools/$_schoolId/parents/me/children/attendance'),
-        headers: {'Authorization': 'Bearer $_token', 'Accept': 'application/json'},
+        Uri.parse(
+            '$_baseUrl/api/schools/$_schoolId/parents/me/children/attendance'),
+        headers: {
+          'Authorization': 'Bearer $_token',
+          'Accept': 'application/json'
+        },
       );
       if (res.statusCode != 200) {
         throw Exception('Failed to load attendance (${res.statusCode})');
       }
       final data = jsonDecode(res.body) as Map<String, dynamic>;
-      final children = (data['children'] as List? ?? []).cast<Map<String, dynamic>>();
-      final match = children.where((c) => c['studentId'].toString() == _selectedChild!['id'].toString()).toList();
+      final children =
+          (data['children'] as List? ?? []).cast<Map<String, dynamic>>();
+      final match = children
+          .where((c) =>
+              c['studentId'].toString() == _selectedChild!['id'].toString())
+          .toList();
       final att = match.isNotEmpty
-          ? ((match.first['attendance'] as List? ?? []).cast<Map<String, dynamic>>())
+          ? ((match.first['attendance'] as List? ?? [])
+              .cast<Map<String, dynamic>>())
           : <Map<String, dynamic>>[];
       att.sort((a, b) {
-        final da = DateTime.tryParse((a['date'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
-        final db = DateTime.tryParse((b['date'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final da = DateTime.tryParse((a['date'] ?? '').toString()) ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final db = DateTime.tryParse((b['date'] ?? '').toString()) ??
+            DateTime.fromMillisecondsSinceEpoch(0);
         return db.compareTo(da);
       });
       setState(() {
         _recentAttendance = att.take(5).toList();
         _pendingExplanations = att
-            .where((e) => ((e['explanation'] as Map?)?['status']?.toString() ?? '').toUpperCase() == 'REQUESTED')
+            .where((e) =>
+                ((e['explanation'] as Map?)?['status']?.toString() ?? '')
+                    .toUpperCase() ==
+                'REQUESTED')
             .length;
       });
     } catch (e) {
@@ -174,21 +201,32 @@ class _HomePageState extends State<HomePage> {
     setState(() => _loadingRemarks = true);
     try {
       final res = await http.get(
-        Uri.parse('$_baseUrl/api/schools/$_schoolId/parents/me/children/remarks'),
-        headers: {'Authorization': 'Bearer $_token', 'Accept': 'application/json'},
+        Uri.parse(
+            '$_baseUrl/api/schools/$_schoolId/parents/me/children/remarks'),
+        headers: {
+          'Authorization': 'Bearer $_token',
+          'Accept': 'application/json'
+        },
       );
       if (res.statusCode != 200) {
         throw Exception('Failed to load remarks (${res.statusCode})');
       }
       final data = jsonDecode(res.body) as Map<String, dynamic>;
-      final children = (data['children'] as List? ?? []).cast<Map<String, dynamic>>();
-      final match = children.where((c) => c['studentId'].toString() == _selectedChild!['id'].toString()).toList();
+      final children =
+          (data['children'] as List? ?? []).cast<Map<String, dynamic>>();
+      final match = children
+          .where((c) =>
+              c['studentId'].toString() == _selectedChild!['id'].toString())
+          .toList();
       final rem = match.isNotEmpty
-          ? ((match.first['remarks'] as List? ?? []).cast<Map<String, dynamic>>())
+          ? ((match.first['remarks'] as List? ?? [])
+              .cast<Map<String, dynamic>>())
           : <Map<String, dynamic>>[];
       rem.sort((a, b) {
-        final da = DateTime.tryParse((a['date'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
-        final db = DateTime.tryParse((b['date'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final da = DateTime.tryParse((a['date'] ?? '').toString()) ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final db = DateTime.tryParse((b['date'] ?? '').toString()) ??
+            DateTime.fromMillisecondsSinceEpoch(0);
         return db.compareTo(da);
       });
       setState(() => _recentRemarks = rem.take(5).toList());
@@ -250,9 +288,12 @@ class _HomePageState extends State<HomePage> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.error_outline, color: Colors.red, size: 32),
+                        const Icon(Icons.error_outline,
+                            color: Colors.red, size: 32),
                         const SizedBox(height: 8),
-                        Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
+                        Text(_error!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.red)),
                         const SizedBox(height: 12),
                         FilledButton.icon(
                           onPressed: _bootstrap,
@@ -288,29 +329,41 @@ class _HomePageState extends State<HomePage> {
                               children: [
                                 CircleAvatar(
                                   radius: 28,
-                                  backgroundColor: Colors.white.withOpacity(0.2),
-                                  backgroundImage: (_schoolLogoUrl != null && _schoolLogoUrl!.isNotEmpty)
+                                  backgroundColor:
+                                      Colors.white.withOpacity(0.2),
+                                  backgroundImage: (_schoolLogoUrl != null &&
+                                          _schoolLogoUrl!.isNotEmpty)
                                       ? NetworkImage(_schoolLogoUrl!)
                                       : null,
-                                  child: (_schoolLogoUrl == null || _schoolLogoUrl!.isEmpty)
-                                      ? const Icon(Icons.school, color: Colors.white)
+                                  child: (_schoolLogoUrl == null ||
+                                          _schoolLogoUrl!.isEmpty)
+                                      ? const Icon(Icons.school,
+                                          color: Colors.white)
                                       : null,
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        _schoolName?.isNotEmpty == true ? _schoolName! : 'Welcome',
-                                        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
+                                        _schoolName?.isNotEmpty == true
+                                            ? _schoolName!
+                                            : 'Welcome',
+                                        style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.w700),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
                                         'Hello, ${_parentName ?? 'Parent'}',
-                                        style: TextStyle(color: Colors.white.withOpacity(0.9)),
+                                        style: TextStyle(
+                                            color:
+                                                Colors.white.withOpacity(0.9)),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -338,7 +391,8 @@ class _HomePageState extends State<HomePage> {
                                 (c) => c['id'].toString() == id,
                                 orElse: () => <String, dynamic>{},
                               );
-                              setState(() => _selectedChild = found.isEmpty ? null : found);
+                              setState(() => _selectedChild =
+                                  found.isEmpty ? null : found);
                               _loadGrades();
                               _loadAttendance();
                               _loadRemarks();
@@ -367,12 +421,17 @@ class _HomePageState extends State<HomePage> {
                                           ? null
                                           : () {
                                               final name =
-                                                  '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'.trim();
+                                                  '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
+                                                      .trim();
                                               Navigator.of(context).push(
                                                 MaterialPageRoute(
                                                   builder: (_) => GradesPage(
-                                                    studentId: _selectedChild!['id'].toString(),
-                                                    studentName: name.isEmpty ? 'Student' : name,
+                                                    studentId:
+                                                        _selectedChild!['id']
+                                                            .toString(),
+                                                    studentName: name.isEmpty
+                                                        ? 'Student'
+                                                        : name,
                                                   ),
                                                 ),
                                               );
@@ -388,7 +447,9 @@ class _HomePageState extends State<HomePage> {
                                       color: Colors.teal,
                                       icon: Icons.calendar_month_outlined,
                                       title: 'Attendance',
-                                      badgeCount: _pendingExplanations > 0 ? _pendingExplanations : null,
+                                      badgeCount: _pendingExplanations > 0
+                                          ? _pendingExplanations
+                                          : null,
                                       onTap: _selectedChild == null
                                           ? null
                                           : () {
@@ -396,12 +457,18 @@ class _HomePageState extends State<HomePage> {
                                                 widget.goToTab!(2);
                                               } else {
                                                 final name =
-                                                    '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'.trim();
+                                                    '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
+                                                        .trim();
                                                 Navigator.of(context).push(
                                                   MaterialPageRoute(
-                                                    builder: (_) => AttendancePage(
-                                                      studentId: _selectedChild!['id'].toString(),
-                                                      studentName: name.isEmpty ? 'Student' : name,
+                                                    builder: (_) =>
+                                                        AttendancePage(
+                                                      studentId:
+                                                          _selectedChild!['id']
+                                                              .toString(),
+                                                      studentName: name.isEmpty
+                                                          ? 'Student'
+                                                          : name,
                                                     ),
                                                   ),
                                                 );
@@ -430,12 +497,17 @@ class _HomePageState extends State<HomePage> {
                                                 return;
                                               }
                                               final name =
-                                                  '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'.trim();
+                                                  '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
+                                                      .trim();
                                               Navigator.of(context).push(
                                                 MaterialPageRoute(
                                                   builder: (_) => RemarksPage(
-                                                    studentId: _selectedChild!['id'].toString(),
-                                                    studentName: name.isEmpty ? 'Student' : name,
+                                                    studentId:
+                                                        _selectedChild!['id']
+                                                            .toString(),
+                                                    studentName: name.isEmpty
+                                                        ? 'Student'
+                                                        : name,
                                                   ),
                                                 ),
                                               );
@@ -455,12 +527,17 @@ class _HomePageState extends State<HomePage> {
                                           ? null
                                           : () {
                                               final name =
-                                                  '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'.trim();
+                                                  '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
+                                                      .trim();
                                               Navigator.of(context).push(
                                                 MaterialPageRoute(
                                                   builder: (_) => TimetablePage(
-                                                    studentId: _selectedChild!['id'].toString(),
-                                                    studentName: name.isEmpty ? 'Student' : name,
+                                                    studentId:
+                                                        _selectedChild!['id']
+                                                            .toString(),
+                                                    studentName: name.isEmpty
+                                                        ? 'Student'
+                                                        : name,
                                                   ),
                                                 ),
                                               );
@@ -488,12 +565,15 @@ class _HomePageState extends State<HomePage> {
                                   widget.goToTab!(1);
                                 } else {
                                   final name =
-                                      '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'.trim();
+                                      '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
+                                          .trim();
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
                                       builder: (_) => GradesPage(
-                                        studentId: _selectedChild!['id'].toString(),
-                                        studentName: name.isEmpty ? 'Student' : name,
+                                        studentId:
+                                            _selectedChild!['id'].toString(),
+                                        studentName:
+                                            name.isEmpty ? 'Student' : name,
                                       ),
                                     ),
                                   );
@@ -501,50 +581,71 @@ class _HomePageState extends State<HomePage> {
                               },
                       ),
                       const SizedBox(height: 8),
-                      if (_loadingGrades) const LinearProgressIndicator(minHeight: 2),
+                      if (_loadingGrades)
+                        const LinearProgressIndicator(minHeight: 2),
                       if (_recentGrades.isEmpty && !_loadingGrades)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 20),
                           child: Column(
                             children: const [
-                              Icon(Icons.school_outlined, size: 34, color: Colors.black26),
+                              Icon(Icons.school_outlined,
+                                  size: 34, color: Colors.black26),
                               SizedBox(height: 6),
-                              Text('No grades yet', style: TextStyle(color: Colors.black54)),
+                              Text('No grades yet',
+                                  style: TextStyle(color: Colors.black54)),
                             ],
                           ),
                         ),
                       ..._recentGrades.map((g) {
-                        final subject = (g['subject'] as Map?)?['name'] ?? 'Subject';
-                        final examName = ((g['examSchedule'] as Map?)?['exam'] as Map?)?['name'] ?? 'Exam';
+                        final subject =
+                            (g['subject'] as Map?)?['name'] ?? 'Subject';
+                        final examName = ((g['examSchedule'] as Map?)?['exam']
+                                as Map?)?['name'] ??
+                            'Exam';
                         final dateStr = (g['examSchedule'] as Map?)?['date'];
-                        final date = dateStr is String && dateStr.isNotEmpty ? DateTime.tryParse(dateStr) : null;
+                        final date = dateStr is String && dateStr.isNotEmpty
+                            ? DateTime.tryParse(dateStr)
+                            : null;
                         final marks = g['marksObtained']?.toString() ?? '-';
                         return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 6),
                           child: GlassContainer(
                             padding: const EdgeInsets.all(12),
                             child: Row(
                               children: [
                                 CircleAvatar(
                                   backgroundColor: Colors.indigo.shade50,
-                                  child: const Icon(Icons.book_outlined, color: Colors.indigo),
+                                  child: const Icon(Icons.book_outlined,
+                                      color: Colors.indigo),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      Text(subject.toString(), style: const TextStyle(fontWeight: FontWeight.w600)),
+                                      Text(subject.toString(),
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w600)),
                                       const SizedBox(height: 4),
-                                      Text('${examName.toString()} • ${date != null ? df.format(date) : ''}',
-                                          style: const TextStyle(color: Colors.black54)),
+                                      Text(
+                                          '${examName.toString()} • ${date != null ? df.format(date) : ''}',
+                                          style: const TextStyle(
+                                              color: Colors.black54)),
                                     ],
                                   ),
                                 ),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(color: Colors.indigo.shade600, borderRadius: BorderRadius.circular(999)),
-                                  child: Text(marks, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                      color: Colors.indigo.shade600,
+                                      borderRadius: BorderRadius.circular(999)),
+                                  child: Text(marks,
+                                      style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold)),
                                 ),
                               ],
                             ),
@@ -566,12 +667,15 @@ class _HomePageState extends State<HomePage> {
                                   widget.goToTab!(2);
                                 } else {
                                   final name =
-                                      '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'.trim();
+                                      '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
+                                          .trim();
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
                                       builder: (_) => AttendancePage(
-                                        studentId: _selectedChild!['id'].toString(),
-                                        studentName: name.isEmpty ? 'Student' : name,
+                                        studentId:
+                                            _selectedChild!['id'].toString(),
+                                        studentName:
+                                            name.isEmpty ? 'Student' : name,
                                       ),
                                     ),
                                   );
@@ -579,44 +683,54 @@ class _HomePageState extends State<HomePage> {
                               },
                       ),
                       const SizedBox(height: 8),
-                      if (_loadingAttendance) const LinearProgressIndicator(minHeight: 2),
+                      if (_loadingAttendance)
+                        const LinearProgressIndicator(minHeight: 2),
                       if (_recentAttendance.isEmpty && !_loadingAttendance)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 20),
                           child: Column(
                             children: const [
-                              Icon(Icons.event_busy_outlined, size: 34, color: Colors.black26),
+                              Icon(Icons.event_busy_outlined,
+                                  size: 34, color: Colors.black26),
                               SizedBox(height: 6),
-                              Text('No attendance yet', style: TextStyle(color: Colors.black54)),
+                              Text('No attendance yet',
+                                  style: TextStyle(color: Colors.black54)),
                             ],
                           ),
                         ),
                       ..._recentAttendance.map((a) {
                         final dateStr = a['date']?.toString();
-                        final d = dateStr != null && dateStr.isNotEmpty ? DateTime.tryParse(dateStr) : null;
+                        final d = dateStr != null && dateStr.isNotEmpty
+                            ? DateTime.tryParse(dateStr)
+                            : null;
                         final status = a['status']?.toString() ?? '-';
                         final remarks = a['remarks']?.toString() ?? '';
                         final explanation = a['explanation'] as Map?;
-                        final explStatus = (explanation?['status']?.toString() ?? '').toUpperCase();
+                        final explStatus =
+                            (explanation?['status']?.toString() ?? '')
+                                .toUpperCase();
                         return GestureDetector(
                           onTap: () {
                             if (widget.goToTab != null) {
                               widget.goToTab!(2);
                             } else {
                               final name =
-                                  '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'.trim();
+                                  '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
+                                      .trim();
                               Navigator.of(context).push(
                                 MaterialPageRoute(
                                   builder: (_) => AttendancePage(
                                     studentId: _selectedChild!['id'].toString(),
-                                    studentName: name.isEmpty ? 'Student' : name,
+                                    studentName:
+                                        name.isEmpty ? 'Student' : name,
                                   ),
                                 ),
                               );
                             }
                           },
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 6),
                             child: GlassContainer(
                               padding: const EdgeInsets.all(12),
                               child: Row(
@@ -624,24 +738,33 @@ class _HomePageState extends State<HomePage> {
                                 children: [
                                   CircleAvatar(
                                     backgroundColor: Colors.teal.shade50,
-                                    child: const Icon(Icons.check_circle_outline, color: Colors.teal),
+                                    child: const Icon(
+                                        Icons.check_circle_outline,
+                                        color: Colors.teal),
                                   ),
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Row(
                                           children: [
                                             _chip(status, _statusColor(status)),
                                             const SizedBox(width: 8),
-                                            if (explStatus == 'REQUESTED') _chip('Explanation requested', Colors.amber.shade700),
-                                            if (explStatus == 'ANSWERED') _chip('Explained', Colors.green.shade700),
+                                            if (explStatus == 'REQUESTED')
+                                              _chip('Explanation requested',
+                                                  Colors.amber.shade700),
+                                            if (explStatus == 'ANSWERED')
+                                              _chip('Explained',
+                                                  Colors.green.shade700),
                                           ],
                                         ),
                                         const SizedBox(height: 6),
-                                        Text('${d != null ? df.format(d) : ''}${remarks.isNotEmpty ? ' • $remarks' : ''}',
-                                            style: const TextStyle(color: Colors.black87)),
+                                        Text(
+                                            '${d != null ? df.format(d) : ''}${remarks.isNotEmpty ? ' • $remarks' : ''}',
+                                            style: const TextStyle(
+                                                color: Colors.black87)),
                                       ],
                                     ),
                                   ),
@@ -667,27 +790,33 @@ class _HomePageState extends State<HomePage> {
                                   return;
                                 }
                                 final name =
-                                    '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'.trim();
+                                    '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
+                                        .trim();
                                 Navigator.of(context).push(
                                   MaterialPageRoute(
                                     builder: (_) => RemarksPage(
-                                      studentId: _selectedChild!['id'].toString(),
-                                      studentName: name.isEmpty ? 'Student' : name,
+                                      studentId:
+                                          _selectedChild!['id'].toString(),
+                                      studentName:
+                                          name.isEmpty ? 'Student' : name,
                                     ),
                                   ),
                                 );
                               },
                       ),
                       const SizedBox(height: 8),
-                      if (_loadingRemarks) const LinearProgressIndicator(minHeight: 2),
+                      if (_loadingRemarks)
+                        const LinearProgressIndicator(minHeight: 2),
                       if (_recentRemarks.isEmpty && !_loadingRemarks)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 20),
                           child: Column(
                             children: const [
-                              Icon(Icons.chat_bubble_outline, size: 34, color: Colors.black26),
+                              Icon(Icons.chat_bubble_outline,
+                                  size: 34, color: Colors.black26),
                               SizedBox(height: 6),
-                              Text('No remarks yet', style: TextStyle(color: Colors.black54)),
+                              Text('No remarks yet',
+                                  style: TextStyle(color: Colors.black54)),
                             ],
                           ),
                         ),
@@ -697,9 +826,12 @@ class _HomePageState extends State<HomePage> {
                         final src = r['source']?.toString() ?? '';
                         final name = r['examOrAssignment']?.toString() ?? '';
                         final dateStr = r['date']?.toString();
-                        final d = dateStr != null && dateStr.isNotEmpty ? DateTime.tryParse(dateStr) : null;
+                        final d = dateStr != null && dateStr.isNotEmpty
+                            ? DateTime.tryParse(dateStr)
+                            : null;
                         return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 6),
                           child: GlassContainer(
                             padding: const EdgeInsets.all(12),
                             child: Row(
@@ -707,24 +839,37 @@ class _HomePageState extends State<HomePage> {
                               children: [
                                 CircleAvatar(
                                   backgroundColor: Colors.deepOrange.shade50,
-                                  child: const Icon(Icons.chat_bubble_outline, color: Colors.deepOrange),
+                                  child: const Icon(Icons.chat_bubble_outline,
+                                      color: Colors.deepOrange),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      Text(subject.isNotEmpty ? subject : 'Remark',
-                                          style: const TextStyle(fontWeight: FontWeight.w600)),
+                                      Text(
+                                          subject.isNotEmpty
+                                              ? subject
+                                              : 'Remark',
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w600)),
                                       const SizedBox(height: 4),
-                                      Text([
-                                        src,
-                                        if (name.isNotEmpty) name,
-                                        if (d != null) df.format(d),
-                                      ].where((e) => e.toString().isNotEmpty).join(' • '),
-                                          style: const TextStyle(color: Colors.black54)),
+                                      Text(
+                                          [
+                                            src,
+                                            if (name.isNotEmpty) name,
+                                            if (d != null) df.format(d),
+                                          ]
+                                              .where((e) =>
+                                                  e.toString().isNotEmpty)
+                                              .join(' • '),
+                                          style: const TextStyle(
+                                              color: Colors.black54)),
                                       const SizedBox(height: 6),
-                                      Text(comment, maxLines: 3, overflow: TextOverflow.ellipsis),
+                                      Text(comment,
+                                          maxLines: 3,
+                                          overflow: TextOverflow.ellipsis),
                                     ],
                                   ),
                                 ),
@@ -760,8 +905,10 @@ class _HomePageState extends State<HomePage> {
   Widget _chip(String label, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(999)),
-      child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 12)),
+      decoration:
+          BoxDecoration(color: color, borderRadius: BorderRadius.circular(999)),
+      child: Text(label,
+          style: const TextStyle(color: Colors.white, fontSize: 12)),
     );
   }
 }
@@ -798,7 +945,10 @@ class _QuickActionCard extends StatelessWidget {
             gradient: gradient,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
-              BoxShadow(color: color.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 6)),
+              BoxShadow(
+                  color: color.withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6)),
             ],
           ),
           child: Padding(
@@ -815,7 +965,8 @@ class _QuickActionCard extends StatelessWidget {
                         right: -8,
                         top: -8,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
                           decoration: const BoxDecoration(
                             color: Colors.red,
                             borderRadius: BorderRadius.all(Radius.circular(10)),
@@ -823,13 +974,18 @@ class _QuickActionCard extends StatelessWidget {
                           constraints: const BoxConstraints(minWidth: 16),
                           child: Text('${(badgeCount! > 99) ? 99 : badgeCount}',
                               textAlign: TextAlign.center,
-                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold)),
                         ),
                       ),
                   ],
                 ),
                 const SizedBox(height: 6),
-                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                Text(title,
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.w700)),
               ],
             ),
           ),
@@ -859,7 +1015,9 @@ class _SectionHeader extends StatelessWidget {
         children: [
           Icon(icon, size: 18),
           const SizedBox(width: 6),
-          Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w600))),
+          Expanded(
+              child: Text(title,
+                  style: const TextStyle(fontWeight: FontWeight.w600))),
           if (actionLabel != null && onAction != null)
             TextButton(onPressed: onAction, child: Text(actionLabel!)),
         ],
@@ -893,7 +1051,9 @@ class _ChildSelectorCard extends StatelessWidget {
       children: [
         Container(
           padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: Colors.indigo.withOpacity(0.08), borderRadius: BorderRadius.circular(10)),
+          decoration: BoxDecoration(
+              color: Colors.indigo.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(10)),
           child: const Icon(Icons.child_care_outlined, color: Colors.indigo),
         ),
         const SizedBox(width: 12),
@@ -901,7 +1061,8 @@ class _ChildSelectorCard extends StatelessWidget {
           child: DropdownButtonFormField<String>(
             value: selectedChildId,
             items: children.map((c) {
-              final name = '${c['firstName'] ?? ''} ${c['lastName'] ?? ''}'.trim();
+              final name =
+                  '${c['firstName'] ?? ''} ${c['lastName'] ?? ''}'.trim();
               return DropdownMenuItem<String>(
                 value: c['id'].toString(),
                 child: Text(name.isEmpty ? 'Student ${c['id']}' : name),
@@ -916,7 +1077,8 @@ class _ChildSelectorCard extends StatelessWidget {
               filled: true,
               fillColor: Color(0xFFF5F6FB),
               isDense: true,
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              contentPadding:
+                  EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             ),
           ),
         ),

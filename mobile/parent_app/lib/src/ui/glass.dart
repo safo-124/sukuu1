@@ -26,9 +26,10 @@ class GlassContainer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final base = color ?? (Theme.of(context).brightness == Brightness.dark
-        ? const Color(0xFF0F172A)
-        : Colors.white);
+    final base = color ??
+        (Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFF0F172A)
+            : Colors.white);
     final glassColor = base.withOpacity(opacity);
 
     return ClipRRect(
@@ -40,7 +41,8 @@ class GlassContainer extends StatelessWidget {
           margin: margin,
           decoration: BoxDecoration(
             color: glassColor,
-            border: border ?? Border.all(color: scheme.outline.withOpacity(0.08)),
+            border:
+                border ?? Border.all(color: scheme.outline.withOpacity(0.08)),
           ),
           child: child,
         ),
@@ -64,7 +66,8 @@ class GlassBottomBar extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             color: base.withOpacity(0.65),
-            border: Border(top: BorderSide(color: Colors.white.withOpacity(0.10))),
+            border:
+                Border(top: BorderSide(color: Colors.white.withOpacity(0.10))),
           ),
           child: child,
         ),
@@ -87,7 +90,8 @@ class GlassAppBarFlex extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             color: base.withOpacity(0.55),
-            border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.06))),
+            border: Border(
+                bottom: BorderSide(color: Colors.white.withOpacity(0.06))),
           ),
         ),
       ),

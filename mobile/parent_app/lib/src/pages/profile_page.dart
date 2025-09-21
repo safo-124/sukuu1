@@ -74,12 +74,14 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _saveSettings() async {
     // sanitize base URL
-    String baseUrl = _baseUrlController.text.trim().replaceAll(RegExp(r"/+\s*$"), "");
+    String baseUrl =
+        _baseUrlController.text.trim().replaceAll(RegExp(r"/+\s*$"), "");
     if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
       baseUrl = 'http://$baseUrl';
     }
     await _storage.write(key: 'baseUrl', value: baseUrl);
-    await _storage.write(key: 'rememberEmail', value: _rememberEmail.toString());
+    await _storage.write(
+        key: 'rememberEmail', value: _rememberEmail.toString());
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Settings saved')),
@@ -122,7 +124,9 @@ class _ProfilePageState extends State<ProfilePage> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
+              ? Center(
+                  child:
+                      Text(_error!, style: const TextStyle(color: Colors.red)))
               : RefreshIndicator(
                   onRefresh: _bootstrap,
                   child: ListView(
@@ -149,18 +153,23 @@ class _ProfilePageState extends State<ProfilePage> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      '${_profile?['user']?['firstName'] ?? ''} ${_profile?['user']?['lastName'] ?? ''}'.trim(),
+                                      '${_profile?['user']?['firstName'] ?? ''} ${_profile?['user']?['lastName'] ?? ''}'
+                                          .trim(),
                                       style: const TextStyle(
-                                          fontSize: 18, fontWeight: FontWeight.w600),
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w600),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
                                       _profile?['user']?['email'] ?? '',
-                                      style: const TextStyle(color: Colors.black54),
+                                      style: const TextStyle(
+                                          color: Colors.black54),
                                     ),
-                                    if (_subdomain != null && _subdomain!.isNotEmpty)
+                                    if (_subdomain != null &&
+                                        _subdomain!.isNotEmpty)
                                       Text('Subdomain: $_subdomain',
-                                          style: const TextStyle(color: Colors.black54)),
+                                          style: const TextStyle(
+                                              color: Colors.black54)),
                                   ],
                                 ),
                               ),
@@ -180,7 +189,8 @@ class _ProfilePageState extends State<ProfilePage> {
                             children: [
                               const Text('App Settings',
                                   style: TextStyle(
-                                      fontSize: 16, fontWeight: FontWeight.w600)),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600)),
                               const SizedBox(height: 12),
                               TextFormField(
                                 controller: _baseUrlController,
@@ -206,14 +216,17 @@ class _ProfilePageState extends State<ProfilePage> {
                               const Divider(height: 24),
                               SwitchListTile(
                                 contentPadding: EdgeInsets.zero,
-                                title: const Text('Remember email on this device'),
+                                title:
+                                    const Text('Remember email on this device'),
                                 value: _rememberEmail,
-                                onChanged: (v) => setState(() => _rememberEmail = v),
+                                onChanged: (v) =>
+                                    setState(() => _rememberEmail = v),
                               ),
                               const Divider(height: 24),
                               const Text('Theme',
                                   style: TextStyle(
-                                      fontSize: 16, fontWeight: FontWeight.w600)),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600)),
                               const SizedBox(height: 12),
                               _ThemeSelector(),
                             ],
@@ -292,9 +305,18 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
       builder: (context, constraints) {
         return SegmentedButton<String>(
           segments: const [
-            ButtonSegment(value: 'system', label: Text('System'), icon: Icon(Icons.settings_suggest_outlined)),
-            ButtonSegment(value: 'light', label: Text('Light'), icon: Icon(Icons.light_mode_outlined)),
-            ButtonSegment(value: 'dark', label: Text('Dark'), icon: Icon(Icons.dark_mode_outlined)),
+            ButtonSegment(
+                value: 'system',
+                label: Text('System'),
+                icon: Icon(Icons.settings_suggest_outlined)),
+            ButtonSegment(
+                value: 'light',
+                label: Text('Light'),
+                icon: Icon(Icons.light_mode_outlined)),
+            ButtonSegment(
+                value: 'dark',
+                label: Text('Dark'),
+                icon: Icon(Icons.dark_mode_outlined)),
           ],
           selected: {
             if (isSystem) 'system' else if (isLight) 'light' else 'dark'
