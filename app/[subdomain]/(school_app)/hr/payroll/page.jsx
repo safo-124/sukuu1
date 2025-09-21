@@ -123,6 +123,9 @@ const PayrollFormFields = ({ formData, onFormChange, onSelectChange, onCheckboxC
 export default function ManagePayrollPage() {
   const schoolData = useSchool();
   const { data: session } = useSession();
+  const userRole = session?.user?.role;
+  const canManage = userRole === 'SCHOOL_ADMIN' || userRole === 'HR_MANAGER' || userRole === 'ACCOUNTANT';
+  const isTeacher = userRole === 'TEACHER';
 
   const [payrollRecords, setPayrollRecords] = useState([]);
   const [staffList, setStaffList] = useState([]); // For staff dropdown in form
@@ -140,6 +143,10 @@ export default function ManagePayrollPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isPayslipDialogOpen, setIsPayslipDialogOpen] = useState(false); // For payslip dialog
   const [selectedRecordForPayslip, setSelectedRecordForPayslip] = useState(null); // Data for payslip
+  const [isPayDialogOpen, setIsPayDialogOpen] = useState(false);
+  const [selectedRecordForPay, setSelectedRecordForPay] = useState(null);
+  const [payForm, setPayForm] = useState({ paymentDate: '', notes: '', receiptUrl: '' });
+  const [isPaySubmitting, setIsPaySubmitting] = useState(false);
 
   const [formData, setFormData] = useState({ ...initialPayrollFormData });
   const [editingRecord, setEditingRecord] = useState(null);
@@ -308,6 +315,42 @@ export default function ManagePayrollPage() {
     // The dialog itself will contain the print functionality
   };
 
+  const openPayDialog = (record) => {
+    setSelectedRecordForPay(record);
+  setPayForm({ paymentDate: format(new Date(), 'yyyy-MM-dd'), notes: '', receiptUrl: '' });
+    setIsPayDialogOpen(true);
+  };
+
+  const submitPay = async () => {
+    if (!schoolData?.id || !selectedRecordForPay) return;
+    setIsPaySubmitting(true);
+    try {
+      const payload = {
+        paymentDate: payForm.paymentDate ? new Date(payForm.paymentDate).toISOString() : undefined,
+        notes: payForm.notes || undefined,
+        receiptUrl: payForm.receiptUrl || undefined,
+      };
+      const response = await fetch(`/api/schools/${schoolData.id}/hr/payroll/${selectedRecordForPay.id}/pay`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        let err = result.error || 'Failed to mark payroll as paid.';
+        if (result.issues) err = result.issues.map(i => `${i.path.join('.') || 'Field'}: ${i.message}`).join('; ');
+        toast.error('Payment Failed', { description: err });
+      } else {
+        toast.success('Payroll marked as paid and expense recorded.');
+        setIsPayDialogOpen(false);
+        setSelectedRecordForPay(null);
+        fetchPayrollRecords();
+      }
+    } catch (e) {
+      toast.error('An unexpected error occurred while paying payroll.');
+    } finally {
+      setIsPaySubmitting(false);
+    }
+  };
+
   const PayslipContent = ({ record, schoolData }) => {
     if (!record || !schoolData) return <p className="text-zinc-500">No payroll record data available.</p>;
 
@@ -363,6 +406,11 @@ export default function ManagePayrollPage() {
 
   return (
     <div className="space-y-8">
+      {isTeacher && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+          You have read-only access to payroll. Contact your administrator for changes.
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className={`text-2xl md:text-3xl font-bold ${titleTextClasses} flex items-center`}>
@@ -370,6 +418,7 @@ export default function ManagePayrollPage() {
           </h1>
           <p className={descriptionTextClasses}>Track staff salaries, allowances, deductions, and generate payslips.</p>
         </div>
+        {canManage && (
         <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setFormError(''); }}>
           <DialogTrigger asChild>
             <Button className={primaryButtonClasses} onClick={openAddDialog}> <PlusCircle className="mr-2 h-4 w-4" /> Add Payroll Record </Button>
@@ -400,6 +449,7 @@ export default function ManagePayrollPage() {
             </form>
           </DialogContent>
         </Dialog>
+        )}
       </div>
 
       {error && ( <Alert variant="destructive" className="bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300 dark:border-red-700/50"> <AlertTriangle className="h-4 w-4" /> <AlertTitle>Error</AlertTitle> <AlertDescription>{error}</AlertDescription> </Alert> )}
@@ -477,9 +527,18 @@ export default function ManagePayrollPage() {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1 md:gap-2">
-                    <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} onClick={() => openEditDialog(record)} title="Edit Record"> <Edit3 className="h-4 w-4" /> </Button>
+                    {canManage && !record.isPaid && (
+                      <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} onClick={() => openPayDialog(record)} title="Mark Paid">
+                        <DollarSign className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {canManage && (
+                      <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} onClick={() => openEditDialog(record)} title="Edit Record"> <Edit3 className="h-4 w-4" /> </Button>
+                    )}
                     <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} onClick={() => handleGeneratePayslip(record)} title="Generate Payslip"> <Printer className="h-4 w-4" /> </Button>
-                    <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8 border-red-300 text-red-600 hover:bg-red-100 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/50`} onClick={() => handleDelete(record.id)} title="Delete Record"> <Trash2 className="h-4 w-4" /> </Button>
+                    {canManage && (
+                      <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8 border-red-300 text-red-600 hover:bg-red-100 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/50`} onClick={() => handleDelete(record.id)} title="Delete Record"> <Trash2 className="h-4 w-4" /> </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
@@ -511,6 +570,42 @@ export default function ManagePayrollPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Pay Payroll Dialog */}
+      {canManage && (
+      <Dialog open={isPayDialogOpen} onOpenChange={setIsPayDialogOpen}>
+        <DialogContent className="sm:max-w-md bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+          <DialogHeader>
+            <DialogTitle className={titleTextClasses}>Mark Payroll as Paid</DialogTitle>
+            <DialogDescription className={descriptionTextClasses}>
+              This will mark the selected payroll as paid and create a corresponding expense under Salaries.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="block mb-1">Payment Date</Label>
+              <Input type="date" value={payForm.paymentDate} onChange={(e) => setPayForm(prev => ({ ...prev, paymentDate: e.target.value }))} className={filterInputClasses} />
+            </div>
+            <div>
+              <Label className="block mb-1">Notes (optional)</Label>
+              <Textarea value={payForm.notes} onChange={(e) => setPayForm(prev => ({ ...prev, notes: e.target.value }))} className={filterInputClasses} placeholder="Any notes for this payment..." />
+            </div>
+            <div>
+              <Label className="block mb-1">Receipt URL (optional)</Label>
+              <Input type="url" value={payForm.receiptUrl} onChange={(e) => setPayForm(prev => ({ ...prev, receiptUrl: e.target.value }))} className={filterInputClasses} placeholder="https://... (link to receipt or proof)" />
+            </div>
+          </div>
+          <DialogFooter className="pt-4">
+            <DialogClose asChild>
+              <Button type="button" variant="outline" className={outlineButtonClasses}>Cancel</Button>
+            </DialogClose>
+            <Button onClick={submitPay} className={primaryButtonClasses} disabled={isPaySubmitting}>
+              {isPaySubmitting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Processing...</>) : 'Confirm Pay'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+  </Dialog>
+  )}
     </div>
   );
 }

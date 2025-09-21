@@ -7,6 +7,7 @@ import 'messages_page.dart';
 import 'timetable_page.dart';
 import 'grades_page.dart';
 import 'attendance_page.dart';
+import 'fees_page.dart';
 
 class _PlaceholderPage extends StatelessWidget {
   final String title;
@@ -44,6 +45,7 @@ class _MainTabsPageState extends State<MainTabsPage> {
       HomePage(goToTab: (i) => setState(() => _index = i)),
       const _GradesTab(),
       const _AttendanceTab(),
+      const _FeesTab(),
       MessagesPage(onAnyRead: _loadUnreadCount),
       const _TimetableTab(),
     ];
@@ -93,6 +95,10 @@ class _MainTabsPageState extends State<MainTabsPage> {
               icon: Icon(Icons.calendar_month_outlined),
               selectedIcon: Icon(Icons.calendar_month),
               label: 'Attendance'),
+          const NavigationDestination(
+              icon: Icon(Icons.receipt_long_outlined),
+              selectedIcon: Icon(Icons.receipt_long),
+              label: 'Fees'),
           NavigationDestination(
             icon: Stack(
               clipBehavior: Clip.none,
@@ -397,6 +403,98 @@ class _AttendanceTabState extends State<_AttendanceTab> {
                 studentId: sid,
                 studentName: name,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FeesTab extends StatefulWidget {
+  const _FeesTab();
+
+  @override
+  State<_FeesTab> createState() => _FeesTabState();
+}
+
+class _FeesTabState extends State<_FeesTab> {
+  final _storage = const FlutterSecureStorage();
+  bool _loading = true;
+  String? _error;
+  List<Map<String, dynamic>> _children = [];
+  Map<String, dynamic>? _selectedChild;
+  Key _contentKey = UniqueKey();
+
+  @override
+  void initState() { super.initState(); _bootstrap(); }
+
+  Future<void> _bootstrap() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final baseUrl = await _storage.read(key: 'baseUrl');
+      final token = await _storage.read(key: 'token');
+      final schoolId = await _storage.read(key: 'schoolId');
+      if (baseUrl == null || token == null || schoolId == null) {
+        throw Exception('Missing auth');
+      }
+      final meRes = await http.get(
+        Uri.parse('$baseUrl/api/schools/$schoolId/parents/me'),
+        headers: { 'Authorization': 'Bearer $token', 'Accept': 'application/json' },
+      );
+      if (meRes.statusCode != 200) {
+        throw Exception('Profile failed (${meRes.statusCode})');
+      }
+      final meJson = jsonDecode(meRes.body) as Map<String, dynamic>;
+      _children = (meJson['children'] as List? ?? []).cast<Map<String, dynamic>>();
+      if (_children.isNotEmpty) _selectedChild = _children.first;
+    } catch (e) { _error = e.toString(); } finally { setState(() { _loading = false; _contentKey = UniqueKey(); }); }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return Scaffold(appBar: AppBar(title: const Text('Fees')), body: const Center(child: CircularProgressIndicator()));
+    }
+    if (_error != null) {
+      return Scaffold(appBar: AppBar(title: const Text('Fees')), body: Center(child: Text(_error!, style: const TextStyle(color: Colors.red))));
+    }
+    if (_selectedChild == null) {
+      return Scaffold(appBar: AppBar(title: const Text('Fees')), body: const Center(child: Text('No linked children')));
+    }
+    final name = '${_selectedChild!['firstName'] ?? ''} ${_selectedChild!['lastName'] ?? ''}'.trim();
+    final sid = _selectedChild!['id'].toString();
+    return Scaffold(
+      appBar: AppBar(title: const Text('Fees')),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Row(
+              children: [
+                const Icon(Icons.child_care_outlined),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: _selectedChild?['id']?.toString(),
+                    items: _children.map((c) {
+                      final cname = '${c['firstName'] ?? ''} ${c['lastName'] ?? ''}'.trim();
+                      return DropdownMenuItem(value: c['id'].toString(), child: Text(cname));
+                    }).toList(),
+                    onChanged: (v) {
+                      final sel = _children.firstWhere((e) => e['id'].toString() == v, orElse: () => {});
+                      setState(() { _selectedChild = sel.isEmpty ? null : sel; _contentKey = UniqueKey(); });
+                    },
+                    decoration: const InputDecoration(labelText: 'Child'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: KeyedSubtree(
+              key: _contentKey,
+              child: FeesPage(studentId: sid, studentName: name, showTitle: false),
             ),
           ),
         ],

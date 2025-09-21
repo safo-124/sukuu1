@@ -77,6 +77,14 @@ enum PaymentMethod {
   OTHER
 }
 
+// Status for parent-initiated payment requests
+enum PaymentRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 enum LeaveStatus {
   PENDING
   APPROVED
@@ -210,6 +218,7 @@ model School {
   drivers                 Driver[]
   books                   Book[]
   bookLoans               BookLoan[]
+  paymentRequests         PaymentRequest[]
   HostelRoom              HostelRoom[]
   inventoryTransactions   InventoryTransaction[]
   // Advanced Timetable relations
@@ -271,6 +280,7 @@ model Parent {
   school   School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   announcementReads AnnouncementRead[]
   absenceExplanationsResponded AbsenceExplanation[] @relation("AbsenceRespondedBy")
+  paymentRequests PaymentRequest[]
 
   @@index([userId])
   @@index([schoolId])
@@ -509,6 +519,7 @@ model Student {
   discounts            Discount[]
   scholarships         Scholarship[]
   bookLoans            BookLoan[]
+  paymentRequests      PaymentRequest[]
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
 
@@ -1161,6 +1172,7 @@ model Invoice {
   payments      Payment[]
   discounts     Discount[]
   allocations   PaymentAllocation[]
+  paymentRequests PaymentRequest[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -1319,6 +1331,31 @@ model PaymentAllocation {
   @@index([schoolId])
   @@index([invoiceId])
   @@index([paymentId])
+}
+
+// Parent-submitted payment requests awaiting staff verification/processing
+model PaymentRequest {
+  id         String                 @id @default(cuid())
+  invoiceId  String
+  invoice    Invoice                @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  studentId  String
+  student    Student                @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  parentId   String
+  parent     Parent                 @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  amount     Float
+  method     PaymentMethod?
+  reference  String?
+  status     PaymentRequestStatus   @default(PENDING)
+  metadata   Json?
+  createdAt  DateTime               @default(now())
+  processedAt DateTime?
+  schoolId   String
+  school     School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@index([invoiceId])
+  @@index([parentId])
+  @@index([studentId])
 }
 
 model ExpenseCategory {

@@ -21,6 +21,7 @@ export async function GET(request, { params }) {
   const staffIdFilter = searchParams.get('staffId');
   const payPeriodStartFrom = searchParams.get('payPeriodStartFrom');
   const payPeriodEndTo = searchParams.get('payPeriodEndTo');
+  const isPaidFilter = searchParams.get('isPaid');
 
   try {
     schoolIdSchema.parse(schoolId);
@@ -30,6 +31,8 @@ export async function GET(request, { params }) {
       ...(staffIdFilter && { staffId: staffIdFilter }),
       ...(payPeriodStartFrom && { payPeriodStart: { gte: new Date(payPeriodStartFrom) } }),
       ...(payPeriodEndTo && { payPeriodEnd: { lte: new Date(payPeriodEndTo) } }),
+      ...(isPaidFilter === 'true' ? { isPaid: true } : {}),
+      ...(isPaidFilter === 'false' ? { isPaid: false } : {}),
     };
 
     // If a teacher is fetching, they should only see their own payslips

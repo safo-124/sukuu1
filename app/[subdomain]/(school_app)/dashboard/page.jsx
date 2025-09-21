@@ -15,7 +15,8 @@ import {
 } from "@/components/ui/card"; // Using parts of Shadcn Card for structure
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { Users, UserCog, Building, CalendarDays, BellPlus, DollarSign, BarChart3, PieChart, ListChecks, Receipt, Clock3 } from 'lucide-react';
+import { Users, UserCog, Building, CalendarDays, BellPlus, DollarSign, BarChart3, PieChart as PieIcon, ListChecks, Receipt, Clock3 } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 
 // --- Helper: StatCard Component (Ensure it's robust for undefined values during loading) ---
 const StatCard = ({ title, value, icon, description, isLoading, linkTo }) => {
@@ -83,6 +84,10 @@ export default function SchoolAdminDashboardPage() {
   const [loadingPerformance, setLoadingPerformance] = useState(false);
   const [studentCounts, setStudentCounts] = useState({ pendingAssignments: 0, unpaidInvoices: 0, nextExam: null });
   const [loadingStudentCounts, setLoadingStudentCounts] = useState(false);
+  // Accountant finance state
+  const [financeStats, setFinanceStats] = useState(null);
+  const [loadingFinance, setLoadingFinance] = useState(false);
+  const [financeRange, setFinanceRange] = useState(30); // 7 | 30 | 90
 
   // Tailwind class constants
   const pageTitleClasses = "text-zinc-900 dark:text-zinc-50";
@@ -129,6 +134,26 @@ export default function SchoolAdminDashboardPage() {
       fetchDashboardStats();
     }
   }, [schoolData, fetchDashboardStats, session?.user?.role]);
+
+  // Load accountant finance dashboard stats
+  useEffect(() => {
+    if (!schoolData?.id || session?.user?.role !== 'ACCOUNTANT') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoadingFinance(true);
+        const res = await fetch(`/api/schools/${schoolData.id}/dashboard/finance?range=${financeRange}`);
+        if (!cancelled && res.ok) {
+          setFinanceStats(await res.json());
+        }
+      } catch (e) {
+        console.error('Finance stats load error', e);
+      } finally {
+        if (!cancelled) setLoadingFinance(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [schoolData?.id, session?.user?.role, financeRange]);
 
   // Load student performance if student
   useEffect(() => {
@@ -287,6 +312,177 @@ export default function SchoolAdminDashboardPage() {
                 </div>
               </div>
             ))}
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  // Accountant dashboard variant
+  if (session?.user?.role === 'ACCOUNTANT') {
+    const fmt = (n) => Number(n || 0).toLocaleString();
+    const currency = (n) => `GHS ${Number(n || 0).toLocaleString()}`;
+    const seriesDates = (() => {
+      if (!financeStats?.payments?.series && !financeStats?.expenses?.series) return [];
+      const map = new Map();
+      (financeStats?.payments?.series || []).forEach(p => map.set(p.date, { date: p.date, payments: p.total, expenses: 0 }));
+      (financeStats?.expenses?.series || []).forEach(e => {
+        if (map.has(e.date)) map.get(e.date).expenses = e.total; else map.set(e.date, { date: e.date, payments: 0, expenses: e.total });
+      });
+      return Array.from(map.values()).sort((a,b)=>a.date.localeCompare(b.date));
+    })();
+    const invoiceStatusData = (() => {
+      const by = financeStats?.invoices?.byStatus || {};
+      return Object.keys(by).map(k => ({ name: k.replaceAll('_',' '), value: Number(by[k]||0) })).filter(d => d.value>0);
+    })();
+    const COLORS = ['#0ea5e9','#22c55e','#f59e0b','#ef4444','#8b5cf6','#14b8a6','#eab308'];
+    const hasSeriesData = seriesDates.length > 0;
+    const hasInvoiceStatusData = invoiceStatusData.length > 0;
+    return (
+      <div className="space-y-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className={`text-3xl font-bold ${pageTitleClasses}`}>Finance Overview</h1>
+            <p className={descriptionTextClasses}>Quick snapshot for invoices, payments and expenses.</p>
+          </div>
+          <div className="flex gap-2 items-center">
+            <div className="hidden md:flex items-center gap-1 mr-2">
+              <Button variant={financeRange===7?undefined:'outline'} size="sm" onClick={()=>setFinanceRange(7)}>7d</Button>
+              <Button variant={financeRange===30?undefined:'outline'} size="sm" onClick={()=>setFinanceRange(30)}>30d</Button>
+              <Button variant={financeRange===90?undefined:'outline'} size="sm" onClick={()=>setFinanceRange(90)}>90d</Button>
+            </div>
+            <Link href={`/${subdomain}/finance/invoices`}><Button className={primaryButtonClasses} size="sm">Create Invoice</Button></Link>
+            <Link href={`/${subdomain}/finance/payments`}><Button variant="outline" className={outlineButtonClasses} size="sm">Record Payment</Button></Link>
+            <Link href={`/${subdomain}/finance/expenses`}><Button variant="outline" className={outlineButtonClasses} size="sm">Add Expense</Button></Link>
+          </div>
+        </div>
+
+        {/* Top stats */}
+        <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          <StatCard
+            title="Outstanding Amount"
+            value={financeStats?.invoices?.outstandingAmount ? currency(financeStats.invoices.outstandingAmount) : '-' }
+            icon={<DollarSign className={`h-5 w-5 ${descriptionTextClasses}`} />}
+            isLoading={loadingFinance}
+            description="Unpaid balance across invoices"
+            linkTo={`/${subdomain}/finance/invoices`}
+          />
+          <StatCard
+            title="Invoices (Total)"
+            value={fmt(financeStats?.invoices?.total)}
+            icon={<Receipt className={`h-5 w-5 ${descriptionTextClasses}`} />}
+            isLoading={loadingFinance}
+            description={`Due in 7 days: ${fmt(financeStats?.invoices?.dueSoon)}`}
+            linkTo={`/${subdomain}/finance/invoices`}
+          />
+          <StatCard
+            title={`Payments (${financeStats?.payments?.rangeDays || financeRange}d)`}
+            value={currency(financeStats?.payments?.lastRange?.totalAmount)}
+            icon={<BarChart3 className={`h-5 w-5 ${descriptionTextClasses}`} />}
+            isLoading={loadingFinance}
+            description={`${fmt(financeStats?.payments?.lastRange?.count)} receipts in range`}
+            linkTo={`/${subdomain}/finance/payments`}
+          />
+          <StatCard
+            title={`Expenses (${financeStats?.expenses?.rangeDays || financeRange}d)`}
+            value={currency(financeStats?.expenses?.lastRange?.totalAmount)}
+            icon={<PieIcon className={`h-5 w-5 ${descriptionTextClasses}`} />}
+            isLoading={loadingFinance}
+            description={`${fmt(financeStats?.expenses?.lastRange?.count)} entries in range`}
+            linkTo={`/${subdomain}/finance/expenses`}
+          />
+          <StatCard
+            title="Net Cashflow"
+            value={currency(financeStats?.netCashflow)}
+            icon={<BarChart3 className={`h-5 w-5 ${descriptionTextClasses}`} />}
+            isLoading={loadingFinance}
+            description={`Payments minus expenses over ${financeStats?.payments?.rangeDays || financeRange} days`}
+          />
+        </section>
+
+        {/* Charts */}
+        <section className="grid gap-6 lg:grid-cols-3">
+          <div className={`lg:col-span-2 ${glassCardClasses}`}>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-semibold">Payments vs Expenses (30 days)</h2>
+            </div>
+            <div className="h-72 w-full">
+              {loadingFinance ? (
+                <Skeleton className="h-full w-full" />
+              ) : hasSeriesData ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={seriesDates} margin={{ top: 10, right: 20, bottom: 0, left: 0 }}>
+                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                    <YAxis tickFormatter={v=>Number(v).toLocaleString()} width={70} />
+                    <Tooltip formatter={(v)=>Number(v).toLocaleString()} />
+                    <Legend />
+                    <Area type="monotone" dataKey="payments" stroke="#0ea5e9" fill="#0ea5e9" fillOpacity={0.2} name="Payments" />
+                    <Area type="monotone" dataKey="expenses" stroke="#ef4444" fill="#ef4444" fillOpacity={0.15} name="Expenses" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-sm text-zinc-500">No data for the last 30 days.</div>
+              )}
+            </div>
+          </div>
+          <div className={`${glassCardClasses}`}>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-semibold">Invoices by Status</h2>
+            </div>
+            <div className="h-72 w-full">
+              {loadingFinance ? (
+                <Skeleton className="h-full w-full" />
+              ) : hasInvoiceStatusData ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={invoiceStatusData} dataKey="value" nameKey="name" outerRadius={100} label>
+                      {invoiceStatusData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Legend />
+                    <Tooltip formatter={(v)=>Number(v).toLocaleString()} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-sm text-zinc-500">No invoice data yet.</div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* Recent activity */}
+        <section className="grid gap-6 lg:grid-cols-2">
+          <div className={glassCardClasses}>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-semibold">Recent Invoices</h2>
+              <Link href={`/${subdomain}/finance/invoices`} className="text-sm underline">View all</Link>
+            </div>
+            <ul className="space-y-2 text-sm">
+              {(!financeStats?.recentInvoices?.length) && !loadingFinance && <li className="text-zinc-500">No recent invoices.</li>}
+              {(financeStats?.recentInvoices||[]).map(inv => (
+                <li key={inv.id} className="flex items-center justify-between border rounded-md px-3 py-2">
+                  <span>{inv.invoiceNumber || inv.id.slice(0,8)}</span>
+                  <span className="font-medium">GHS {Number(inv.totalAmount||0).toLocaleString()}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className={glassCardClasses}>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-semibold">Today</h2>
+              <div className="text-xs text-zinc-500">Payments & Expenses</div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-md border p-3">
+                <div className="text-xs text-zinc-500 mb-1">Payments</div>
+                <div className="text-xl font-semibold">{currency(financeStats?.payments?.today?.totalAmount)}</div>
+              </div>
+              <div className="rounded-md border p-3">
+                <div className="text-xs text-zinc-500 mb-1">Expenses</div>
+                <div className="text-xl font-semibold">{currency(financeStats?.expenses?.today?.totalAmount)}</div>
+              </div>
+            </div>
           </div>
         </section>
       </div>
