@@ -427,10 +427,16 @@ class _FeesTabState extends State<_FeesTab> {
   Key _contentKey = UniqueKey();
 
   @override
-  void initState() { super.initState(); _bootstrap(); }
+  void initState() {
+    super.initState();
+    _bootstrap();
+  }
 
   Future<void> _bootstrap() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final baseUrl = await _storage.read(key: 'baseUrl');
       final token = await _storage.read(key: 'token');
@@ -440,29 +446,49 @@ class _FeesTabState extends State<_FeesTab> {
       }
       final meRes = await http.get(
         Uri.parse('$baseUrl/api/schools/$schoolId/parents/me'),
-        headers: { 'Authorization': 'Bearer $token', 'Accept': 'application/json' },
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json'
+        },
       );
       if (meRes.statusCode != 200) {
         throw Exception('Profile failed (${meRes.statusCode})');
       }
       final meJson = jsonDecode(meRes.body) as Map<String, dynamic>;
-      _children = (meJson['children'] as List? ?? []).cast<Map<String, dynamic>>();
+      _children =
+          (meJson['children'] as List? ?? []).cast<Map<String, dynamic>>();
       if (_children.isNotEmpty) _selectedChild = _children.first;
-    } catch (e) { _error = e.toString(); } finally { setState(() { _loading = false; _contentKey = UniqueKey(); }); }
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      setState(() {
+        _loading = false;
+        _contentKey = UniqueKey();
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return Scaffold(appBar: AppBar(title: const Text('Fees')), body: const Center(child: CircularProgressIndicator()));
+      return Scaffold(
+          appBar: AppBar(title: const Text('Fees')),
+          body: const Center(child: CircularProgressIndicator()));
     }
     if (_error != null) {
-      return Scaffold(appBar: AppBar(title: const Text('Fees')), body: Center(child: Text(_error!, style: const TextStyle(color: Colors.red))));
+      return Scaffold(
+          appBar: AppBar(title: const Text('Fees')),
+          body: Center(
+              child: Text(_error!, style: const TextStyle(color: Colors.red))));
     }
     if (_selectedChild == null) {
-      return Scaffold(appBar: AppBar(title: const Text('Fees')), body: const Center(child: Text('No linked children')));
+      return Scaffold(
+          appBar: AppBar(title: const Text('Fees')),
+          body: const Center(child: Text('No linked children')));
     }
-    final name = '${_selectedChild!['firstName'] ?? ''} ${_selectedChild!['lastName'] ?? ''}'.trim();
+    final name =
+        '${_selectedChild!['firstName'] ?? ''} ${_selectedChild!['lastName'] ?? ''}'
+            .trim();
     final sid = _selectedChild!['id'].toString();
     return Scaffold(
       appBar: AppBar(title: const Text('Fees')),
@@ -478,12 +504,20 @@ class _FeesTabState extends State<_FeesTab> {
                   child: DropdownButtonFormField<String>(
                     value: _selectedChild?['id']?.toString(),
                     items: _children.map((c) {
-                      final cname = '${c['firstName'] ?? ''} ${c['lastName'] ?? ''}'.trim();
-                      return DropdownMenuItem(value: c['id'].toString(), child: Text(cname));
+                      final cname =
+                          '${c['firstName'] ?? ''} ${c['lastName'] ?? ''}'
+                              .trim();
+                      return DropdownMenuItem(
+                          value: c['id'].toString(), child: Text(cname));
                     }).toList(),
                     onChanged: (v) {
-                      final sel = _children.firstWhere((e) => e['id'].toString() == v, orElse: () => {});
-                      setState(() { _selectedChild = sel.isEmpty ? null : sel; _contentKey = UniqueKey(); });
+                      final sel = _children.firstWhere(
+                          (e) => e['id'].toString() == v,
+                          orElse: () => {});
+                      setState(() {
+                        _selectedChild = sel.isEmpty ? null : sel;
+                        _contentKey = UniqueKey();
+                      });
                     },
                     decoration: const InputDecoration(labelText: 'Child'),
                   ),
@@ -494,7 +528,8 @@ class _FeesTabState extends State<_FeesTab> {
           Expanded(
             child: KeyedSubtree(
               key: _contentKey,
-              child: FeesPage(studentId: sid, studentName: name, showTitle: false),
+              child:
+                  FeesPage(studentId: sid, studentName: name, showTitle: false),
             ),
           ),
         ],
