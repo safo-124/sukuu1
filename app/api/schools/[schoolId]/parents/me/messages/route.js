@@ -6,7 +6,8 @@ import { getApiSession } from '@/lib/apiAuth';
 export async function GET(request, { params }) {
   try {
     const session = await getApiSession(request);
-    const schoolId = params?.schoolId;
+    const p = await params;
+    const schoolId = p?.schoolId;
 
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (session.user.role !== 'PARENT') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -85,7 +86,8 @@ export async function GET(request, { params }) {
 export async function POST(request, { params }) {
   try {
     const session = await getApiSession(request);
-    const schoolId = params?.schoolId;
+    const p = await params;
+    const schoolId = p?.schoolId;
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (session.user.role !== 'PARENT') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     if (!schoolId || session.user.schoolId !== schoolId) return NextResponse.json({ error: 'Wrong school' }, { status: 403 });

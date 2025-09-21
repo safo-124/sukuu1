@@ -26,6 +26,8 @@ class _AttendancePageState extends State<AttendancePage> {
 
   String _filter = 'ALL'; // ALL, PRESENT, ABSENT, LATE, EXCUSED
   List<Map<String, dynamic>> _items = [];
+  final _ctrl = TextEditingController();
+  bool _sending = false;
 
   @override
   void initState() {
@@ -63,7 +65,7 @@ class _AttendancePageState extends State<AttendancePage> {
       final match = children
           .where((c) => c['studentId'].toString() == widget.studentId)
           .toList();
-      final att = match.isNotEmpty
+    final att = match.isNotEmpty
           ? ((match.first['attendance'] as List? ?? [])
               .cast<Map<String, dynamic>>())
           : <Map<String, dynamic>>[];
@@ -173,6 +175,9 @@ class _AttendancePageState extends State<AttendancePage> {
                                 : null;
                             final status = a['status']?.toString() ?? '-';
                             final remarks = a['remarks']?.toString() ?? '';
+                            final explanation = a['explanation'] as Map<String, dynamic>?;
+                            final explStatus = (explanation?['status']?.toString() ?? '').toUpperCase();
+                            final canExplain = status.toUpperCase() == 'ABSENT' && (explanation == null || (explStatus != 'ANSWERED'));
                             return Card(
                               margin: const EdgeInsets.symmetric(
                                   horizontal: 12, vertical: 6),
@@ -183,8 +188,33 @@ class _AttendancePageState extends State<AttendancePage> {
                                       color: Colors.teal),
                                 ),
                                 title: Text(status),
-                                subtitle: Text(
-                                    '${d != null ? df.format(d) : ''}${remarks.isNotEmpty ? ' • $remarks' : ''}'),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('${d != null ? df.format(d) : ''}${remarks.isNotEmpty ? ' • $remarks' : ''}'),
+                                    const SizedBox(height: 6),
+                                    Wrap(
+                                      crossAxisAlignment: WrapCrossAlignment.center,
+                                      spacing: 8,
+                                      runSpacing: 6,
+                                      children: [
+                                        _buildExplanationChip(explStatus, explanation),
+                                        if (canExplain)
+                                          TextButton(
+                                            onPressed: () => _openExplainDialog(a),
+                                            child: const Text('Explain'),
+                                          )
+                                        else if (explanation != null)
+                                          TextButton(
+                                            onPressed: () => _openExplainDialog(a, initialText: (explanation['responseText'] ?? '').toString()),
+                                            child: const Text('Edit'),
+                                          ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                // trailing handled within subtitle via action buttons
+                                trailing: null,
                               ),
                             );
                           },
@@ -193,6 +223,107 @@ class _AttendancePageState extends State<AttendancePage> {
                     ],
                   ),
                 ),
+    );
+  }
+
+  Future<void> _openExplainDialog(Map<String, dynamic> attendance, {String? initialText}) async {
+    _ctrl.text = initialText ?? '';
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(initialText == null || initialText.isEmpty ? 'Explain Absence' : 'Edit Explanation'),
+        content: TextField(
+          controller: _ctrl,
+          maxLines: 4,
+          decoration: const InputDecoration(hintText: 'Enter your explanation'),
+        ),
+        actions: [
+          TextButton(onPressed: _sending ? null : () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: _sending
+                ? null
+                : () async {
+                    final text = _ctrl.text.trim();
+                    if (text.isEmpty) {
+                      _showSnack('Please enter an explanation', false);
+                      return;
+                    }
+                    try {
+                      setState(() => _sending = true);
+                      final id = attendance['id']?.toString();
+                      if (id == null || id.isEmpty) {
+                        _showSnack('Invalid attendance item', false);
+                        return;
+                      }
+                      final url = '$_baseUrl/api/schools/$_schoolId/parents/me/attendance/$id/explanation/respond';
+                      final res = await http.post(Uri.parse(url),
+                          headers: {
+                            'Authorization': 'Bearer $_token',
+                            'Content-Type': 'application/json',
+                          },
+                          body: jsonEncode({'responseText': text}));
+                      if (res.statusCode >= 200 && res.statusCode < 300) {
+                        if (!mounted) return;
+                        Navigator.of(context).pop();
+                        _showSnack(initialText == null || initialText.isEmpty ? 'Explanation sent' : 'Explanation updated');
+                        await _load();
+                      } else {
+                        String msg = 'Failed (${res.statusCode})';
+                        try {
+                          final j = jsonDecode(res.body);
+                          msg = (j['message'] ?? j['error'] ?? msg).toString();
+                        } catch (_) {}
+                        _showSnack(msg, false);
+                      }
+                    } catch (e) {
+                      _showSnack('Error: ${e.toString()}', false);
+                    } finally {
+                      if (mounted) setState(() => _sending = false);
+                    }
+                  },
+            child: _sending
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : Text((initialText == null || initialText.isEmpty) ? 'Send' : 'Update'),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExplanationChip(String explStatus, Map<String, dynamic>? explanation) {
+    Color bg;
+    String label;
+    switch (explStatus) {
+      case 'REQUESTED':
+        bg = Colors.amber.shade600;
+        label = 'Explanation Requested';
+        break;
+      case 'ANSWERED':
+        bg = Colors.green.shade600;
+        label = 'Explanation Answered';
+        break;
+      default:
+        bg = Colors.grey.shade500;
+        label = 'No Explanation';
+    }
+    return Chip(
+      label: Text(label, style: const TextStyle(color: Colors.white)),
+      backgroundColor: bg,
+    );
+  }
+
+  void _showSnack(String message, [bool success = true]) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: success ? Colors.green.shade700 : Colors.red.shade700,
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 }

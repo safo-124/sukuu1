@@ -7,7 +7,8 @@ import { getApiSession } from '@/lib/apiAuth';
 export async function GET(request, { params }) {
   try {
     const session = await getApiSession(request);
-    const schoolId = params?.schoolId;
+    const p = await params;
+    const schoolId = p?.schoolId;
 
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

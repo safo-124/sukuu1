@@ -9,7 +9,8 @@ import { getApiSession } from '@/lib/apiAuth';
 export async function GET(request, { params }) {
   try {
     const session = await getApiSession(request);
-    const schoolId = params?.schoolId?.toString();
+    const p = await params;
+    const schoolId = p?.schoolId?.toString();
 
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (session.user.role !== 'PARENT') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -50,7 +51,9 @@ export async function GET(request, { params }) {
     // Fetch recent attendance for those enrollments (limit last 30 by date)
     const attendance = await prisma.attendance.findMany({
       where: { studentEnrollmentId: { in: enrollmentIds }, schoolId },
-      select: { id: true, studentEnrollmentId: true, date: true, status: true, remarks: true, sectionId: true },
+      select: { id: true, studentEnrollmentId: true, date: true, status: true, remarks: true, sectionId: true,
+        absenceExplanations: { select: { id: true, status: true, requestNote: true, responseText: true, createdAt: true, updatedAt: true }, orderBy: { createdAt: 'desc' }, take: 1 }
+      },
       orderBy: { date: 'desc' },
       take: 300, // approx 10 per child if 30 children, adjust as needed
     });
@@ -67,7 +70,10 @@ export async function GET(request, { params }) {
       const sid = enrollmentToStudent.get(a.studentEnrollmentId);
       const entry = byStudent.get(sid);
       if (entry) {
-        entry.attendance.push({ date: a.date, status: a.status, remarks: a.remarks, sectionId: a.sectionId });
+        const lastExp = (a.absenceExplanations && a.absenceExplanations[0]) || null;
+        entry.attendance.push({ id: a.id, date: a.date, status: a.status, remarks: a.remarks, sectionId: a.sectionId,
+          explanation: lastExp ? { id: lastExp.id, status: lastExp.status, requestNote: lastExp.requestNote, responseText: lastExp.responseText } : null
+        });
       }
     }
 

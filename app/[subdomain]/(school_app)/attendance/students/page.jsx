@@ -272,6 +272,9 @@ export default function ManageStudentAttendancePage() {
   const [editingAttendance, setEditingAttendance] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [askDialogOpen, setAskDialogOpen] = useState(false);
+  const [askNote, setAskNote] = useState('');
+  const [askTarget, setAskTarget] = useState(null);
 
   // Tailwind class constants
   const titleTextClasses = "text-black dark:text-white";
@@ -421,6 +424,21 @@ export default function ManageStudentAttendancePage() {
     } catch (err) { toast.error(`Deletion Failed: ${err.message}`, { id: toastId }); }
   };
 
+  const openAskDialog = (attendance) => { setAskTarget(attendance); setAskNote(''); setAskDialogOpen(true); };
+  const requestExplanation = async () => {
+    if (!schoolData?.id || !askTarget) return;
+    try {
+      const res = await fetch(`/api/schools/${schoolData.id}/attendance/students/${askTarget.id}/explanation/request`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ note: askNote || undefined })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      toast.success('Request sent');
+      setAskDialogOpen(false); setAskTarget(null); setAskNote('');
+      fetchStudentAttendances();
+    } catch (e) { toast.error('Failed to request explanation', { description: e.message }); }
+  };
+
   // --- Helper Functions for Display ---
   const getStudentName = useCallback((enrollmentId) => {
     const enrollment = studentEnrollments.find(e => e.id === enrollmentId);
@@ -497,6 +515,7 @@ export default function ManageStudentAttendancePage() {
               <TableHead className={`${titleTextClasses} font-semibold`}>Date</TableHead>
               <TableHead className={`${titleTextClasses} font-semibold text-center`}>Status</TableHead>
               <TableHead className={`${titleTextClasses} font-semibold hidden md:table-cell`}>Recorded By</TableHead>
+              <TableHead className={`${titleTextClasses} font-semibold`}>Explanation</TableHead>
               <TableHead className={`text-right ${titleTextClasses} font-semibold`}>Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -521,10 +540,20 @@ export default function ManageStudentAttendancePage() {
                 <TableCell className={`${descriptionTextClasses}`}>{formatDisplayDate(attendance.date)}</TableCell>
                 <TableCell className={`${descriptionTextClasses} text-center`}>{attendance.status}</TableCell>
                 <TableCell className={`${descriptionTextClasses} hidden md:table-cell`}>{attendance.takenBy?.firstName || ''} {attendance.takenBy?.lastName || ''}</TableCell>
+                <TableCell className={`${descriptionTextClasses}`}>
+                  {attendance.absenceExplanations?.length ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs border border-zinc-300 dark:border-zinc-700">
+                      {attendance.absenceExplanations[0].status}
+                    </span>
+                  ) : (
+                    <span className="text-zinc-500">—</span>
+                  )}
+                </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1 md:gap-2">
                     <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} onClick={() => openEditDialog(attendance)} title="Edit Attendance"> <Edit3 className="h-4 w-4" /> </Button>
                     <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8 border-red-300 text-red-600 hover:bg-red-100 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/50`} onClick={() => handleDelete(attendance.id)} title="Delete Attendance"> <Trash2 className="h-4 w-4" /> </Button>
+                    <Button variant="default" size="icon" className={`h-8 w-8`} onClick={() => openAskDialog(attendance)} title="Ask Parent"> <ClipboardList className="h-4 w-4" /> </Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -538,6 +567,22 @@ export default function ManageStudentAttendancePage() {
           </TableBody>
         </Table>
       </div>
+      <Dialog open={askDialogOpen} onOpenChange={setAskDialogOpen}>
+        <DialogContent className="bg-white dark:bg-zinc-900">
+          <DialogHeader>
+            <DialogTitle>Request Explanation</DialogTitle>
+            <DialogDescription>Optionally add a note for the parent.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Label className="text-sm">Note</Label>
+            <Textarea value={askNote} onChange={(e) => setAskNote(e.target.value)} rows={3} />
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <Button onClick={requestExplanation}>Send Request</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

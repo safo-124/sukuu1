@@ -9,7 +9,8 @@ import 'remarks_page.dart';
 import 'timetable_page.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final void Function(int index)? goToTab; // allow switching tabs from home quick actions
+  const HomePage({super.key, this.goToTab});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -35,6 +36,7 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> _recentGrades = [];
   List<Map<String, dynamic>> _recentAttendance = [];
   List<Map<String, dynamic>> _recentRemarks = [];
+  int _pendingExplanations = 0; // number of attendance items requesting explanation
 
   @override
   void initState() {
@@ -173,14 +175,14 @@ class _HomePageState extends State<HomePage> {
       if (res.statusCode != 200) {
         throw Exception('Failed to load attendance (${res.statusCode})');
       }
-      final data = jsonDecode(res.body) as Map<String, dynamic>;
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
       final children =
           (data['children'] as List? ?? []).cast<Map<String, dynamic>>();
       final match = children
           .where((c) =>
               c['studentId'].toString() == _selectedChild!['id'].toString())
           .toList();
-      final att = match.isNotEmpty
+    final att = match.isNotEmpty
           ? ((match.first['attendance'] as List? ?? [])
               .cast<Map<String, dynamic>>())
           : <Map<String, dynamic>>[];
@@ -192,7 +194,11 @@ class _HomePageState extends State<HomePage> {
         return db.compareTo(da);
       });
       setState(() {
-        _recentAttendance = att.take(5).toList();
+    _recentAttendance = att.take(5).toList();
+    _pendingExplanations = att
+      .where((e) => ((e['explanation'] as Map?)?['status']?.toString() ?? '')
+        .toUpperCase() == 'REQUESTED')
+      .length;
       });
     } catch (e) {
       setState(() {
@@ -388,121 +394,163 @@ class _HomePageState extends State<HomePage> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Quick Actions
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _QuickActionCard(
-                              color: Colors.indigo,
-                              icon: Icons.leaderboard_outlined,
-                              title: 'Grades',
-                              onTap: _selectedChild == null
-                                  ? null
-                                  : () {
-                                      final name =
-                                          '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
-                                              .trim();
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) => GradesPage(
-                                            studentId: _selectedChild!['id']
-                                                .toString(),
-                                            studentName:
-                                                name.isEmpty ? 'Student' : name,
-                                          ),
-                                        ),
-                                      );
-                                    },
+                      // Quick Actions (grid style)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _QuickActionCard(
+                                    color: Colors.indigo,
+                                    icon: Icons.leaderboard_outlined,
+                                    title: 'Grades',
+                                    onTap: _selectedChild == null
+                                        ? null
+                                        : () {
+                                            final name =
+                                                '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
+                                                    .trim();
+                                            Navigator.of(context).push(
+                                              MaterialPageRoute(
+                                                builder: (_) => GradesPage(
+                                                  studentId: _selectedChild!['id']
+                                                      .toString(),
+                                                  studentName: name.isEmpty
+                                                      ? 'Student'
+                                                      : name,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _QuickActionCard(
+                                    color: Colors.teal,
+                                    icon: Icons.calendar_month_outlined,
+                                    title: 'Attendance',
+                                    badgeCount: _pendingExplanations > 0
+                                        ? _pendingExplanations
+                                        : null,
+                                    onTap: _selectedChild == null
+                                        ? null
+                                        : () {
+                                            if (widget.goToTab != null) {
+                                              widget.goToTab!(2);
+                                            } else {
+                                              final name =
+                                                  '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
+                                                      .trim();
+                                              Navigator.of(context).push(
+                                                MaterialPageRoute(
+                                                  builder: (_) => AttendancePage(
+                                                    studentId:
+                                                        _selectedChild!['id']
+                                                            .toString(),
+                                                    studentName: name.isEmpty
+                                                        ? 'Student'
+                                                        : name,
+                                                  ),
+                                                ),
+                                              );
+                                            }
+                                          },
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _QuickActionCard(
-                              color: Colors.teal,
-                              icon: Icons.calendar_month_outlined,
-                              title: 'Attendance',
-                              onTap: _selectedChild == null
-                                  ? null
-                                  : () {
-                                      final name =
-                                          '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
-                                              .trim();
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) => AttendancePage(
-                                            studentId: _selectedChild!['id']
-                                                .toString(),
-                                            studentName:
-                                                name.isEmpty ? 'Student' : name,
-                                          ),
-                                        ),
-                                      );
-                                    },
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _QuickActionCard(
+                                    color: Colors.deepOrange,
+                                    icon: Icons.chat_bubble_outline,
+                                    title: 'Remarks',
+                                    onTap: _selectedChild == null
+                                        ? null
+                                        : () {
+                                            final name =
+                                                '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
+                                                    .trim();
+                                            Navigator.of(context).push(
+                                              MaterialPageRoute(
+                                                builder: (_) => RemarksPage(
+                                                  studentId: _selectedChild!['id']
+                                                      .toString(),
+                                                  studentName: name.isEmpty
+                                                      ? 'Student'
+                                                      : name,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _QuickActionCard(
+                                    color: Colors.deepPurple,
+                                    icon: Icons.schedule,
+                                    title: 'Timetable',
+                                    onTap: _selectedChild == null
+                                        ? null
+                                        : () {
+                                            final name =
+                                                '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
+                                                    .trim();
+                                            Navigator.of(context).push(
+                                              MaterialPageRoute(
+                                                builder: (_) => TimetablePage(
+                                                  studentId: _selectedChild!['id']
+                                                      .toString(),
+                                                  studentName: name.isEmpty
+                                                      ? 'Student'
+                                                      : name,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _QuickActionCard(
-                              color: Colors.deepOrange,
-                              icon: Icons.chat_bubble_outline,
-                              title: 'Remarks',
-                              onTap: _selectedChild == null
-                                  ? null
-                                  : () {
-                                      final name =
-                                          '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
-                                              .trim();
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) => RemarksPage(
-                                            studentId: _selectedChild!['id']
-                                                .toString(),
-                                            studentName:
-                                                name.isEmpty ? 'Student' : name,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _QuickActionCard(
-                              color: Colors.deepPurple,
-                              icon: Icons.schedule,
-                              title: 'Timetable',
-                              onTap: _selectedChild == null
-                                  ? null
-                                  : () {
-                                      final name =
-                                          '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
-                                              .trim();
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) => TimetablePage(
-                                            studentId: _selectedChild!['id']
-                                                .toString(),
-                                            studentName:
-                                                name.isEmpty ? 'Student' : name,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
 
                       const SizedBox(height: 20),
 
                       // Recent Grades
-                      Row(
-                        children: const [
-                          Icon(Icons.history, size: 18),
-                          SizedBox(width: 6),
-                          Text('Recent grades',
-                              style: TextStyle(fontWeight: FontWeight.w600)),
-                        ],
+                      _SectionHeader(
+                        icon: Icons.history,
+                        title: 'Recent grades',
+                        actionLabel: 'View all',
+                        onAction: _selectedChild == null
+                            ? null
+                            : () {
+                                if (widget.goToTab != null) {
+                                  widget.goToTab!(1); // Grades tab index
+                                } else {
+                                  final name =
+                                      '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
+                                          .trim();
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => GradesPage(
+                                        studentId:
+                                            _selectedChild!['id'].toString(),
+                                        studentName: name.isEmpty
+                                            ? 'Student'
+                                            : name,
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
                       ),
                       const SizedBox(height: 8),
                       if (_loadingGrades)
@@ -525,18 +573,44 @@ class _HomePageState extends State<HomePage> {
                             : null;
                         final marks = g['marksObtained']?.toString() ?? '-';
                         return Card(
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: Colors.indigo.shade50,
-                              child: const Icon(Icons.book_outlined,
-                                  color: Colors.indigo),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  backgroundColor: Colors.indigo.shade50,
+                                  child: const Icon(Icons.book_outlined,
+                                      color: Colors.indigo),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(subject.toString(),
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w600)),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '${examName.toString()} • ${date != null ? df.format(date) : ''}',
+                                        style: const TextStyle(color: Colors.black54),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.indigo.shade600,
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text(marks,
+                                      style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold)),
+                                ),
+                              ],
                             ),
-                            title: Text(subject.toString()),
-                            subtitle: Text(
-                                '${examName.toString()} • ${date != null ? df.format(date) : ''}'),
-                            trailing: Text(marks,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold)),
                           ),
                         );
                       }),
@@ -544,13 +618,32 @@ class _HomePageState extends State<HomePage> {
                       const SizedBox(height: 20),
 
                       // Recent Attendance
-                      Row(
-                        children: const [
-                          Icon(Icons.calendar_month_outlined, size: 18),
-                          SizedBox(width: 6),
-                          Text('Recent attendance',
-                              style: TextStyle(fontWeight: FontWeight.w600)),
-                        ],
+                      _SectionHeader(
+                        icon: Icons.calendar_month_outlined,
+                        title: 'Recent attendance',
+                        actionLabel: 'View all',
+                        onAction: _selectedChild == null
+                            ? null
+                            : () {
+                                if (widget.goToTab != null) {
+                                  widget.goToTab!(2);
+                                } else {
+                                  final name =
+                                      '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
+                                          .trim();
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => AttendancePage(
+                                        studentId:
+                                            _selectedChild!['id'].toString(),
+                                        studentName: name.isEmpty
+                                            ? 'Student'
+                                            : name,
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
                       ),
                       const SizedBox(height: 8),
                       if (_loadingAttendance)
@@ -568,30 +661,91 @@ class _HomePageState extends State<HomePage> {
                             : null;
                         final status = a['status']?.toString() ?? '-';
                         final remarks = a['remarks']?.toString() ?? '';
+                        final explanation = a['explanation'] as Map?;
+                        final explStatus =
+                            (explanation?['status']?.toString() ?? '')
+                                .toUpperCase();
                         return Card(
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: Colors.teal.shade50,
-                              child: const Icon(Icons.check_circle_outline,
-                                  color: Colors.teal),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                CircleAvatar(
+                                  backgroundColor: Colors.teal.shade50,
+                                  child: const Icon(Icons.check_circle_outline,
+                                      color: Colors.teal),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          _chip(status, _statusColor(status)),
+                                          const SizedBox(width: 8),
+                                          if (explStatus == 'REQUESTED')
+                                            _chip('Explanation requested', Colors.amber.shade700),
+                                          if (explStatus == 'ANSWERED')
+                                            _chip('Explained', Colors.green.shade700),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text('${d != null ? df.format(d) : ''}${remarks.isNotEmpty ? ' • $remarks' : ''}',
+                                          style: const TextStyle(color: Colors.black87)),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
-                            title: Text(status),
-                            subtitle: Text(
-                                '${d != null ? df.format(d) : ''}${remarks.isNotEmpty ? ' • $remarks' : ''}'),
                           ),
-                        );
+                        ).onTap(() {
+                              // Tapping recent attendance navigates to the Attendance tab
+                              if (widget.goToTab != null) {
+                                widget.goToTab!(2);
+                              } else {
+                                final name =
+                                    '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
+                                        .trim();
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => AttendancePage(
+                                      studentId: _selectedChild!['id']
+                                          .toString(),
+                                      studentName:
+                                          name.isEmpty ? 'Student' : name,
+                                    ),
+                                  ),
+                                );
+                              }
+                            });
                       }),
 
                       const SizedBox(height: 20),
 
                       // Recent Remarks
-                      Row(
-                        children: const [
-                          Icon(Icons.chat_bubble_outline, size: 18),
-                          SizedBox(width: 6),
-                          Text('Recent remarks',
-                              style: TextStyle(fontWeight: FontWeight.w600)),
-                        ],
+                      _SectionHeader(
+                        icon: Icons.chat_bubble_outline,
+                        title: 'Recent remarks',
+                        actionLabel: _selectedChild == null ? null : 'View all',
+                        onAction: _selectedChild == null
+                            ? null
+                            : () {
+                                final name =
+                                    '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
+                                        .trim();
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => RemarksPage(
+                                      studentId:
+                                          _selectedChild!['id'].toString(),
+                                      studentName:
+                                          name.isEmpty ? 'Student' : name,
+                                    ),
+                                  ),
+                                );
+                              },
                       ),
                       const SizedBox(height: 8),
                       if (_loadingRemarks)
@@ -612,22 +766,73 @@ class _HomePageState extends State<HomePage> {
                             ? DateTime.tryParse(dateStr)
                             : null;
                         return Card(
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: Colors.deepOrange.shade50,
-                              child: const Icon(Icons.chat_bubble_outline,
-                                  color: Colors.deepOrange),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                CircleAvatar(
+                                  backgroundColor: Colors.deepOrange.shade50,
+                                  child: const Icon(Icons.chat_bubble_outline,
+                                      color: Colors.deepOrange),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(subject.isNotEmpty ? subject : 'Remark',
+                                          style: const TextStyle(fontWeight: FontWeight.w600)),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        [src, if (name.isNotEmpty) name, if (d != null) df.format(d)].join(' • '),
+                                        style: const TextStyle(color: Colors.black54),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        comment,
+                                        maxLines: 3,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
-                            title:
-                                Text(subject.isNotEmpty ? subject : 'Remark'),
-                            subtitle: Text(
-                                '${src}${name.isNotEmpty ? ' • $name' : ''}${d != null ? ' • ${df.format(d)}' : ''}\n$comment'),
                           ),
                         );
                       }),
                     ],
                   ),
                 ),
+    );
+  }
+
+  // Helper widgets and styles
+  Color _statusColor(String status) {
+    switch (status.toUpperCase()) {
+      case 'PRESENT':
+        return Colors.green.shade700;
+      case 'ABSENT':
+        return Colors.red.shade700;
+      case 'LATE':
+        return Colors.orange.shade700;
+      case 'EXCUSED':
+        return Colors.blueGrey.shade700;
+      default:
+        return Colors.grey.shade600;
+    }
+  }
+
+  Widget _chip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(label,
+          style: const TextStyle(color: Colors.white, fontSize: 12)),
     );
   }
 }
@@ -658,11 +863,13 @@ class _QuickActionCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final VoidCallback? onTap;
+  final int? badgeCount;
   const _QuickActionCard({
     required this.color,
     required this.icon,
     required this.title,
     this.onTap,
+    this.badgeCount,
   });
 
   @override
@@ -694,7 +901,30 @@ class _QuickActionCard extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, color: Colors.white),
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(icon, color: Colors.white),
+                    if (badgeCount != null && (badgeCount ?? 0) > 0)
+                      Positioned(
+                        right: -8,
+                        top: -8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: const BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.all(Radius.circular(10))),
+                          constraints: const BoxConstraints(minWidth: 16),
+                          child: Text('${(badgeCount! > 99) ? 99 : badgeCount}',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                  ],
+                ),
                 const SizedBox(height: 6),
                 Text(title,
                     style: const TextStyle(
@@ -706,6 +936,46 @@ class _QuickActionCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  const _SectionHeader({
+    required this.icon,
+    required this.title,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          Icon(icon, size: 18),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(title,
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+          ),
+          if (actionLabel != null && onAction != null)
+            TextButton(onPressed: onAction, child: Text(actionLabel!)),
+        ],
+      ),
+    );
+  }
+}
+
+// Tiny extension to add onTap to any widget easily
+extension _InkOnTap on Widget {
+  Widget onTap(VoidCallback onTap) => Material(
+        color: Colors.transparent,
+        child: InkWell(onTap: onTap, child: this),
+      );
 }
 
 class _ChildSelectorCard extends StatelessWidget {

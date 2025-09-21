@@ -43,6 +43,14 @@ enum AttendanceStatus {
   EXCUSED
 }
 
+// Parent absence explanation workflow
+enum AbsenceExplanationStatus {
+  NONE        // no request initiated
+  REQUESTED   // teacher/admin requested explanation
+  ANSWERED    // parent responded
+  CLOSED      // closed by staff
+}
+
 enum FeeFrequency {
   ONE_TIME
   MONTHLY
@@ -210,6 +218,7 @@ model School {
   roomUnavailabilities       RoomUnavailability[]
   pinnedTimetableSlots       PinnedTimetableSlot[]
   timetableRuns              TimetableRun[]
+  absenceExplanations        AbsenceExplanation[]
 
   @@index([subdomain])
   @@index([customDomain])
@@ -243,6 +252,7 @@ model User {
   gradesPublished         Grade[]           @relation("GradePublishedBy")
   inventoryTransactionsPerformed InventoryTransaction[] @relation("InventoryTransactionsPerformed")
   announcementReads AnnouncementRead[]
+  absenceExplanationsRequested AbsenceExplanation[] @relation("AbsenceRequestedBy")
 
   @@index([email])
   @@index([schoolId])
@@ -260,6 +270,7 @@ model Parent {
   schoolId String
   school   School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   announcementReads AnnouncementRead[]
+  absenceExplanationsResponded AbsenceExplanation[] @relation("AbsenceRespondedBy")
 
   @@index([userId])
   @@index([schoolId])
@@ -629,6 +640,9 @@ model Attendance {
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
 
+  // Relationship: one attendance can have one active absence explanation thread
+  absenceExplanations AbsenceExplanation[]
+
   @@unique([studentEnrollmentId, date])
   @@unique([sectionId, date, studentEnrollmentId], map: "UQ_Attendance_Section_Date_Enrollment")
   @@index([schoolId, date])
@@ -652,6 +666,26 @@ model StaffAttendance {
   @@unique([staffId, date])
   @@index([schoolId, date])
   @@index([takenById])
+}
+
+model AbsenceExplanation {
+  id             String                     @id @default(cuid())
+  attendanceId   String
+  attendance     Attendance                  @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  schoolId       String
+  school         School                      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  status         AbsenceExplanationStatus    @default(REQUESTED)
+  requestNote    String?                     @db.Text
+  requestedById  String?                     // userId of teacher/admin who requested
+  requestedBy    User?                       @relation("AbsenceRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+  responseText   String?                     @db.Text
+  respondedById  String?                     // parentId responding
+  respondedBy    Parent?                     @relation("AbsenceRespondedBy", fields: [respondedById], references: [id], onDelete: SetNull)
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
+
+  @@index([attendanceId])
+  @@index([schoolId])
 }
 
 // --------------------

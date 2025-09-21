@@ -87,7 +87,8 @@ export async function GET(request, { params }) {
           },
           takenBy: {
             select: { id: true, firstName: true, lastName: true, email: true }
-          }
+          },
+          absenceExplanations: { select: { id: true, status: true, createdAt: true, updatedAt: true }, orderBy: { createdAt: 'desc' }, take: 1 }
         },
         orderBy: [
           { date: 'desc' },
