@@ -9,7 +9,8 @@ import 'remarks_page.dart';
 import 'timetable_page.dart';
 
 class HomePage extends StatefulWidget {
-  final void Function(int index)? goToTab; // allow switching tabs from home quick actions
+  final void Function(int index)?
+      goToTab; // allow switching tabs from home quick actions
   const HomePage({super.key, this.goToTab});
 
   @override
@@ -36,7 +37,8 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> _recentGrades = [];
   List<Map<String, dynamic>> _recentAttendance = [];
   List<Map<String, dynamic>> _recentRemarks = [];
-  int _pendingExplanations = 0; // number of attendance items requesting explanation
+  int _pendingExplanations =
+      0; // number of attendance items requesting explanation
 
   @override
   void initState() {
@@ -175,14 +177,14 @@ class _HomePageState extends State<HomePage> {
       if (res.statusCode != 200) {
         throw Exception('Failed to load attendance (${res.statusCode})');
       }
-    final data = jsonDecode(res.body) as Map<String, dynamic>;
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
       final children =
           (data['children'] as List? ?? []).cast<Map<String, dynamic>>();
       final match = children
           .where((c) =>
               c['studentId'].toString() == _selectedChild!['id'].toString())
           .toList();
-    final att = match.isNotEmpty
+      final att = match.isNotEmpty
           ? ((match.first['attendance'] as List? ?? [])
               .cast<Map<String, dynamic>>())
           : <Map<String, dynamic>>[];
@@ -194,11 +196,13 @@ class _HomePageState extends State<HomePage> {
         return db.compareTo(da);
       });
       setState(() {
-    _recentAttendance = att.take(5).toList();
-    _pendingExplanations = att
-      .where((e) => ((e['explanation'] as Map?)?['status']?.toString() ?? '')
-        .toUpperCase() == 'REQUESTED')
-      .length;
+        _recentAttendance = att.take(5).toList();
+        _pendingExplanations = att
+            .where((e) =>
+                ((e['explanation'] as Map?)?['status']?.toString() ?? '')
+                    .toUpperCase() ==
+                'REQUESTED')
+            .length;
       });
     } catch (e) {
       setState(() {
@@ -415,8 +419,9 @@ class _HomePageState extends State<HomePage> {
                                             Navigator.of(context).push(
                                               MaterialPageRoute(
                                                 builder: (_) => GradesPage(
-                                                  studentId: _selectedChild!['id']
-                                                      .toString(),
+                                                  studentId:
+                                                      _selectedChild!['id']
+                                                          .toString(),
                                                   studentName: name.isEmpty
                                                       ? 'Student'
                                                       : name,
@@ -446,7 +451,8 @@ class _HomePageState extends State<HomePage> {
                                                       .trim();
                                               Navigator.of(context).push(
                                                 MaterialPageRoute(
-                                                  builder: (_) => AttendancePage(
+                                                  builder: (_) =>
+                                                      AttendancePage(
                                                     studentId:
                                                         _selectedChild!['id']
                                                             .toString(),
@@ -479,8 +485,9 @@ class _HomePageState extends State<HomePage> {
                                             Navigator.of(context).push(
                                               MaterialPageRoute(
                                                 builder: (_) => RemarksPage(
-                                                  studentId: _selectedChild!['id']
-                                                      .toString(),
+                                                  studentId:
+                                                      _selectedChild!['id']
+                                                          .toString(),
                                                   studentName: name.isEmpty
                                                       ? 'Student'
                                                       : name,
@@ -505,8 +512,9 @@ class _HomePageState extends State<HomePage> {
                                             Navigator.of(context).push(
                                               MaterialPageRoute(
                                                 builder: (_) => TimetablePage(
-                                                  studentId: _selectedChild!['id']
-                                                      .toString(),
+                                                  studentId:
+                                                      _selectedChild!['id']
+                                                          .toString(),
                                                   studentName: name.isEmpty
                                                       ? 'Student'
                                                       : name,
@@ -543,9 +551,8 @@ class _HomePageState extends State<HomePage> {
                                       builder: (_) => GradesPage(
                                         studentId:
                                             _selectedChild!['id'].toString(),
-                                        studentName: name.isEmpty
-                                            ? 'Student'
-                                            : name,
+                                        studentName:
+                                            name.isEmpty ? 'Student' : name,
                                       ),
                                     ),
                                   );
@@ -585,7 +592,8 @@ class _HomePageState extends State<HomePage> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(subject.toString(),
                                           style: const TextStyle(
@@ -593,13 +601,15 @@ class _HomePageState extends State<HomePage> {
                                       const SizedBox(height: 4),
                                       Text(
                                         '${examName.toString()} • ${date != null ? df.format(date) : ''}',
-                                        style: const TextStyle(color: Colors.black54),
+                                        style: const TextStyle(
+                                            color: Colors.black54),
                                       ),
                                     ],
                                   ),
                                 ),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 6),
                                   decoration: BoxDecoration(
                                     color: Colors.indigo.shade600,
                                     borderRadius: BorderRadius.circular(999),
@@ -636,9 +646,8 @@ class _HomePageState extends State<HomePage> {
                                       builder: (_) => AttendancePage(
                                         studentId:
                                             _selectedChild!['id'].toString(),
-                                        studentName: name.isEmpty
-                                            ? 'Student'
-                                            : name,
+                                        studentName:
+                                            name.isEmpty ? 'Student' : name,
                                       ),
                                     ),
                                   );
@@ -679,21 +688,26 @@ class _HomePageState extends State<HomePage> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
                                           _chip(status, _statusColor(status)),
                                           const SizedBox(width: 8),
                                           if (explStatus == 'REQUESTED')
-                                            _chip('Explanation requested', Colors.amber.shade700),
+                                            _chip('Explanation requested',
+                                                Colors.amber.shade700),
                                           if (explStatus == 'ANSWERED')
-                                            _chip('Explained', Colors.green.shade700),
+                                            _chip('Explained',
+                                                Colors.green.shade700),
                                         ],
                                       ),
                                       const SizedBox(height: 6),
-                                      Text('${d != null ? df.format(d) : ''}${remarks.isNotEmpty ? ' • $remarks' : ''}',
-                                          style: const TextStyle(color: Colors.black87)),
+                                      Text(
+                                          '${d != null ? df.format(d) : ''}${remarks.isNotEmpty ? ' • $remarks' : ''}',
+                                          style: const TextStyle(
+                                              color: Colors.black87)),
                                     ],
                                   ),
                                 ),
@@ -701,25 +715,23 @@ class _HomePageState extends State<HomePage> {
                             ),
                           ),
                         ).onTap(() {
-                              // Tapping recent attendance navigates to the Attendance tab
-                              if (widget.goToTab != null) {
-                                widget.goToTab!(2);
-                              } else {
-                                final name =
-                                    '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
-                                        .trim();
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => AttendancePage(
-                                      studentId: _selectedChild!['id']
-                                          .toString(),
-                                      studentName:
-                                          name.isEmpty ? 'Student' : name,
-                                    ),
-                                  ),
-                                );
-                              }
-                            });
+                          // Tapping recent attendance navigates to the Attendance tab
+                          if (widget.goToTab != null) {
+                            widget.goToTab!(2);
+                          } else {
+                            final name =
+                                '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
+                                    .trim();
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => AttendancePage(
+                                  studentId: _selectedChild!['id'].toString(),
+                                  studentName: name.isEmpty ? 'Student' : name,
+                                ),
+                              ),
+                            );
+                          }
+                        });
                       }),
 
                       const SizedBox(height: 20),
@@ -779,14 +791,24 @@ class _HomePageState extends State<HomePage> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      Text(subject.isNotEmpty ? subject : 'Remark',
-                                          style: const TextStyle(fontWeight: FontWeight.w600)),
+                                      Text(
+                                          subject.isNotEmpty
+                                              ? subject
+                                              : 'Remark',
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w600)),
                                       const SizedBox(height: 4),
                                       Text(
-                                        [src, if (name.isNotEmpty) name, if (d != null) df.format(d)].join(' • '),
-                                        style: const TextStyle(color: Colors.black54),
+                                        [
+                                          src,
+                                          if (name.isNotEmpty) name,
+                                          if (d != null) df.format(d)
+                                        ].join(' • '),
+                                        style: const TextStyle(
+                                            color: Colors.black54),
                                       ),
                                       const SizedBox(height: 6),
                                       Text(
@@ -910,10 +932,12 @@ class _QuickActionCard extends StatelessWidget {
                         right: -8,
                         top: -8,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
                           decoration: const BoxDecoration(
                               color: Colors.red,
-                              borderRadius: BorderRadius.all(Radius.circular(10))),
+                              borderRadius:
+                                  BorderRadius.all(Radius.circular(10))),
                           constraints: const BoxConstraints(minWidth: 16),
                           child: Text('${(badgeCount! > 99) ? 99 : badgeCount}',
                               textAlign: TextAlign.center,

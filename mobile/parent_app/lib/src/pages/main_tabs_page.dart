@@ -200,7 +200,8 @@ class _GradesTabState extends State<_GradesTab> {
     if (_error != null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Grades')),
-        body: Center(child: Text(_error!, style: const TextStyle(color: Colors.red))),
+        body: Center(
+            child: Text(_error!, style: const TextStyle(color: Colors.red))),
       );
     }
     if (_selectedChild == null) {
@@ -209,7 +210,9 @@ class _GradesTabState extends State<_GradesTab> {
         body: const Center(child: Text('No linked children')),
       );
     }
-    final name = '${_selectedChild!['firstName'] ?? ''} ${_selectedChild!['lastName'] ?? ''}'.trim();
+    final name =
+        '${_selectedChild!['firstName'] ?? ''} ${_selectedChild!['lastName'] ?? ''}'
+            .trim();
     final sid = _selectedChild!['id'].toString();
     return Scaffold(
       appBar: AppBar(title: const Text('Grades')),
@@ -225,7 +228,9 @@ class _GradesTabState extends State<_GradesTab> {
                   child: DropdownButtonFormField<String>(
                     value: _selectedChild?['id']?.toString(),
                     items: _children.map((c) {
-                      final cname = '${c['firstName'] ?? ''} ${c['lastName'] ?? ''}'.trim();
+                      final cname =
+                          '${c['firstName'] ?? ''} ${c['lastName'] ?? ''}'
+                              .trim();
                       return DropdownMenuItem(
                           value: c['id'].toString(), child: Text(cname));
                     }).toList(),
@@ -336,7 +341,8 @@ class _AttendanceTabState extends State<_AttendanceTab> {
     if (_error != null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Attendance')),
-        body: Center(child: Text(_error!, style: const TextStyle(color: Colors.red))),
+        body: Center(
+            child: Text(_error!, style: const TextStyle(color: Colors.red))),
       );
     }
     if (_selectedChild == null) {
@@ -345,7 +351,9 @@ class _AttendanceTabState extends State<_AttendanceTab> {
         body: const Center(child: Text('No linked children')),
       );
     }
-    final name = '${_selectedChild!['firstName'] ?? ''} ${_selectedChild!['lastName'] ?? ''}'.trim();
+    final name =
+        '${_selectedChild!['firstName'] ?? ''} ${_selectedChild!['lastName'] ?? ''}'
+            .trim();
     final sid = _selectedChild!['id'].toString();
     return Scaffold(
       appBar: AppBar(title: const Text('Attendance')),
@@ -361,7 +369,9 @@ class _AttendanceTabState extends State<_AttendanceTab> {
                   child: DropdownButtonFormField<String>(
                     value: _selectedChild?['id']?.toString(),
                     items: _children.map((c) {
-                      final cname = '${c['firstName'] ?? ''} ${c['lastName'] ?? ''}'.trim();
+                      final cname =
+                          '${c['firstName'] ?? ''} ${c['lastName'] ?? ''}'
+                              .trim();
                       return DropdownMenuItem(
                           value: c['id'].toString(), child: Text(cname));
                     }).toList(),

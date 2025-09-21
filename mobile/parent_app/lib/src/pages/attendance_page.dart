@@ -65,7 +65,7 @@ class _AttendancePageState extends State<AttendancePage> {
       final match = children
           .where((c) => c['studentId'].toString() == widget.studentId)
           .toList();
-    final att = match.isNotEmpty
+      final att = match.isNotEmpty
           ? ((match.first['attendance'] as List? ?? [])
               .cast<Map<String, dynamic>>())
           : <Map<String, dynamic>>[];
@@ -175,9 +175,15 @@ class _AttendancePageState extends State<AttendancePage> {
                                 : null;
                             final status = a['status']?.toString() ?? '-';
                             final remarks = a['remarks']?.toString() ?? '';
-                            final explanation = a['explanation'] as Map<String, dynamic>?;
-                            final explStatus = (explanation?['status']?.toString() ?? '').toUpperCase();
-                            final canExplain = status.toUpperCase() == 'ABSENT' && (explanation == null || (explStatus != 'ANSWERED'));
+                            final explanation =
+                                a['explanation'] as Map<String, dynamic>?;
+                            final explStatus =
+                                (explanation?['status']?.toString() ?? '')
+                                    .toUpperCase();
+                            final canExplain =
+                                status.toUpperCase() == 'ABSENT' &&
+                                    (explanation == null ||
+                                        (explStatus != 'ANSWERED'));
                             return Card(
                               margin: const EdgeInsets.symmetric(
                                   horizontal: 12, vertical: 6),
@@ -191,22 +197,31 @@ class _AttendancePageState extends State<AttendancePage> {
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('${d != null ? df.format(d) : ''}${remarks.isNotEmpty ? ' • $remarks' : ''}'),
+                                    Text(
+                                        '${d != null ? df.format(d) : ''}${remarks.isNotEmpty ? ' • $remarks' : ''}'),
                                     const SizedBox(height: 6),
                                     Wrap(
-                                      crossAxisAlignment: WrapCrossAlignment.center,
+                                      crossAxisAlignment:
+                                          WrapCrossAlignment.center,
                                       spacing: 8,
                                       runSpacing: 6,
                                       children: [
-                                        _buildExplanationChip(explStatus, explanation),
+                                        _buildExplanationChip(
+                                            explStatus, explanation),
                                         if (canExplain)
                                           TextButton(
-                                            onPressed: () => _openExplainDialog(a),
+                                            onPressed: () =>
+                                                _openExplainDialog(a),
                                             child: const Text('Explain'),
                                           )
                                         else if (explanation != null)
                                           TextButton(
-                                            onPressed: () => _openExplainDialog(a, initialText: (explanation['responseText'] ?? '').toString()),
+                                            onPressed: () => _openExplainDialog(
+                                                a,
+                                                initialText: (explanation[
+                                                            'responseText'] ??
+                                                        '')
+                                                    .toString()),
                                             child: const Text('Edit'),
                                           ),
                                       ],
@@ -226,19 +241,24 @@ class _AttendancePageState extends State<AttendancePage> {
     );
   }
 
-  Future<void> _openExplainDialog(Map<String, dynamic> attendance, {String? initialText}) async {
+  Future<void> _openExplainDialog(Map<String, dynamic> attendance,
+      {String? initialText}) async {
     _ctrl.text = initialText ?? '';
     await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(initialText == null || initialText.isEmpty ? 'Explain Absence' : 'Edit Explanation'),
+        title: Text(initialText == null || initialText.isEmpty
+            ? 'Explain Absence'
+            : 'Edit Explanation'),
         content: TextField(
           controller: _ctrl,
           maxLines: 4,
           decoration: const InputDecoration(hintText: 'Enter your explanation'),
         ),
         actions: [
-          TextButton(onPressed: _sending ? null : () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+          TextButton(
+              onPressed: _sending ? null : () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel')),
           FilledButton(
             onPressed: _sending
                 ? null
@@ -255,7 +275,8 @@ class _AttendancePageState extends State<AttendancePage> {
                         _showSnack('Invalid attendance item', false);
                         return;
                       }
-                      final url = '$_baseUrl/api/schools/$_schoolId/parents/me/attendance/$id/explanation/respond';
+                      final url =
+                          '$_baseUrl/api/schools/$_schoolId/parents/me/attendance/$id/explanation/respond';
                       final res = await http.post(Uri.parse(url),
                           headers: {
                             'Authorization': 'Bearer $_token',
@@ -265,7 +286,9 @@ class _AttendancePageState extends State<AttendancePage> {
                       if (res.statusCode >= 200 && res.statusCode < 300) {
                         if (!mounted) return;
                         Navigator.of(context).pop();
-                        _showSnack(initialText == null || initialText.isEmpty ? 'Explanation sent' : 'Explanation updated');
+                        _showSnack(initialText == null || initialText.isEmpty
+                            ? 'Explanation sent'
+                            : 'Explanation updated');
                         await _load();
                       } else {
                         String msg = 'Failed (${res.statusCode})';
@@ -285,16 +308,20 @@ class _AttendancePageState extends State<AttendancePage> {
                 ? const SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
                   )
-                : Text((initialText == null || initialText.isEmpty) ? 'Send' : 'Update'),
+                : Text((initialText == null || initialText.isEmpty)
+                    ? 'Send'
+                    : 'Update'),
           )
         ],
       ),
     );
   }
 
-  Widget _buildExplanationChip(String explStatus, Map<String, dynamic>? explanation) {
+  Widget _buildExplanationChip(
+      String explStatus, Map<String, dynamic>? explanation) {
     Color bg;
     String label;
     switch (explStatus) {
