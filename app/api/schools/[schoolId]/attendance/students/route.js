@@ -9,7 +9,7 @@ import { schoolIdSchema, createStudentAttendanceSchema } from '@/validators/acad
 // GET /api/schools/[schoolId]/attendance/students
 // Fetches all student attendance records for a specific school
 export async function GET(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId } = await params;
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'TEACHER' && session.user?.role !== 'SECRETARY')) {
@@ -131,7 +131,7 @@ export async function GET(request, { params }) {
 // POST /api/schools/[schoolId]/attendance/students
 // Creates a new student attendance record
 export async function POST(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId } = await params;
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'TEACHER' && session.user?.role !== 'SECRETARY')) {

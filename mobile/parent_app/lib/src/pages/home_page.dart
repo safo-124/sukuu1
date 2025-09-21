@@ -479,6 +479,11 @@ class _HomePageState extends State<HomePage> {
                                     onTap: _selectedChild == null
                                         ? null
                                         : () {
+                                            // If there's a Messages tab (index 3), prefer switching to it
+                                            if (widget.goToTab != null) {
+                                              widget.goToTab!(3);
+                                              return;
+                                            }
                                             final name =
                                                 '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
                                                     .trim();
@@ -563,10 +568,17 @@ class _HomePageState extends State<HomePage> {
                       if (_loadingGrades)
                         const LinearProgressIndicator(minHeight: 2),
                       if (_recentGrades.isEmpty && !_loadingGrades)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                          child: Text('No grades yet',
-                              style: TextStyle(color: Colors.black54)),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          child: Column(
+                            children: const [
+                              Icon(Icons.school_outlined,
+                                  size: 34, color: Colors.black26),
+                              SizedBox(height: 6),
+                              Text('No grades yet',
+                                  style: TextStyle(color: Colors.black54)),
+                            ],
+                          ),
                         ),
                       ..._recentGrades.map((g) {
                         final subject =
@@ -658,10 +670,17 @@ class _HomePageState extends State<HomePage> {
                       if (_loadingAttendance)
                         const LinearProgressIndicator(minHeight: 2),
                       if (_recentAttendance.isEmpty && !_loadingAttendance)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                          child: Text('No attendance yet',
-                              style: TextStyle(color: Colors.black54)),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          child: Column(
+                            children: const [
+                              Icon(Icons.event_busy_outlined,
+                                  size: 34, color: Colors.black26),
+                              SizedBox(height: 6),
+                              Text('No attendance yet',
+                                  style: TextStyle(color: Colors.black54)),
+                            ],
+                          ),
                         ),
                       ..._recentAttendance.map((a) {
                         final dateStr = a['date']?.toString();
@@ -744,6 +763,11 @@ class _HomePageState extends State<HomePage> {
                         onAction: _selectedChild == null
                             ? null
                             : () {
+                                if (widget.goToTab != null) {
+                                  // Remarks are shown under Messages tab in this app
+                                  widget.goToTab!(3);
+                                  return;
+                                }
                                 final name =
                                     '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
                                         .trim();
@@ -763,10 +787,17 @@ class _HomePageState extends State<HomePage> {
                       if (_loadingRemarks)
                         const LinearProgressIndicator(minHeight: 2),
                       if (_recentRemarks.isEmpty && !_loadingRemarks)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                          child: Text('No remarks yet',
-                              style: TextStyle(color: Colors.black54)),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          child: Column(
+                            children: const [
+                              Icon(Icons.chat_bubble_outline,
+                                  size: 34, color: Colors.black26),
+                              SizedBox(height: 6),
+                              Text('No remarks yet',
+                                  style: TextStyle(color: Colors.black54)),
+                            ],
+                          ),
                         ),
                       ..._recentRemarks.map((r) {
                         final comment = r['comment']?.toString() ?? '';
@@ -859,26 +890,7 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class _Header extends StatelessWidget {
-  final List<Map<String, dynamic>> children;
-  final String? selectedChildId;
-  final void Function(String id) onChildChanged;
-
-  const _Header({
-    required this.children,
-    required this.selectedChildId,
-    required this.onChildChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return _ChildSelectorCard(
-      children: children,
-      selectedChildId: selectedChildId,
-      onChildChanged: onChildChanged,
-    );
-  }
-}
+// Removed unused _Header widget (inlined child selector above)
 
 class _QuickActionCard extends StatelessWidget {
   final Color color;

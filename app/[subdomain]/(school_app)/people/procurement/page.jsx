@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import Link from "next/link";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
@@ -81,6 +82,7 @@ export default function ProcurementOfficersPage() {
             onChange={e => setQuery(e.target.value)}
             className="w-56"
           />
+          <Link href={`/${subdomain}/dashboard/procurement`} className="text-sm underline text-primary">Dashboard</Link>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button size="sm" variant="outline">Add Officer</Button>
@@ -163,9 +165,14 @@ export default function ProcurementOfficersPage() {
       {!loading && !error && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map(off => (
-            <Card key={off.id} className="p-4 space-y-2">
-              <div className="font-medium">{off.firstName} {off.lastName}</div>
-              <div className="text-sm text-muted-foreground break-all">{off.email}</div>
+            <Card key={off.id} className="p-4 space-y-2 cursor-pointer transition hover:shadow-sm" onClick={() => router.push(`/${subdomain}/people/procurement/${off.id}`)}>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="font-medium">{off.firstName} {off.lastName}</div>
+                  <div className="text-sm text-muted-foreground break-all">{off.email}</div>
+                </div>
+                <Button size="xs" variant="ghost" onClick={(e) => { e.stopPropagation(); router.push(`/${subdomain}/people/procurement/${off.id}`); }}>View</Button>
+              </div>
               <div className="text-xs text-muted-foreground">ID: {off.staffIdNumber}</div>
               <div className="text-xs">{off.jobTitle}</div>
             </Card>

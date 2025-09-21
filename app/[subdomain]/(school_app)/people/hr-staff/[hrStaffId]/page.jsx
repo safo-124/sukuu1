@@ -17,7 +17,7 @@ export default function HRStaffProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
-  const [form, setForm] = useState({ firstName:"", lastName:"", email:"", phoneNumber:"", jobTitle:"", qualification:"", staffIdNumber:"" });
+  const [form, setForm] = useState({ firstName:"", lastName:"", email:"", phoneNumber:"", jobTitle:"", qualification:"", staffIdNumber:"", password: "" });
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -58,7 +58,7 @@ export default function HRStaffProfilePage() {
           <p className="text-sm text-muted-foreground">{data.jobTitle} • {data.staffIdNumber}</p>
         </div>
         <div className="flex gap-2">
-          <Dialog open={editOpen} onOpenChange={(o)=>{ setEditOpen(o); if (o && data) setForm({ firstName:data.firstName||"", lastName:data.lastName||"", email:data.email||"", phoneNumber:data.phoneNumber||"", jobTitle:data.jobTitle||"", qualification:data.qualification||"", staffIdNumber:data.staffIdNumber||"" }); }}>
+          <Dialog open={editOpen} onOpenChange={(o)=>{ setEditOpen(o); if (o && data) setForm({ firstName:data.firstName||"", lastName:data.lastName||"", email:data.email||"", phoneNumber:data.phoneNumber||"", jobTitle:data.jobTitle||"", qualification:data.qualification||"", staffIdNumber:data.staffIdNumber||"", password: "" }); }}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm">Edit</Button>
             </DialogTrigger>
@@ -72,6 +72,7 @@ export default function HRStaffProfilePage() {
                 setSaving(true);
                 try {
                   const payload = { ...form };
+                  if (!payload.password) delete payload.password;
                   if (!payload.qualification) delete payload.qualification;
                   const res = await fetch(`/api/schools/${schoolId}/people/hr-staff/${hrStaffId}`, {
                     method:'PATCH',
@@ -83,6 +84,7 @@ export default function HRStaffProfilePage() {
                   setData(d=>({ ...d, ...j.data }));
                   toast.success('Updated');
                   setEditOpen(false);
+                  setForm(f => ({ ...f, password: "" }));
                 } catch (err) {
                   toast.error(err.message||'Update failed');
                 } finally { setSaving(false); }
@@ -99,6 +101,10 @@ export default function HRStaffProfilePage() {
                   <div className="sm:col-span-2">
                     <label className="block text-xs font-medium mb-1">Email</label>
                     <Input type="email" value={form.email} onChange={e=>setForm(f=>({...f, email:e.target.value}))} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-medium mb-1">New Password</label>
+                    <Input type="password" value={form.password} onChange={e=>setForm(f=>({...f, password:e.target.value}))} placeholder="Leave blank to keep current" />
                   </div>
                   <div className="sm:col-span-2">
                     <label className="block text-xs font-medium mb-1">Phone</label>

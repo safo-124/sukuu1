@@ -9,7 +9,7 @@ import { schoolIdSchema } from '@/validators/academics.validators'; // Re-use sc
 // GET /api/schools/[schoolId]/people/student-enrollments
 // Fetches all student enrollment records for a specific school
 export async function GET(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId } = await params;
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'TEACHER' && session.user?.role !== 'SECRETARY')) {

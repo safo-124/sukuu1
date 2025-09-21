@@ -5,7 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { createExamSchema } from '@/validators/exams.validators';
 
 export async function GET(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId } = await params;
   const session = await getServerSession(authOptions);
   if (!session || session.user?.schoolId !== schoolId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -27,7 +27,7 @@ export async function GET(request, { params }) {
 }
 
 export async function POST(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId } = await params;
   const session = await getServerSession(authOptions);
   if (!session || session.user?.schoolId !== schoolId || session.user?.role !== 'SCHOOL_ADMIN') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
