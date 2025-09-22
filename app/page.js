@@ -14,6 +14,14 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white font-sans antialiased relative">
+      {/* Theme toggle */}
+      <button
+        aria-label="Toggle theme"
+        onClick={toggleTheme}
+        className="fixed right-4 top-4 z-20 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/10 backdrop-blur hover:bg-white/20 transition"
+      >
+        {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+      </button>
       {/* Background gradient effect - mimic Prisma */}
       <div className="absolute inset-0 z-0 opacity-20" style={{
         background: 'radial-gradient(at 50% 10%, #3b0764, transparent), radial-gradient(at 50% 90%, #0c0a09, transparent)'

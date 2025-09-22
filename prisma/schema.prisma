@@ -348,6 +348,7 @@ model SchoolRequest {
   schoolName    String
   subdomain     String?
   message       String?
+  requestedModules String[] @default([])
   schoolId      String?              // set when converted/linked to a real School
   school        School?              @relation(fields: [schoolId], references: [id], onDelete: SetNull)
   createdAt     DateTime             @default(now())

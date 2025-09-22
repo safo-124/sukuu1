@@ -3,12 +3,20 @@
 import { useState } from 'react';
 
 export default function RequestSchoolForm() {
-  const [form, setForm] = useState({ requesterName: '', requesterEmail: '', requesterPhone: '', schoolName: '', subdomain: '', message: '' });
+  const [form, setForm] = useState({ requesterName: '', requesterEmail: '', requesterPhone: '', schoolName: '', subdomain: '', message: '', requestedModules: [] });
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
 
   const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const toggleModule = (key) => {
+    setForm((prev) => {
+      const set = new Set(prev.requestedModules);
+      if (set.has(key)) set.delete(key); else set.add(key);
+      return { ...prev, requestedModules: Array.from(set) };
+    });
+  };
 
   const submit = async () => {
     setSubmitting(true);
@@ -67,6 +75,19 @@ export default function RequestSchoolForm() {
           <div className="md:col-span-2">
             <label className="block text-sm text-zinc-400 mb-1">Message (optional)</label>
             <textarea name="message" rows="5" value={form.message} onChange={onChange} className="w-full rounded-md bg-zinc-800 text-white px-3 py-2 border border-zinc-700" />
+          </div>
+          <div className="md:col-span-2">
+            <div className="block text-sm text-zinc-400 mb-1">Modules you’re interested in (optional)</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {[{
+                key:'parent-app',label:'Parent App Access'
+              },{ key:'auto-timetable',label:'Auto Timetable' },{ key:'finance',label:'Finance' },{ key:'advanced-hr',label:'Advanced HR' },{ key:'procurement',label:'Procurement' },{ key:'library',label:'Library' },{ key:'transportation',label:'Transportation' },{ key:'hostel',label:'Hostel' }].map(m => (
+                <label key={m.key} className="flex items-center gap-2 p-2 rounded border border-zinc-700 bg-zinc-800/60">
+                  <input type="checkbox" checked={form.requestedModules.includes(m.key)} onChange={() => toggleModule(m.key)} className="accent-sky-500" />
+                  <span>{m.label}</span>
+                </label>
+              ))}
+            </div>
           </div>
         </div>
 

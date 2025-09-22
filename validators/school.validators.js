@@ -54,3 +54,29 @@ export const updateSchoolSchema = z.object({
 export const schoolIdParamSchema = z.object({
   schoolId: z.string().cuid({ message: "Invalid School ID format." }),
 });
+
+// Public school request schema (used by /api/schools/request)
+export const REQUEST_MODULE_KEYS = [
+  'parent-app',
+  'auto-timetable',
+  'finance',
+  'advanced-hr',
+  'procurement',
+  'library',
+  'transportation',
+  'hostel',
+];
+
+export const publicSchoolRequestSchema = z.object({
+  requesterName: z.string().min(1, 'Your name is required'),
+  requesterEmail: z.string().email('Valid email required'),
+  requesterPhone: z.string().optional().nullable(),
+  schoolName: z.string().min(1, 'School name is required'),
+  subdomain: z.string()
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, { message: 'Only lowercase letters, numbers and hyphens' })
+    .min(3, 'At least 3 characters')
+    .optional()
+    .nullable(),
+  message: z.string().max(2000).optional().nullable(),
+  requestedModules: z.array(z.enum(REQUEST_MODULE_KEYS)).optional().default([]),
+});

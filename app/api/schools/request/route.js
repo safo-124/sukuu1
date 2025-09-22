@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma';
 import { notifyAdminNewRequest } from '@/lib/notify';
+import { publicSchoolRequestSchema, REQUEST_MODULE_KEYS } from '@/validators/school.validators';
 
 // Simple in-memory rate limiter by IP: 5 requests / 10 minutes
 const RL_WINDOW_MS = 10 * 60 * 1000;
@@ -22,10 +23,14 @@ export async function POST(req) {
       return new Response(JSON.stringify({ error: 'Too Many Requests' }), { status: 429 });
     }
     const body = await req.json();
-    const { requesterName, requesterEmail, requesterPhone, schoolName, subdomain, message } = body || {};
-    if (!requesterName || !requesterEmail || !schoolName) {
-      return new Response(JSON.stringify({ error: 'requesterName, requesterEmail and schoolName are required' }), { status: 400 });
+    // Validate with zod
+    const parsed = publicSchoolRequestSchema.safeParse(body || {});
+    if (!parsed.success) {
+      return new Response(JSON.stringify({ error: 'Invalid input', issues: parsed.error.issues }), { status: 400 });
     }
+    const { requesterName, requesterEmail, requesterPhone, schoolName, subdomain, message, requestedModules } = parsed.data;
+    // Already validated; also defensively normalize to lower-case
+    const cleanModules = Array.from(new Set((requestedModules || []).map((m) => String(m).trim().toLowerCase()))).filter((m) => REQUEST_MODULE_KEYS.includes(m));
     const request = await prisma.schoolRequest.create({
       data: {
         requesterName,
@@ -34,6 +39,7 @@ export async function POST(req) {
         schoolName,
         subdomain: subdomain || null,
         message: message || null,
+        requestedModules: cleanModules,
         logs: {
           create: {
             action: 'CREATED',

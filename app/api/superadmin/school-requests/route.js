@@ -27,7 +27,7 @@ export async function GET(req) {
   });
   const format = searchParams.get('format');
   if (format === 'csv') {
-    const rows = [['id','createdAt','status','requesterName','requesterEmail','requesterPhone','schoolName','subdomain','message']];
+    const rows = [['id','createdAt','status','requesterName','requesterEmail','requesterPhone','schoolName','subdomain','message','requestedModules']];
     for (const r of requests) {
       rows.push([
         r.id,
@@ -38,7 +38,8 @@ export async function GET(req) {
         r.requesterPhone || '',
         r.schoolName,
         r.subdomain || '',
-        (r.message || '').replace(/[\r\n]+/g, ' ')
+        (r.message || '').replace(/[\r\n]+/g, ' '),
+        Array.isArray(r.requestedModules) ? r.requestedModules.join('|') : ''
       ]);
     }
     const csv = rows.map((row) => row.map((v) => typeof v === 'string' && v.includes(',') ? `"${v.replace(/"/g,'""')}"` : v).join(',')).join('\n');
@@ -54,18 +55,30 @@ export async function PATCH(req) {
   }
   try {
     const body = await req.json();
-    const { id, status, notes, action, schoolName, subdomain } = body || {};
+  const { id, status, notes, action, schoolName, subdomain, modules } = body || {};
     if (action === 'CONVERT') {
       if (!id) return new Response(JSON.stringify({ error: 'id is required' }), { status: 400 });
       // Create School and link to request
-      const reqItem = await prisma.schoolRequest.findUnique({ where: { id } });
+  const reqItem = await prisma.schoolRequest.findUnique({ where: { id } });
       if (!reqItem) return new Response(JSON.stringify({ error: 'Request not found' }), { status: 404 });
       if (reqItem.schoolId) return new Response(JSON.stringify({ error: 'Already linked to a school' }), { status: 400 });
+      // Map requested modules to feature flags
+  const override = Array.isArray(modules) ? modules.map((m) => String(m).trim().toLowerCase()).filter(Boolean) : null;
+  const rm = override && override.length ? Array.from(new Set(override)) : (Array.isArray(reqItem.requestedModules) ? reqItem.requestedModules : []);
+      const has = (k) => rm.includes(k);
       const createdSchool = await prisma.school.create({
         data: {
           name: schoolName || reqItem.schoolName,
           subdomain: subdomain || reqItem.subdomain || null,
           isActive: true,
+          hasParentAppAccess: has('parent-app'),
+          hasAutoTimetable: has('auto-timetable'),
+          hasFinanceModule: has('finance'),
+          hasAdvancedHRModule: has('advanced-hr'),
+          hasProcurementModule: has('procurement'),
+          hasLibraryModule: has('library'),
+          hasTransportationModule: has('transportation'),
+          hasHostelModule: has('hostel'),
         }
       });
       const updated = await prisma.schoolRequest.update({

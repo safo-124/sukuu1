@@ -26,6 +26,16 @@ export default function RequestsPage() {
   const [status, setStatus] = useState('');
   const [q, setQ] = useState('');
   const [savingId, setSavingId] = useState(null);
+  const labelMap = {
+    'parent-app': 'Parent App Access',
+    'auto-timetable': 'Auto Timetable',
+    'finance': 'Finance',
+    'advanced-hr': 'Advanced HR',
+    'procurement': 'Procurement',
+    'library': 'Library',
+    'transportation': 'Transportation',
+    'hostel': 'Hostel',
+  };
 
   const paramsString = useMemo(() => {
     const params = new URLSearchParams();
@@ -61,15 +71,17 @@ export default function RequestsPage() {
     window.open(url, '_blank');
   };
 
-  const convertToSchool = async (id, currentName, currentSubdomain) => {
+  const convertToSchool = async (id, currentName, currentSubdomain, currentModules) => {
     const name = prompt('School name:', currentName || '') || currentName;
     const sub = prompt('Subdomain (optional):', currentSubdomain || '') || currentSubdomain || '';
     const notes = prompt('Notes (optional):', '') || '';
+    const modulesInput = prompt('Modules (comma-separated keys: parent-app, auto-timetable, finance, advanced-hr, procurement, library, transportation, hostel). Leave empty to use request selection.', (Array.isArray(currentModules) ? currentModules.join(',') : '')) || '';
+    const modules = Array.from(new Set(modulesInput.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)));
     setSavingId(id);
     await fetch('/api/superadmin/school-requests', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'CONVERT', id, schoolName: name, subdomain: sub, notes })
+      body: JSON.stringify({ action: 'CONVERT', id, schoolName: name, subdomain: sub, notes, modules })
     });
     setSavingId(null);
     await load();
@@ -109,7 +121,7 @@ export default function RequestsPage() {
                     <button disabled={savingId===r.id} onClick={() => updateStatus(r.id, 'APPROVED')} className="px-2 py-1 bg-emerald-600 text-white rounded">Approve</button>
                     <button disabled={savingId===r.id} onClick={() => updateStatus(r.id, 'REJECTED')} className="px-2 py-1 bg-rose-600 text-white rounded">Reject</button>
                     {!r.schoolId && (
-                      <button disabled={savingId===r.id} onClick={() => convertToSchool(r.id, r.schoolName, r.subdomain)} className="px-2 py-1 bg-indigo-600 text-white rounded">Convert to School</button>
+                      <button disabled={savingId===r.id} onClick={() => convertToSchool(r.id, r.schoolName, r.subdomain, r.requestedModules)} className="px-2 py-1 bg-indigo-600 text-white rounded">Convert to School</button>
                     )}
                   </div>
                 </div>
@@ -120,6 +132,17 @@ export default function RequestsPage() {
                   <div className="text-zinc-400">Requester</div>
                   <div>{r.requesterName}</div>
                   <div className="text-zinc-400 text-xs">{r.requesterEmail}{r.requesterPhone ? ` · ${r.requesterPhone}` : ''}</div>
+                </div>
+                <div>
+                  <div className="text-zinc-400">Requested modules</div>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {(r.requestedModules && r.requestedModules.length ? r.requestedModules : []).map((m) => (
+                      <Badge key={m} className="bg-zinc-800/70 border border-zinc-700 text-zinc-200">{labelMap[m] || m}</Badge>
+                    ))}
+                    {(!r.requestedModules || r.requestedModules.length === 0) && (
+                      <span className="text-zinc-500">None specified</span>
+                    )}
+                  </div>
                 </div>
                 {r.message ? (
                   <div>
