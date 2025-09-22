@@ -1,30 +1,270 @@
-export const metadata = { title: 'Pricing — Sukuu' };
+export const metadata = { 
+  title: 'Pricing — Sukuu',
+  description: 'Simple, transparent pricing that scales with your school. Start free or choose a plan that fits your needs.'
+};
+
+import Link from 'next/link';
+import { Check, ArrowRight, Star, Zap, Shield, Users, Building, Crown } from 'lucide-react';
 
 export default function PricingPage() {
   const tiers = [
-    { name: 'Starter', price: '$0', desc: 'For small schools trying Sukuu', features: ['Up to 50 students', 'Core modules', 'Email support'] },
-    { name: 'Growth', price: '$99/mo', desc: 'For growing schools', features: ['Up to 1,000 students', 'Advanced modules', 'Priority support'] },
-    { name: 'Enterprise', price: 'Contact us', desc: 'Custom needs at scale', features: ['Unlimited students', 'Custom SLAs', 'Dedicated onboarding'] },
+    { 
+      name: 'Starter', 
+      price: '$0', 
+      period: 'Forever free',
+      desc: 'Perfect for small schools getting started', 
+      features: [
+        'Up to 50 students',
+        'Core academics module',
+        'Basic finance tracking',
+        'Email support',
+        'Mobile parent app',
+        'Standard reports'
+      ],
+      cta: 'Start for free',
+      popular: false,
+      icon: Users
+    },
+    { 
+      name: 'Professional', 
+      price: '$99', 
+      period: 'per month',
+      desc: 'For growing schools that need more power', 
+      features: [
+        'Up to 1,000 students',
+        'All modules included',
+        'Advanced reporting',
+        'Priority support',
+        'Custom branding',
+        'API access',
+        'Advanced integrations',
+        'Multi-campus support'
+      ],
+      cta: 'Start free trial',
+      popular: true,
+      icon: Building
+    },
+    { 
+      name: 'Enterprise', 
+      price: 'Custom', 
+      period: 'tailored pricing',
+      desc: 'Custom solutions for large institutions', 
+      features: [
+        'Unlimited students',
+        'White-label solution',
+        'Custom SLAs',
+        'Dedicated support',
+        'Custom modules',
+        'Advanced security',
+        'Training & onboarding',
+        'Migration assistance'
+      ],
+      cta: 'Contact sales',
+      popular: false,
+      icon: Crown
+    },
   ];
+
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <div className="mx-auto max-w-6xl px-6 py-12">
-        <h1 className="text-4xl font-extrabold text-white mb-3">Pricing</h1>
-        <p className="text-zinc-400 mb-10">Simple plans that scale with your school.</p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {tiers.map((t) => (
-            <div key={t.name} className="rounded-xl border border-white/10 bg-zinc-900/50 p-6">
-              <div className="text-lg font-semibold text-white">{t.name}</div>
-              <div className="mt-1 text-3xl font-extrabold">{t.price}</div>
-              <p className="mt-2 text-zinc-400">{t.desc}</p>
-              <ul className="mt-4 space-y-2 text-sm text-zinc-300">
-                {t.features.map((f) => <li key={f}>• {f}</li>)}
-              </ul>
-              <button className="mt-6 w-full rounded-md bg-sky-600 px-4 py-2 font-semibold text-white hover:bg-sky-700">Choose {t.name}</button>
-            </div>
-          ))}
+    <div>
+      {/* Hero */}
+      <section className="relative overflow-hidden px-4 py-20">
+        <div className="absolute inset-0 bg-gradient-to-br from-sky-900/10 via-zinc-950 to-purple-900/10"></div>
+        <div className="relative mx-auto max-w-6xl text-center">
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-emerald-950/50 px-4 py-2 text-sm text-emerald-200 border border-emerald-800/30">
+            <Star className="h-4 w-4" />
+            <span>Start free • No credit card required</span>
+          </div>
+          
+          <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-white">
+            Simple pricing that{' '}
+            <span className="bg-gradient-to-r from-emerald-400 to-sky-400 bg-clip-text text-transparent">
+              scales with you
+            </span>
+          </h1>
+          
+          <p className="mt-6 text-xl text-zinc-300 max-w-3xl mx-auto">
+            Transparent pricing with no hidden fees. Start free and upgrade as your school grows.
+          </p>
         </div>
-      </div>
+      </section>
+
+      {/* Pricing cards */}
+      <section className="px-4 py-16">
+        <div className="mx-auto max-w-7xl">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {tiers.map((tier, index) => {
+              const IconComponent = tier.icon;
+              return (
+                <div 
+                  key={tier.name} 
+                  className={`relative rounded-3xl border p-8 transition-all duration-300 hover:shadow-2xl ${
+                    tier.popular 
+                      ? 'border-sky-500/50 bg-gradient-to-b from-sky-900/20 to-sky-950/20 shadow-xl shadow-sky-500/10 scale-105' 
+                      : 'border-white/10 bg-gradient-to-b from-zinc-900/40 to-zinc-900/20 hover:border-white/20'
+                  }`}
+                >
+                  {tier.popular && (
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                      <div className="rounded-full bg-gradient-to-r from-sky-600 to-purple-600 px-4 py-1 text-sm font-semibold text-white">
+                        Most Popular
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="text-center">
+                    <div className={`mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl ${
+                      tier.popular ? 'bg-sky-500/20 text-sky-400' : 'bg-zinc-800/50 text-zinc-400'
+                    }`}>
+                      <IconComponent className="h-8 w-8" />
+                    </div>
+                    
+                    <h3 className="text-2xl font-bold text-white">{tier.name}</h3>
+                    <p className="mt-2 text-zinc-400">{tier.desc}</p>
+                    
+                    <div className="mt-6">
+                      <div className="flex items-baseline justify-center">
+                        <span className="text-4xl font-bold text-white">{tier.price}</span>
+                        {tier.period !== 'Forever free' && tier.period !== 'tailored pricing' && (
+                          <span className="ml-1 text-zinc-400">/{tier.period.split(' ')[1]}</span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-sm text-zinc-400">{tier.period}</p>
+                    </div>
+                  </div>
+                  
+                  <ul className="mt-8 space-y-4">
+                    {tier.features.map((feature, featureIndex) => (
+                      <li key={featureIndex} className="flex items-start gap-3">
+                        <div className={`mt-1 h-5 w-5 rounded-full flex items-center justify-center ${
+                          tier.popular ? 'bg-sky-500/20' : 'bg-emerald-500/20'
+                        }`}>
+                          <Check className={`h-3 w-3 ${
+                            tier.popular ? 'text-sky-400' : 'text-emerald-400'
+                          }`} />
+                        </div>
+                        <span className="text-zinc-300">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  
+                  <div className="mt-8">
+                    <Link
+                      href={tier.name === 'Enterprise' ? '/contact' : '/get-started'}
+                      className={`group inline-flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-4 font-semibold transition-all duration-200 ${
+                        tier.popular
+                          ? 'bg-gradient-to-r from-sky-600 to-purple-600 text-white hover:from-sky-700 hover:to-purple-700 shadow-lg shadow-sky-500/25'
+                          : 'border border-white/20 text-white hover:bg-white/10 hover:border-white/30'
+                      }`}
+                    >
+                      {tier.cta}
+                      <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Features comparison */}
+      <section className="px-4 py-16 border-t border-white/10">
+        <div className="mx-auto max-w-6xl">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-white mb-4">Compare features</h2>
+            <p className="text-zinc-400">All plans include core functionality with additional features as you scale</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="rounded-xl border border-white/10 bg-zinc-900/40 p-6">
+              <Shield className="h-8 w-8 text-blue-400 mb-3" />
+              <h3 className="font-semibold text-white mb-2">Security & Compliance</h3>
+              <p className="text-zinc-400 text-sm">Enterprise-grade security across all plans</p>
+            </div>
+            
+            <div className="rounded-xl border border-white/10 bg-zinc-900/40 p-6">
+              <Zap className="h-8 w-8 text-yellow-400 mb-3" />
+              <h3 className="font-semibold text-white mb-2">Performance</h3>
+              <p className="text-zinc-400 text-sm">Lightning-fast response times guaranteed</p>
+            </div>
+            
+            <div className="rounded-xl border border-white/10 bg-zinc-900/40 p-6">
+              <Users className="h-8 w-8 text-green-400 mb-3" />
+              <h3 className="font-semibold text-white mb-2">Support</h3>
+              <p className="text-zinc-400 text-sm">Dedicated support team for all customers</p>
+            </div>
+            
+            <div className="rounded-xl border border-white/10 bg-zinc-900/40 p-6">
+              <Building className="h-8 w-8 text-purple-400 mb-3" />
+              <h3 className="font-semibold text-white mb-2">Scalability</h3>
+              <p className="text-zinc-400 text-sm">Grow from 50 to 50,000 students seamlessly</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="px-4 py-16">
+        <div className="mx-auto max-w-4xl">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-white mb-4">Frequently asked questions</h2>
+          </div>
+          
+          <div className="space-y-6">
+            <div className="rounded-xl border border-white/10 bg-zinc-900/40 p-6">
+              <h3 className="font-semibold text-white mb-2">Can I change plans anytime?</h3>
+              <p className="text-zinc-400">Yes, you can upgrade or downgrade your plan at any time. Changes take effect immediately.</p>
+            </div>
+            
+            <div className="rounded-xl border border-white/10 bg-zinc-900/40 p-6">
+              <h3 className="font-semibold text-white mb-2">Is there a free trial?</h3>
+              <p className="text-zinc-400">Yes! All paid plans come with a 14-day free trial. No credit card required.</p>
+            </div>
+            
+            <div className="rounded-xl border border-white/10 bg-zinc-900/40 p-6">
+              <h3 className="font-semibold text-white mb-2">What about data migration?</h3>
+              <p className="text-zinc-400">We provide free data migration assistance for all Professional and Enterprise customers.</p>
+            </div>
+            
+            <div className="rounded-xl border border-white/10 bg-zinc-900/40 p-6">
+              <h3 className="font-semibold text-white mb-2">Do you offer discounts for non-profits?</h3>
+              <p className="text-zinc-400">Yes, we offer special pricing for educational non-profits. Contact us for details.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="px-4 py-20 text-center">
+        <div className="mx-auto max-w-4xl">
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
+            Ready to transform your school?
+          </h2>
+          <p className="text-xl text-zinc-300 mb-8">
+            Join thousands of schools already using Sukuu to streamline their operations.
+          </p>
+          <div className="flex flex-col sm:flex-row justify-center gap-4">
+            <Link 
+              href="/get-started" 
+              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-sky-600 to-purple-600 px-8 py-4 font-semibold text-white hover:from-sky-700 hover:to-purple-700 transition-all duration-200"
+            >
+              Start free trial
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link 
+              href="/contact" 
+              className="inline-flex items-center gap-2 rounded-full border border-white/20 px-8 py-4 text-white hover:bg-white/10 transition-all duration-200"
+            >
+              Contact sales
+            </Link>
+          </div>
+          
+          <div className="mt-8 text-sm text-zinc-500">
+            No credit card required • Cancel anytime
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

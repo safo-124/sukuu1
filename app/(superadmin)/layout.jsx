@@ -2,10 +2,10 @@
 "use client";
 
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation'; // App Router
+import { useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
-import { Header } from '@/components/superadmin/Header'; // Adjust path
-import { Sidebar } from '@/components/superadmin/Sidebar'; // Adjust path
+import { Header } from '@/components/superadmin/Header';
+import { Sidebar } from '@/components/superadmin/Sidebar';
 import { Toaster } from 'sonner';
 
 export default function SuperAdminLayout({ children }) {
@@ -13,23 +13,19 @@ export default function SuperAdminLayout({ children }) {
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Edge hover open handler
   const handleEdgeEnter = useCallback(() => setIsSidebarOpen(true), []);
   const handleSidebarClose = useCallback(() => setIsSidebarOpen(false), []);
 
   useEffect(() => {
-    if (status === 'loading') return; // Don't do anything while session is loading
+    if (status === 'loading') return;
     if (!session) {
-      router.replace('/login'); // Redirect to login if not authenticated
+      router.replace('/login');
     } else if (session.user?.role !== 'SUPER_ADMIN') {
-      // If logged in but not SUPER_ADMIN, deny access or redirect
-      // This could be a generic '/unauthorized' page or back to login with an error
       console.warn("Access denied: User is not a SUPER_ADMIN");
       router.replace('/login?error=UnauthorizedRole');
     }
   }, [session, status, router]);
 
-  // Open sidebar by default on large screens for discoverability
   useEffect(() => {
     if (typeof window !== 'undefined') {
       if (window.innerWidth >= 1024) {
@@ -38,40 +34,79 @@ export default function SuperAdminLayout({ children }) {
     }
   }, []);
 
-  // Show a loading state or null while determining auth status or if redirecting
   if (status === 'loading' || !session || session.user?.role !== 'SUPER_ADMIN') {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 dark:from-zinc-950 dark:to-zinc-900">
-        <p className="text-xl text-slate-700 dark:text-zinc-200">Loading or Access Denied...</p>
-        {/* You could put a more sophisticated loader here */}
+      <div className="flex items-center justify-center min-h-screen relative overflow-hidden">
+        {/* Animated Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+          <div className="absolute inset-0">
+            <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl animate-pulse"></div>
+            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '2s'}}></div>
+          </div>
+        </div>
+        
+        <div className="relative z-10 text-center">
+          <div className="mb-6 inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 shadow-lg shadow-purple-500/25">
+            <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+          </div>
+          <p className="text-xl text-white">Verifying access...</p>
+          <p className="text-gray-400 mt-2">Please wait while we authenticate your session</p>
+        </div>
       </div>
     );
   }
 
-  // If session exists and user is SUPER_ADMIN, render the layout with children
   return (
-    <div className="relative flex min-h-screen flex-col bg-gradient-to-br from-slate-100/70 to-slate-200/70 dark:from-zinc-950/90 dark:to-zinc-900/90">
-      {/* Background pattern overlay (subtle) */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(1000px_600px_at_0%_0%,rgba(14,165,233,0.08),transparent),radial-gradient(800px_500px_at_100%_100%,rgba(99,102,241,0.06),transparent)]" />
+    <div className="relative flex min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/30 dark:from-slate-950 dark:via-purple-950/20 dark:to-slate-950">
+      {/* Background pattern overlay */}
+      <div className="absolute inset-0 opacity-30">
+        <div className="absolute inset-0" style={{
+          backgroundImage: `url("data:image/svg+xml,%3csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3e%3cg fill='none' fill-rule='evenodd'%3e%3cg fill='%236366f1' fill-opacity='0.05'%3e%3ccircle cx='30' cy='30' r='1'/%3e%3c/g%3e%3c/g%3e%3c/svg%3e")`,
+        }}></div>
+      </div>
+
+      {/* Animated floating shapes */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-20 left-10 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl animate-pulse"></div>
+        <div className="absolute bottom-32 right-20 w-48 h-48 bg-blue-500/5 rounded-full blur-2xl animate-pulse" style={{animationDelay: '3s'}}></div>
+        <div className="absolute top-1/2 left-1/3 w-24 h-24 bg-indigo-500/5 rounded-full blur-2xl animate-pulse" style={{animationDelay: '6s'}}></div>
+      </div>
 
       <Header />
 
-      {/* Edge hover zone: opens sidebar on hover */}
+      {/* Edge hover zone */}
       <div
-        className="fixed left-0 top-0 z-50 h-screen w-2 md:w-2 lg:w-3 xl:w-4"
+        className="fixed left-0 top-0 z-50 h-screen w-2 md:w-3"
         onMouseEnter={handleEdgeEnter}
       />
 
-      <div className="relative flex flex-1 pt-16"> {/* pt-16 for header height */}
+      <div className="relative flex flex-1 pt-20">
         <Sidebar isOpen={isSidebarOpen} onClose={handleSidebarClose} />
 
-        {/* Main content area with glass card effect wrapper */}
-        <main className="relative z-10 flex-1 overflow-y-auto p-4 md:p-6">
-          <div className="rounded-xl border border-white/20 bg-white/40 p-4 shadow-lg backdrop-blur-md dark:border-white/10 dark:bg-zinc-900/40">
-            {children}
+        {/* Main content area */}
+        <main className="relative z-10 flex-1 overflow-y-auto p-6 transition-all duration-300">
+          <div className="max-w-7xl mx-auto">
+            <div className="backdrop-blur-xl bg-white/70 dark:bg-slate-900/70 border border-white/20 dark:border-white/10 rounded-3xl shadow-2xl shadow-black/5 dark:shadow-black/20 overflow-hidden">
+              <div className="p-8">
+                {children}
+              </div>
+            </div>
           </div>
         </main>
-        <Toaster richColors theme="system" closeButton position="top-right" />
+        
+        <Toaster 
+          richColors 
+          theme="system" 
+          closeButton 
+          position="top-right"
+          toastOptions={{
+            style: {
+              background: 'rgba(255, 255, 255, 0.9)',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+            },
+          }}
+        />
       </div>
     </div>
   );

@@ -1,247 +1,190 @@
-// app/[subdomain]/login/page.jsx
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { signIn, useSession } from 'next-auth/react';
-import { useRouter, useParams } from 'next/navigation';
+import { useEffect, useState } from "react";
+import { signIn } from "next-auth/react";
+import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { toast } from 'sonner';
-import Link from 'next/link';
-import { Loader2, LogIn } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle } from 'lucide-react';
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Eye, EyeOff, AlertTriangle } from "lucide-react";
+import Link from "next/link";
 
-
-export default function SchoolAdminLoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isVerifyingSchool, setIsVerifyingSchool] = useState(true);
+export default function LoginPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [school, setSchool] = useState(null);
+  const [schoolLoading, setSchoolLoading] = useState(true);
   const router = useRouter();
-  const params = useParams();
-  const { data: session, status: sessionStatus } = useSession();
-  const [schoolName, setSchoolName] = useState('');
-  const [schoolExistsAndActive, setSchoolExistsAndActive] = useState(null);
-  const [error, setError] = useState(''); // FIX: Declare error as a state variable
+  const { subdomain } = useParams();
 
-  const subdomain = params.subdomain;
-  const dashboardUrl = subdomain ? `/${subdomain}/dashboard` : '/';
-
-  // Redirect if already authenticated for this school
   useEffect(() => {
-    if (sessionStatus === 'authenticated' &&
-        session?.user?.role === 'SCHOOL_ADMIN' && // Only redirect if it's an admin
-        session?.user?.schoolSubdomain === subdomain) {
-      router.replace(dashboardUrl);
+    let active = true;
+    async function loadSchool() {
+      if (!subdomain) return;
+      try {
+        setSchoolLoading(true);
+        const res = await fetch(`/api/schools/by-subdomain/${subdomain}`);
+        if (!res.ok) throw new Error("Failed to load school");
+        const data = await res.json();
+        if (active) setSchool(data.school);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        if (active) setSchoolLoading(false);
+      }
     }
-  }, [sessionStatus, session, router, subdomain, dashboardUrl]);
-
-  // Fetch school name for display and validate subdomain
-  useEffect(() => {
-    if (subdomain) {
-      setIsVerifyingSchool(true);
-      fetch(`/api/schools/by-subdomain/${subdomain}`)
-        .then(res => {
-          if (!res.ok) {
-            return res.json().then(errData => {
-              throw new Error(errData.error || `School domain check failed: ${res.status}`);
-            }).catch(() => {
-              throw new Error(`School domain check failed: ${res.status}`);
-            });
-          }
-          return res.json();
-        })
-        .then(data => {
-          if (data.school && data.school.name && data.school.isActive) {
-            setSchoolName(data.school.name);
-            setSchoolExistsAndActive(true);
-          } else if (data.school && !data.school.isActive) {
-            toast.error("This school account is currently inactive.", { description: "Please contact support or the main administrator."});
-            setSchoolName(data.school.name);
-            setSchoolExistsAndActive(false);
-          } else {
-            toast.error("Invalid school domain or school not found.", { description: "Please check the URL and try again."});
-            setSchoolExistsAndActive(false);
-          }
-        }).catch((err) => {
-            toast.error("Error Verifying School", { description: err.message || "Could not verify the school domain."});
-            setSchoolExistsAndActive(false);
-        }).finally(() => {
-            setIsVerifyingSchool(false);
-        });
-    } else {
-        toast.error("School domain is missing from URL.");
-        setSchoolExistsAndActive(false);
-        setIsVerifyingSchool(false);
-    }
+    loadSchool();
+    return () => {
+      active = false;
+    };
   }, [subdomain]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!schoolExistsAndActive) {
-        toast.error("Login unavailable.", { description: "This school domain is invalid or inactive."});
-        return;
-    }
-    setIsLoading(true);
+    setLoading(true);
+    setError("");
 
-    const result = await signIn('credentials', {
+    const result = await signIn("credentials", {
+      email,
+      password,
+      subdomain,
       redirect: false,
-      email: email,
-      password: password,
-      subdomain: subdomain, // FIX: Changed 'subdomain_context' to 'subdomain'
     });
 
-    setIsLoading(false);
-
-    if (result.error) {
-      setError(result.error); // Set the error state
-      toast.error("Login Failed", { description: result.error === "CredentialsSignin" ? "Invalid email or password for this school." : result.error });
-    } else if (result.ok) {
-      toast.success("Login successful! Redirecting...");
-      router.push(dashboardUrl);
+    if (result?.error) {
+      setError("Invalid email or password");
+      setLoading(false);
+    } else {
+      router.push(`/${subdomain}/dashboard`);
     }
   };
 
-  // --- Tailwind Class Constants for "Beautiful" B&W Design ---
-  const titleTextClasses = "text-zinc-900 dark:text-zinc-50";
-  const descriptionTextClasses = "text-zinc-600 dark:text-zinc-400";
-  const glassCardClasses = `
-    w-full max-w-md p-8 md:p-10
-    rounded-xl backdrop-blur-2xl backdrop-saturate-150
-    shadow-2xl dark:shadow-black/50
-    bg-white/80 border border-zinc-200/90
-    dark:bg-zinc-900/80 dark:border dark:border-zinc-700/90
-  `; // Enhanced glass effect
-  const labelTextClasses = `text-sm font-medium ${titleTextClasses}`;
-  const inputTextClasses = `
-    bg-white/70 dark:bg-zinc-800/70
-    text-zinc-900 dark:text-zinc-50
-    border-zinc-300 dark:border-zinc-700
-    focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-black focus:ring-black dark:focus:ring-white
-    focus:border-transparent dark:focus:border-transparent
-    placeholder:text-zinc-400 dark:placeholder:text-zinc-500
-    transition-shadow duration-150 ease-in-out
-  `; // More refined input
-  const primaryButtonClasses = `
-    bg-black text-white
-    hover:bg-zinc-800
-    dark:bg-white dark:text-black
-    dark:hover:bg-zinc-200
-    focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-black dark:focus-visible:ring-white dark:focus-visible:ring-offset-black
-    transition-colors duration-150 ease-in-out
-  `;
-  const teacherLoginButtonClasses = `
-    w-full py-3 text-base font-semibold flex items-center justify-center gap-2
-    bg-sky-600 text-white
-    hover:bg-sky-700
-    dark:bg-sky-400 dark:text-zinc-900
-    dark:hover:bg-sky-300
-    focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-600 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-black
-    transition-colors duration-150 ease-in-out
-  `; // New button style for teacher login
-  const linkTextClasses = "font-medium text-zinc-700 hover:text-black dark:text-zinc-300 dark:hover:text-white transition-colors";
-
-  if (isVerifyingSchool) {
-    return (
-        <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-zinc-100 dark:bg-zinc-950">
-            <Loader2 className={`h-12 w-12 animate-spin ${descriptionTextClasses}`} />
-            <p className={`mt-4 text-lg ${titleTextClasses}`}>Verifying school domain...</p>
-        </div>
-    );
-  }
-
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-zinc-100 dark:bg-zinc-950 antialiased">
-      <div className={glassCardClasses}>
-        <div className="text-center mb-8">
-          <h1 className={`text-3xl font-bold ${titleTextClasses}`}>
-            {schoolName || (subdomain ? 'School Login' : 'Loading...')}
-          </h1>
-          {schoolExistsAndActive !== false && schoolName && (
-            <p className={`mt-2 ${descriptionTextClasses}`}>
-              Welcome to the {schoolName} portal.
-            </p>
-          )}
-          {schoolExistsAndActive === false && (
-            <p className="text-red-600 dark:text-red-400 mt-2 font-medium">
-              This school domain is currently unavailable.
-            </p>
-          )}
-        </div>
+    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900">
+      {/* Animated Blobs */}
+      <div className="absolute inset-0 opacity-30">
+        <div className="blob blob-1"></div>
+        <div className="blob blob-2"></div>
+        <div className="blob blob-3"></div>
+      </div>
 
-        {schoolExistsAndActive && (
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <Label htmlFor="email" className={labelTextClasses}>Email Address</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className={`${inputTextClasses} mt-1.5`}
-                placeholder="you@example.com"
-              />
+      {/* Glass Container */}
+      <div className="relative min-h-screen flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="backdrop-blur-xl bg-white/10 border-white/20 rounded-2xl p-8 shadow-2xl">
+            {/* Header */}
+            <div className="text-center mb-8">
+              <div className="flex justify-center mb-6">
+                <div className="relative">
+                  {school?.logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={school.logoUrl}
+                      alt={`${school.name} logo`}
+                      className="w-16 h-16 rounded-2xl object-cover shadow-lg border border-white/20 bg-white/10"
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl shadow-lg"></div>
+                  )}
+                </div>
+              </div>
+              <h1 className="text-3xl font-bold text-white mb-2">
+                {schoolLoading ? "Loading..." : school?.name || "School Admin Login"}
+              </h1>
+              <p className="text-gray-300">
+                {school?.name ? `${school.name} • Admin Portal` : "Access your school management portal"}
+              </p>
             </div>
-            <div>
-              <Label htmlFor="password" className={labelTextClasses}>Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className={`${inputTextClasses} mt-1.5`}
-                placeholder="••••••••"
-              />
-            </div>
+
             {/* Error Alert */}
-            {error && ( // Now 'error' is a state variable
-              <Alert variant="destructive" className="bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300 dark:border-red-700/50">
+            {error && (
+              <Alert className="bg-red-500/20 border-red-500/30 text-red-200 mb-4">
                 <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Login Error</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-            <Button
-              type="submit"
-              className={`${primaryButtonClasses} w-full py-3 text-base font-semibold flex items-center justify-center gap-2`}
-              disabled={isLoading || !schoolExistsAndActive}
-            >
-              {isLoading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <LogIn className="h-5 w-5" />
-              )}
-              <span>{isLoading ? 'Signing In...' : 'Sign In as Admin'}</span>
-            </Button>
-          </form>
-        )}
 
-        {/* Teacher Login Button */}
-        {schoolExistsAndActive && (
-          <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700">
-            <p className={`text-center text-sm mb-3 ${descriptionTextClasses}`}>
-              Are you a teacher?
-            </p>
-            <Link href={`/${subdomain}/teacher-login`} passHref>
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-sm font-medium text-gray-200">
+                  Email Address
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="bg-white/10 border border-white/20 text-white placeholder:text-gray-400 focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20 rounded-xl h-12"
+                  placeholder="admin@school.com"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-sm font-medium text-gray-200">
+                  Password
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="bg-white/10 border border-white/20 text-white placeholder:text-gray-400 focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20 rounded-xl h-12 pr-12"
+                    placeholder="••••••••••"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+
               <Button
-                type="button"
-                className={`${teacherLoginButtonClasses} w-full`}
-                disabled={!schoolExistsAndActive}
+                type="submit"
+                className="w-full h-12 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg transition-all duration-200 transform hover:scale-[1.02]"
+                disabled={loading}
               >
-                Sign In as Teacher
+                {loading ? "Signing In..." : "Sign In as Administrator"}
               </Button>
-            </Link>
-          </div>
-        )}
+            </form>
 
-        <p className={`mt-6 text-center text-sm ${descriptionTextClasses}`}>
-          Not a school administrator? <Link href="/" className={linkTextClasses}>Return to Sukuu Home</Link>
-        </p>
+            {/* Teacher Login */}
+            <div className="mt-8 pt-6 border-t border-white/20">
+              <p className="text-center text-sm text-gray-300 mb-4">Are you a teacher or staff member?</p>
+              <Link href={`/${subdomain}/teacher-login`}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-12 border-white/20 text-white hover:bg-white/10 rounded-xl transition-all duration-200"
+                >
+                  Teacher & Staff Login
+                </Button>
+              </Link>
+            </div>
+
+            {/* Footer */}
+            <div className="mt-8 pt-6 border-t border-white/20 text-center">
+              <p className="text-sm text-gray-400">
+                Not part of this school?{" "}
+                <Link href="/" className="text-purple-400 hover:text-purple-300 font-medium transition-colors">
+                  Return to Sukuu Home
+                </Link>
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
+
