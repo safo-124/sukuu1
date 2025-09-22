@@ -14,6 +14,9 @@ const MARKETING_PREFIXES = [
   '/blog',
   '/about',
   '/contact',
+  '/solutions',
+  '/customers',
+  '/get-started',
   '/signup',
   '/login',
   '/admin',
@@ -39,6 +42,7 @@ export default function Navbar() {
       </Link>
       <nav className="hidden md:flex items-center space-x-6">
         <Link href="/products" className="text-zinc-400 hover:text-white transition-colors duration-200">Products</Link>
+        <Link href="/solutions" className="text-zinc-400 hover:text-white transition-colors duration-200">Solutions</Link>
         <Link href="/pricing" className="text-zinc-400 hover:text-white transition-colors duration-200">Pricing</Link>
         <Link href="/resources" className="text-zinc-400 hover:text-white transition-colors duration-200">Resources</Link>
         <Link href="/docs" className="text-zinc-400 hover:text-white transition-colors duration-200">Docs</Link>

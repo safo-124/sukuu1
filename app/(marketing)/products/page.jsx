@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { BookOpen, DollarSign, Users, Home, CalendarDays, FileText, ClipboardList, GraduationCap, Library, Bus, Settings, Newspaper, Receipt } from 'lucide-react';
+import { BookOpen, DollarSign, Users, Home, Newspaper, Settings } from 'lucide-react';
 
 export const metadata = {
   title: 'Sukuu Products',
@@ -14,7 +14,6 @@ export default function ProductsPage() {
         <p className="text-zinc-400 mb-10">Everything your school needs, in one place.</p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Academics */}
           <section id="academics" className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
             <div className="flex items-center gap-3 mb-3">
               <BookOpen className="h-6 w-6 text-sky-400" />
@@ -28,7 +27,6 @@ export default function ProductsPage() {
             <div className="mt-4"><Link href="/docs" className="text-sky-400 hover:underline">Read docs</Link></div>
           </section>
 
-          {/* Finance */}
           <section id="finance" className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
             <div className="flex items-center gap-3 mb-3">
               <DollarSign className="h-6 w-6 text-green-400" />
@@ -42,7 +40,6 @@ export default function ProductsPage() {
             <div className="mt-4"><Link href="/docs" className="text-sky-400 hover:underline">Read docs</Link></div>
           </section>
 
-          {/* HR */}
           <section id="hr" className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
             <div className="flex items-center gap-3 mb-3">
               <Users className="h-6 w-6 text-purple-400" />
@@ -56,7 +53,6 @@ export default function ProductsPage() {
             <div className="mt-4"><Link href="/docs" className="text-sky-400 hover:underline">Read docs</Link></div>
           </section>
 
-          {/* Resources */}
           <section id="resources" className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
             <div className="flex items-center gap-3 mb-3">
               <Home className="h-6 w-6 text-yellow-400" />
@@ -70,7 +66,6 @@ export default function ProductsPage() {
             <div className="mt-4"><Link href="/docs" className="text-sky-400 hover:underline">Read docs</Link></div>
           </section>
 
-          {/* Communication */}
           <section id="communication" className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
             <div className="flex items-center gap-3 mb-3">
               <Newspaper className="h-6 w-6 text-pink-400" />
@@ -84,7 +79,6 @@ export default function ProductsPage() {
             <div className="mt-4"><Link href="/docs" className="text-sky-400 hover:underline">Read docs</Link></div>
           </section>
 
-          {/* Administration */}
           <section id="admin" className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
             <div className="flex items-center gap-3 mb-3">
               <Settings className="h-6 w-6 text-indigo-400" />
