@@ -3,12 +3,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Building, Settings2, Users2 } from 'lucide-react'; // Example icons
+import { LayoutDashboard, Building, Settings2, Users2, ClipboardList } from 'lucide-react'; // Example icons
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/schools', label: 'Manage Schools', icon: Building },
-  // Add more items as needed
+  { href: '/requests', label: 'School Requests', icon: ClipboardList },
+  { href: '/account-requests', label: 'Account Requests', icon: ClipboardList },
   { href: '/users', label: 'Manage Users', icon: Users2 },
   { href: '/settings', label: 'System Settings', icon: Settings2 },
 ];
@@ -27,7 +28,7 @@ export function Sidebar({ isOpen = false, onClose }) {
       <div className="h-full overflow-y-auto px-3 py-4 rounded-r-xl border border-white/20 bg-white/30 shadow-lg backdrop-blur-md dark:border-white/10 dark:bg-zinc-900/30">
         <ul className="space-y-2 font-medium">
           {navItems.map((item) => {
-            const isActive = pathname === item.href || (item.href !== '/(superadmin)/dashboard' && pathname.startsWith(item.href));
+            const isActive = pathname === item.href || pathname.startsWith(item.href);
             const Icon = item.icon;
             return (
               <li key={item.label}>

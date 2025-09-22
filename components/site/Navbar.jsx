@@ -54,8 +54,8 @@ export default function Navbar() {
           {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
         </button>
         <Link href="/login" className="text-zinc-400 hover:text-white transition-colors duration-200 hidden sm:block">Log in</Link>
-        <Link href="/signup" className="px-4 py-2 bg-white text-zinc-900 rounded-full font-semibold hover:bg-zinc-200 transition-colors duration-200 shadow-lg">
-          Sign up
+        <Link href="/get-started" className="px-4 py-2 bg-white text-zinc-900 rounded-full font-semibold hover:bg-zinc-200 transition-colors duration-200 shadow-lg">
+          Get started
         </Link>
       </div>
     </header>

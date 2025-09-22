@@ -100,7 +100,7 @@ export default function ProductsPage() {
         </div>
 
         <div className="mt-12 text-center">
-          <Link href="/signup" className="inline-block px-6 py-3 bg-sky-600 text-white rounded-md font-semibold hover:bg-sky-700">Start free</Link>
+          <Link href="/get-started" className="inline-block px-6 py-3 bg-sky-600 text-white rounded-md font-semibold hover:bg-sky-700">Get started</Link>
         </div>
       </div>
     </div>

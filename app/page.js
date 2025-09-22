@@ -30,8 +30,8 @@ export default function LandingPage() {
           Academics, Finance, HR, Communication and Resources in a single, secure platform. Multi-tenant by design, fast by default.
         </p>
         <div className="flex space-x-4">
-          <Link href="/signup" className="px-8 py-3 bg-sky-600 text-white rounded-full text-lg font-semibold hover:bg-sky-700 transition-colors duration-300 shadow-xl">
-            Get started for free
+          <Link href="/get-started" className="px-8 py-3 bg-sky-600 text-white rounded-full text-lg font-semibold hover:bg-sky-700 transition-colors duration-300 shadow-xl">
+            Get started
           </Link>
           <Link href="/products" className="px-8 py-3 border border-zinc-500 text-white rounded-full text-lg font-semibold hover:bg-zinc-800 transition-colors duration-300">
             Learn More

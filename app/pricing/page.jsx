@@ -22,7 +22,7 @@ export default function PricingPage() {
               <li>Multi-tenant with 1 school</li>
               <li>Email support</li>
             </ul>
-            <Link href="/signup" className="block text-center px-4 py-2 bg-white text-zinc-900 rounded-md font-semibold hover:bg-zinc-200">Get started</Link>
+            <Link href="/get-started" className="block text-center px-4 py-2 bg-white text-zinc-900 rounded-md font-semibold hover:bg-zinc-200">Get started</Link>
           </div>
 
           <div className="rounded-2xl border border-sky-500 bg-zinc-900/60 p-8 ring-1 ring-sky-500/30">
@@ -35,7 +35,7 @@ export default function PricingPage() {
               <li>Payroll with receipts & notes</li>
               <li>Priority support</li>
             </ul>
-            <Link href="/signup" className="block text-center px-4 py-2 bg-sky-600 text-white rounded-md font-semibold hover:bg-sky-700">Start Pro</Link>
+            <Link href="/get-started" className="block text-center px-4 py-2 bg-sky-600 text-white rounded-md font-semibold hover:bg-sky-700">Start Pro</Link>
           </div>
 
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-8">

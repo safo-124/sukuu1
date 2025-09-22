@@ -109,6 +109,24 @@ enum InventoryTransactionType {
   ADJUST  // manual adjustment to a specific on-hand quantity
 }
 
+// Requests incoming from public site to create onboard a School
+enum SchoolRequestStatus {
+  NEW
+  REVIEWING
+  APPROVED
+  REJECTED
+  CONTACTED
+}
+
+// Account requests from individuals/orgs who want an admin account
+enum AccountRequestStatus {
+  NEW
+  REVIEWING
+  APPROVED
+  REJECTED
+  CONTACTED
+}
+
 // --------------------
 // FINANCE RE-DESIGN ENUMS (Phase 1)
 // --------------------
@@ -228,6 +246,7 @@ model School {
   pinnedTimetableSlots       PinnedTimetableSlot[]
   timetableRuns              TimetableRun[]
   absenceExplanations        AbsenceExplanation[]
+  incomingRequests           SchoolRequest[]
 
   @@index([subdomain])
   @@index([customDomain])
@@ -262,6 +281,8 @@ model User {
   inventoryTransactionsPerformed InventoryTransaction[] @relation("InventoryTransactionsPerformed")
   announcementReads AnnouncementRead[]
   absenceExplanationsRequested AbsenceExplanation[] @relation("AbsenceRequestedBy")
+  requestLogs RequestLog[]
+  accountRequestLogs AccountRequestLog[]
 
   @@index([email])
   @@index([schoolId])
@@ -284,6 +305,72 @@ model Parent {
 
   @@index([userId])
   @@index([schoolId])
+}
+
+// Public-facing request to create an admin account (separate from School onboarding)
+model AccountRequest {
+  id             String               @id @default(cuid())
+  status         AccountRequestStatus @default(NEW)
+  requesterName  String
+  requesterEmail String
+  requesterPhone String?
+  organization   String?
+  message        String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  logs           AccountRequestLog[]
+
+  @@index([status, createdAt])
+}
+
+// Audit log for account request status changes and notes
+model AccountRequestLog {
+  id           String          @id @default(cuid())
+  accountRequestId String
+  accountRequest AccountRequest @relation(fields: [accountRequestId], references: [id], onDelete: Cascade)
+  actorUserId  String?
+  actorUser    User?           @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  action       String          // e.g., CREATED, STATUS_CHANGE, NOTE_ADDED
+  notes        String?
+  createdAt    DateTime        @default(now())
+
+  @@index([accountRequestId, createdAt])
+  @@index([actorUserId])
+}
+
+// Public-facing request to onboard a new School
+model SchoolRequest {
+  id            String               @id @default(cuid())
+  status        SchoolRequestStatus  @default(NEW)
+  requesterName String
+  requesterEmail String
+  requesterPhone String?
+  schoolName    String
+  subdomain     String?
+  message       String?
+  schoolId      String?              // set when converted/linked to a real School
+  school        School?              @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  logs          RequestLog[]
+
+  @@index([status, createdAt])
+  @@index([schoolId])
+}
+
+// Audit log for request status changes and notes
+model RequestLog {
+  id            String      @id @default(cuid())
+  requestId     String
+  request       SchoolRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actorUserId   String?
+  actorUser     User?       @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  action        String      // e.g., CREATED, STATUS_CHANGE, NOTE_ADDED
+  notes         String?
+  createdAt     DateTime    @default(now())
+
+  @@index([requestId, createdAt])
+  @@index([actorUserId])
 }
 
 // Linking table for Parent and Student (Many-to-Many)

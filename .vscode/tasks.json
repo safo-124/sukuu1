@@ -18,6 +18,15 @@
 				"$eslint-stylish"
 			],
 			"group": "build"
+		},
+		{
+			"label": "Prisma migrate dev (requests)",
+			"type": "shell",
+			"command": "npx prisma migrate dev --name school_requests_and_logs",
+			"problemMatcher": [
+				"$eslint-stylish"
+			],
+			"group": "build"
 		}
 	]
 }
