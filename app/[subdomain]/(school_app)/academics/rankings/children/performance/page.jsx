@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useSchool } from '../../../layout';
+import { useSchool } from '@/app/[subdomain]/(school_app)/layout';
 import { useSession } from 'next-auth/react';
 import RequireRole from '@/components/auth/RequireRole';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
