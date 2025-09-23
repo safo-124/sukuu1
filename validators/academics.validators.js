@@ -553,3 +553,5 @@ export const updateGradeSchema = z.object({
   gpa: z.coerce.number().min(0).optional().nullable(),
   comments: z.string().max(500).optional().nullable(),
 });
+
+
