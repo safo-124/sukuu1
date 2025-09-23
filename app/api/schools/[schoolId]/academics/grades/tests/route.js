@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { testGradesSchema } from '@/validators/grades.validators';
+import { upsertSectionRankings } from '@/lib/analytics/grades';
 
 // POST /api/schools/[schoolId]/academics/grades/tests
 // Stores classwork/test grades identified by a label. Multiple tests per subject/section/term are allowed via different labels.
@@ -44,6 +45,7 @@ export async function POST(request, { params }) {
     }
 
     // Save or update by matching (studentId, subjectId, termId, academicYearId, sectionId, label) via manual find/update
+    const isAdmin = ['SCHOOL_ADMIN','SUPER_ADMIN'].includes(session.user?.role);
     await prisma.$transaction(async (tx) => {
       for (const g of grades) {
         // Only current enrolled students in the section/year
@@ -54,13 +56,23 @@ export async function POST(request, { params }) {
           where: { studentId: g.studentId, subjectId, termId, academicYearId, sectionId, comments: label },
         });
         if (existing) {
-          await tx.grade.update({ where: { id: existing.id }, data: { marksObtained: g.marksObtained } });
+          if (isAdmin) {
+            await tx.grade.update({ where: { id: existing.id }, data: { marksObtained: g.marksObtained } });
+          } else {
+            // Teachers cannot modify an existing test grade entry
+            continue;
+          }
         } else {
           await tx.grade.create({ data: { studentId: g.studentId, subjectId, termId, academicYearId, schoolId, sectionId, marksObtained: g.marksObtained, comments: label } });
         }
       }
     });
 
+    try {
+      await upsertSectionRankings({ schoolId, sectionId, termId, academicYearId, publish: false });
+    } catch (e) {
+      console.warn('Ranking recompute skipped (test):', e?.message || e);
+    }
     return NextResponse.json({ success: true, message: 'Test grades saved.' }, { status: 200 });
   } catch (error) {
     console.error('POST test grades error:', error);

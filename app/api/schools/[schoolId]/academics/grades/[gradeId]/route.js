@@ -34,8 +34,12 @@ export async function PUT(request, { params }) {
   const { schoolId, gradeId } = params;
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user?.schoolId !== schoolId || !['SCHOOL_ADMIN', 'TEACHER'].includes(session.user?.role)) {
+  if (!session || session.user?.schoolId !== schoolId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  // Only admins can modify existing grades; teachers are blocked from updates once created
+  if (!['SCHOOL_ADMIN', 'SUPER_ADMIN'].includes(session.user?.role)) {
+    return NextResponse.json({ error: 'Only admins can modify grades.' }, { status: 403 });
   }
 
   try {
@@ -44,9 +48,7 @@ export async function PUT(request, { params }) {
     if (!existing) {
       return NextResponse.json({ error: 'Grade record not found.' }, { status: 404 });
     }
-    if (existing.isPublished && !['SCHOOL_ADMIN','SUPER_ADMIN'].includes(session.user?.role)) {
-      return NextResponse.json({ error: 'Published grades can only be modified by an admin.' }, { status: 403 });
-    }
+    // Already enforced above: only admins proceed. For published state, still allow admin override.
     const body = await request.json();
     const validation = updateGradeSchema.safeParse(body);
 
@@ -82,8 +84,12 @@ export async function DELETE(request, { params }) {
   const { schoolId, gradeId } = params;
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user?.schoolId !== schoolId || !['SCHOOL_ADMIN', 'TEACHER'].includes(session.user?.role)) {
+  if (!session || session.user?.schoolId !== schoolId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  // Only admins can delete grades
+  if (!['SCHOOL_ADMIN', 'SUPER_ADMIN'].includes(session.user?.role)) {
+    return NextResponse.json({ error: 'Only admins can delete grades.' }, { status: 403 });
   }
 
   try {
@@ -91,9 +97,7 @@ export async function DELETE(request, { params }) {
     if (!existing) {
       return NextResponse.json({ error: 'Grade record not found for deletion.' }, { status: 404 });
     }
-    if (existing.isPublished && !['SCHOOL_ADMIN','SUPER_ADMIN'].includes(session.user?.role)) {
-      return NextResponse.json({ error: 'Published grades can only be deleted by an admin.' }, { status: 403 });
-    }
+    // Only admins reach here; allow delete regardless of published status (policy: admin override)
     await prisma.grade.delete({
       where: { id: gradeId, schoolId: schoolId },
     });

@@ -108,6 +108,8 @@ function getNavigationSections(schoolSubdomain, role) {
       { href: `/${schoolSubdomain}/academics/timetable`, label: 'Timetable', icon: CalendarDays },
       { href: `/${schoolSubdomain}/academics/examinations`, label: 'Examinations', icon: GraduationCap },
       { href: `/${schoolSubdomain}/academics/grades`, label: 'Grades', icon: Percent },
+      { href: `/${schoolSubdomain}/academics/grades/manage`, label: 'Manage Grades', icon: Settings },
+      { href: `/${schoolSubdomain}/academics/rankings`, label: 'Rankings Overview', icon: PieChart },
     ];
     const peopleItems = [
       { href: `/${schoolSubdomain}/people/students`, label: 'Manage Students', icon: Users },
@@ -230,6 +232,7 @@ function getNavigationSections(schoolSubdomain, role) {
           { title: 'Academics', items: [
             { href: `/${schoolSubdomain}/academics/assignments`, label: 'My Assignments', icon: CheckSquare },
             { href: `/${schoolSubdomain}/academics/grades`, label: 'My Grades', icon: Percent },
+            { href: `/${schoolSubdomain}/student/rankings`, label: 'My Rankings', icon: PieChart },
             { href: `/${schoolSubdomain}/academics/timetable`, label: 'My Timetable', icon: CalendarDays },
             { href: `/${schoolSubdomain}/academics/examinations`, label: 'My Exams', icon: GraduationCap },
             { href: `/${schoolSubdomain}/academics/subjects`, label: 'My Subjects', icon: BookOpen },
@@ -248,7 +251,11 @@ function getNavigationSections(schoolSubdomain, role) {
       case 'PARENT':
         return [
           { items: commonItems },
-          { title: 'Children', items: [ { href: `/${schoolSubdomain}/people/students`, label: 'My Children', icon: Users } ] },
+          { title: 'Children', items: [
+            { href: `/${schoolSubdomain}/people/students`, label: 'My Children', icon: Users },
+            { href: `/${schoolSubdomain}/academics/rankings/children/performance`, label: 'Children Performance', icon: PieChart },
+            { href: `/${schoolSubdomain}/academics/rankings/children`, label: 'Children Rankings', icon: PieChart },
+          ] },
           { title: 'Finance', items: [
             { href: `/${schoolSubdomain}/finance/invoices`, label: "Children's Invoices", icon: DollarSign },
             { href: `/${schoolSubdomain}/finance/payments`, label: "Children's Payments", icon: CheckSquare },

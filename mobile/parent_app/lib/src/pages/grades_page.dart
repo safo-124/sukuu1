@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart' as printing;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../api/parents_api.dart';
 
 class GradesPage extends StatefulWidget {
   final String studentId;
@@ -37,6 +38,14 @@ class _GradesPageState extends State<GradesPage> {
   List<Map<String, dynamic>> _children = [];
   // Band thresholds (percent minimums)
   double _bandA = 80, _bandB = 70, _bandC = 60, _bandD = 50;
+  // Analytics & rankings
+  bool _loadingInsights = false;
+  Map<String, dynamic>?
+      _analytics; // { average: number, subjects: [...], predictions: {...} }
+  List<Map<String, dynamic>> _subjectInsights = [];
+  Map<String, dynamic>? _predictions; // keyed by subjectId
+  Map<String, dynamic>?
+      _ranking; // { position, sectionTotal, section{name}, term{name}, academicYear{name} }
 
   Future<void> _load() async {
     setState(() {
@@ -50,16 +59,9 @@ class _GradesPageState extends State<GradesPage> {
       if (token == null || baseUrl == null || schoolId == null)
         throw Exception('Missing auth or config');
 
-      final res = await http.get(
-        Uri.parse('$baseUrl/api/schools/$schoolId/parents/me/children/grades'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json'
-        },
-      );
-      if (res.statusCode != 200)
-        throw Exception('Failed: ${res.statusCode} ${res.body}');
-      final json = jsonDecode(res.body) as Map<String, dynamic>;
+      final api =
+          ParentsApiClient(baseUrl: baseUrl, token: token, schoolId: schoolId);
+      final json = await api.getChildrenGrades();
       final children = (json['children'] as List?) ?? [];
       final targetId = (_activeStudentId ?? widget.studentId).toString();
       final my = children
@@ -76,24 +78,30 @@ class _GradesPageState extends State<GradesPage> {
         _selectedTerm = 'all';
         if (widget.allowChildSwitch) {
           final kids = children.cast<Map<String, dynamic>>().map((c) {
+            final id = (c['studentId'] ?? c['id'])?.toString();
             final first = c['firstName'] ??
                 (c['student'] is Map ? c['student']['firstName'] : null);
             final last = c['lastName'] ??
                 (c['student'] is Map ? c['student']['lastName'] : null);
+            final name = (c['name']?.toString() ??
+                    ('${first ?? ''} ${last ?? ''}').trim())
+                .trim();
             return {
-              'id': (c['studentId'] ?? c['id'])?.toString(),
-              'firstName': first,
-              'lastName': last,
+              'id': id,
+              'displayName': name,
             };
           }).toList();
           _children = kids;
           if (_activeStudentId == null && kids.isNotEmpty) {
             _activeStudentId =
                 (kids.first['id'] ?? widget.studentId).toString();
+            _activeStudentName = kids.first['displayName']?.toString();
           }
         }
       });
       await _restoreFilters();
+      // Load analytics & rankings for the active student
+      await _loadInsights();
     } catch (e) {
       setState(() {
         _error = 'Error: $e';
@@ -139,6 +147,8 @@ class _GradesPageState extends State<GradesPage> {
     final sid = (_activeStudentId ?? widget.studentId).toString();
     await prefs.setString('grades_filter_ay_$sid', _selectedAy);
     await prefs.setString('grades_filter_term_$sid', _selectedTerm);
+    // After saving filters, refresh insights (analytics + rankings)
+    await _loadInsights();
   }
 
   Future<void> _restoreFilters() async {
@@ -151,6 +161,90 @@ class _GradesPageState extends State<GradesPage> {
         if (ay != null) _selectedAy = ay;
         if (term != null) _selectedTerm = term;
       });
+    }
+  }
+
+  // Build query params from selected filters
+  Map<String, String> _currentFilterQuery() {
+    final qp = <String, String>{};
+    if (_selectedAy != 'all') qp['academicYearId'] = _selectedAy;
+    if (_selectedTerm != 'all') qp['termId'] = _selectedTerm;
+    return qp;
+  }
+
+  Future<void> _loadInsights() async {
+    // Fetch analytics and rankings for the active student using the new parent APIs
+    final studentId = (_activeStudentId ?? widget.studentId).toString();
+    try {
+      setState(() {
+        _loadingInsights = true;
+      });
+      final baseUrl = await _storage.read(key: 'baseUrl');
+      final token = await _storage.read(key: 'token');
+      final schoolId = await _storage.read(key: 'schoolId');
+      if (baseUrl == null || token == null || schoolId == null) return;
+      final api =
+          ParentsApiClient(baseUrl: baseUrl, token: token, schoolId: schoolId);
+
+      final qp = _currentFilterQuery();
+      final aResJson = await api.getChildrenAnalytics(
+        academicYearId: qp['academicYearId'],
+        termId: qp['termId'],
+      );
+      Map<String, dynamic>? analytics; // for the active student
+      List<Map<String, dynamic>> subjectInsights = [];
+      Map<String, dynamic>? predictions;
+      final kids =
+          (aResJson['children'] as List? ?? []).cast<Map<String, dynamic>>();
+      final mine = kids.firstWhere(
+          (k) => (k['student']?['id']?.toString() ?? '') == studentId,
+          orElse: () => {});
+      if (mine.isNotEmpty) {
+        analytics = (mine['analytics'] as Map?)?.cast<String, dynamic>();
+        final subs = (analytics?['subjects'] as List? ?? [])
+            .cast<Map>()
+            .map((e) => e.cast<String, dynamic>())
+            .toList();
+        subjectInsights = subs;
+        predictions =
+            (analytics?['predictions'] as Map?)?.cast<String, dynamic>();
+      }
+
+      // Rankings
+      final rResJson = await api.getChildrenRankings(
+        academicYearId: qp['academicYearId'],
+        termId: qp['termId'],
+      );
+      Map<String, dynamic>? rankingForStudent;
+      final arr =
+          (rResJson['rankings'] as List? ?? []).cast<Map<String, dynamic>>();
+      final mineR =
+          arr.where((e) => e['studentId']?.toString() == studentId).toList();
+      if (mineR.isNotEmpty) {
+        mineR.sort((a, b) {
+          final as = a['computedAt']?.toString();
+          final bs = b['computedAt']?.toString();
+          if (as == null || bs == null) return 0;
+          return (DateTime.tryParse(bs) ?? DateTime(0))
+              .compareTo(DateTime.tryParse(as) ?? DateTime(0));
+        });
+        rankingForStudent = mineR.first;
+      }
+
+      setState(() {
+        _analytics = analytics;
+        _subjectInsights = subjectInsights;
+        _predictions = predictions;
+        _ranking = rankingForStudent;
+      });
+    } catch (_) {
+      // swallow insights errors; keep grades visible
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingInsights = false;
+        });
+      }
     }
   }
 
@@ -595,8 +689,7 @@ class _GradesPageState extends State<GradesPage> {
                                 value: _activeStudentId?.toString(),
                                 items: _children.map((c) {
                                   final name =
-                                      '${c['firstName'] ?? ''} ${c['lastName'] ?? ''}'
-                                          .trim();
+                                      c['displayName']?.toString() ?? '';
                                   return DropdownMenuItem(
                                       value: c['id'].toString(),
                                       child: Text(name));
@@ -611,8 +704,8 @@ class _GradesPageState extends State<GradesPage> {
                                         : sel['id'].toString();
                                     _activeStudentName = sel.isEmpty
                                         ? null
-                                        : ('${sel['firstName'] ?? ''} ${sel['lastName'] ?? ''}')
-                                            .trim();
+                                        : (sel['displayName']?.toString() ??
+                                            '');
                                   });
                                   _load();
                                 },
@@ -621,6 +714,117 @@ class _GradesPageState extends State<GradesPage> {
                               ),
                             ),
                           ],
+                        ),
+                      ),
+                    if (!widget.showTitle)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              final current = _applyFilters();
+                              _exportPdf(current, widget.studentName);
+                            },
+                            icon: const Icon(Icons.picture_as_pdf_outlined,
+                                size: 18),
+                            label: const Text('Export PDF'),
+                          ),
+                        ),
+                      ),
+                    // Insights header: Scope + Average + Position (if available)
+                    if (_loadingInsights)
+                      const Padding(
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        child: LinearProgressIndicator(minHeight: 2),
+                      )
+                    else if (_analytics != null || _ranking != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        child: Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      // Scope line
+                                      Builder(builder: (context) {
+                                        String ayName = 'All Years';
+                                        String termName = 'All Terms';
+                                        if (_selectedAy != 'all') {
+                                          final ayOpt = _buildAyOptions()
+                                              .firstWhere(
+                                                  (o) => o['id'] == _selectedAy,
+                                                  orElse: () =>
+                                                      {'name': _selectedAy});
+                                          ayName = ayOpt['name'] ?? _selectedAy;
+                                        }
+                                        if (_selectedTerm != 'all') {
+                                          final termOpt = _buildTermOptions(_records
+                                                  .where((g) =>
+                                                      _selectedAy == 'all' ||
+                                                      (g['academicYear']
+                                                                      as Map?)?[
+                                                                  'id']
+                                                              ?.toString() ==
+                                                          _selectedAy)
+                                                  .toList())
+                                              .firstWhere(
+                                                  (o) =>
+                                                      o['id'] == _selectedTerm,
+                                                  orElse: () =>
+                                                      {'name': _selectedTerm});
+                                          termName =
+                                              termOpt['name'] ?? _selectedTerm;
+                                        }
+                                        return Text(
+                                            'Scope: $ayName • $termName',
+                                            style: TextStyle(
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .onSurface
+                                                    .withOpacity(0.7),
+                                                fontSize: 12));
+                                      }),
+                                      const SizedBox(height: 6),
+                                      const Text('Performance Overview',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.w600)),
+                                      const SizedBox(height: 6),
+                                      if (_analytics?['average'] is num)
+                                        Text(
+                                          'Average: ${(_analytics!['average'] as num).toStringAsFixed(1)}%',
+                                          style: TextStyle(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .primary,
+                                              fontWeight: FontWeight.w600),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                if (_ranking != null)
+                                  _PositionBadge(
+                                    position: (_ranking!['position'] as num?)
+                                            ?.toInt() ??
+                                        null,
+                                    total: (_ranking!['sectionTotal'] as num?)
+                                            ?.toInt() ??
+                                        null,
+                                    label: (_ranking?['section']?['name']
+                                            ?.toString() ??
+                                        'Section'),
+                                  ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     if (!widget.showTitle)
@@ -724,6 +928,162 @@ class _GradesPageState extends State<GradesPage> {
                         ],
                       ),
                     ),
+
+                    // Subject insights (from analytics)
+                    if (_loadingInsights && _subjectInsights.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        child: Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Simple skeletons
+                                Container(
+                                    height: 14,
+                                    width: 120,
+                                    color: Colors.black12),
+                                const SizedBox(height: 12),
+                                ...List.generate(
+                                    3,
+                                    (i) => Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 8.0),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Container(
+                                                  height: 12,
+                                                  width: 160,
+                                                  color: Colors.black12),
+                                              const SizedBox(height: 6),
+                                              LinearProgressIndicator(
+                                                value: null,
+                                                minHeight: 6,
+                                                backgroundColor: Colors.black12,
+                                              ),
+                                            ],
+                                          ),
+                                        )),
+                              ],
+                            ),
+                          ),
+                        ),
+                      )
+                    else if (_subjectInsights.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        child: Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Subject Insights',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.w600)),
+                                const SizedBox(height: 8),
+                                ..._subjectInsights.map((s) {
+                                  final subjectName =
+                                      s['subjectName']?.toString() ?? 'Subject';
+                                  final avg =
+                                      (s['average'] as num?)?.toDouble();
+                                  // predictions keyed by subjectId
+                                  final sid = s['subjectId']?.toString();
+                                  final pred = sid != null
+                                      ? (_predictions?[sid]
+                                          as Map<String, dynamic>?)
+                                      : null;
+                                  final trend = pred?['trend']?.toString();
+                                  final nextTerm =
+                                      (pred?['nextTerm'] as num?)?.toDouble();
+                                  final band =
+                                      avg != null ? _bandFor(avg) : null;
+                                  final color = _colorFor(subjectName);
+                                  IconData? trendIcon;
+                                  Color trendColor = Colors.grey;
+                                  if (trend == 'up') {
+                                    trendIcon = Icons.trending_up;
+                                    trendColor = Colors.green;
+                                  } else if (trend == 'down') {
+                                    trendIcon = Icons.trending_down;
+                                    trendColor = Colors.red;
+                                  } else if (trend == 'flat') {
+                                    trendIcon = Icons.trending_flat;
+                                    trendColor = Colors.orange;
+                                  }
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 8.0),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(subjectName,
+                                                  style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.w500)),
+                                            ),
+                                            if (band != null)
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 8,
+                                                        vertical: 2),
+                                                decoration: BoxDecoration(
+                                                    color:
+                                                        color.withOpacity(0.1),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            10)),
+                                                child: Text('Band $band',
+                                                    style: TextStyle(
+                                                        color: color,
+                                                        fontSize: 12)),
+                                              ),
+                                            const SizedBox(width: 8),
+                                            if (trendIcon != null)
+                                              Icon(trendIcon,
+                                                  size: 18, color: trendColor),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                        if (avg != null)
+                                          LinearProgressIndicator(
+                                            value: (avg / 100).clamp(0.0, 1.0),
+                                            minHeight: 6,
+                                            color: color,
+                                            backgroundColor:
+                                                color.withOpacity(0.15),
+                                          ),
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                                'Avg: ${avg?.toStringAsFixed(1) ?? '-'}%'),
+                                            if (nextTerm != null)
+                                              Text(
+                                                  'Next term: ${nextTerm.toStringAsFixed(1)}%'),
+                                          ],
+                                        )
+                                      ],
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
 
                     const SizedBox(height: 4),
 
@@ -864,7 +1224,8 @@ class _GradesPageState extends State<GradesPage> {
     if (widget.showTitle) {
       return Scaffold(
         appBar: AppBar(
-          title: Text('Grades \u2022 ${widget.studentName}'),
+          title:
+              Text('Grades \u2022 ${_activeStudentName ?? widget.studentName}'),
           actions: [
             IconButton(
                 onPressed: _loading ? null : _load,
@@ -873,7 +1234,8 @@ class _GradesPageState extends State<GradesPage> {
               tooltip: 'Export PDF',
               onPressed: _loading
                   ? null
-                  : () => _exportPdf(_applyFilters(), widget.studentName),
+                  : () => _exportPdf(_applyFilters(),
+                      _activeStudentName ?? widget.studentName),
               icon: const Icon(Icons.picture_as_pdf_outlined),
             )
           ],
@@ -882,6 +1244,38 @@ class _GradesPageState extends State<GradesPage> {
       );
     }
     return content;
+  }
+}
+
+class _PositionBadge extends StatelessWidget {
+  final int? position;
+  final int? total;
+  final String? label; // e.g., section name
+  const _PositionBadge({this.position, this.total, this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    if (position == null || total == null) return const SizedBox.shrink();
+    final text = 'Pos: $position/$total';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.amber.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.amber.withOpacity(0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(text,
+              style: const TextStyle(
+                  color: Colors.amber, fontWeight: FontWeight.w600)),
+          if (label != null)
+            Text(label!,
+                style: const TextStyle(color: Colors.amber, fontSize: 11))
+        ],
+      ),
+    );
   }
 }
 

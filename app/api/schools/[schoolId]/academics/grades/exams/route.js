@@ -67,41 +67,53 @@ export async function POST(request, { params }) {
       if (debug) console.log('EXAM_GRADES_DEBUG authorized', { staffId, sectionId, subjectId, reasons });
     }
 
-    // Upsert grades in a transaction
+    const isAdmin = ['SCHOOL_ADMIN','SUPER_ADMIN'].includes(session.user?.role);
+    // Create or update based on role policy
     await prisma.$transaction(async (tx) => {
       for (const g of grades) {
         // Ensure student belongs to section in the given academic year
         const enrollment = await tx.studentEnrollment.findFirst({ where: { studentId: g.studentId, sectionId, academicYearId, schoolId } });
         if (!enrollment) continue; // skip invalid rows silently
 
-        // Compute letter/gpa is optional; keeping null here, could compute with GradingScale later
-        await tx.grade.upsert({
-          where: {
-            studentId_examScheduleId_subjectId: {
-              studentId: g.studentId,
-              examScheduleId,
-              subjectId,
-            },
-          },
-          update: {
-            marksObtained: g.marksObtained,
-            comments: g.comments ?? undefined,
-            termId,
-            academicYearId,
-            sectionId,
-          },
-          create: {
+        const whereUnique = {
+          studentId_examScheduleId_subjectId: {
             studentId: g.studentId,
-            subjectId,
             examScheduleId,
-            termId,
-            academicYearId,
-            marksObtained: g.marksObtained,
-            comments: g.comments ?? undefined,
-            schoolId,
-            sectionId,
+            subjectId,
           },
-        });
+        };
+        const existing = await tx.grade.findUnique({ where: whereUnique });
+        if (existing) {
+          if (isAdmin) {
+            await tx.grade.update({
+              where: whereUnique,
+              data: {
+                marksObtained: g.marksObtained,
+                comments: g.comments ?? undefined,
+                termId,
+                academicYearId,
+                sectionId,
+              },
+            });
+          } else {
+            // Teacher cannot modify existing
+            continue;
+          }
+        } else {
+          await tx.grade.create({
+            data: {
+              studentId: g.studentId,
+              subjectId,
+              examScheduleId,
+              termId,
+              academicYearId,
+              marksObtained: g.marksObtained,
+              comments: g.comments ?? undefined,
+              schoolId,
+              sectionId,
+            },
+          });
+        }
       }
     });
 

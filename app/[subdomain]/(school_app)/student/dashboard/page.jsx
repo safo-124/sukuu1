@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useSchool } from '../../layout';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PieChart, BarChart3, CalendarDays } from 'lucide-react';
+import { PieChart, BarChart3, CalendarDays, Trophy } from 'lucide-react';
 import { toast } from 'sonner';
 
 const glassCardClasses = 'p-6 md:p-8 rounded-xl backdrop-blur-xl backdrop-saturate-150 shadow-xl dark:shadow-2xl bg-white/70 border border-zinc-200/80 dark:bg-zinc-900/70 dark:border-zinc-700/80';
@@ -36,6 +36,7 @@ export default function StudentDashboardPage() {
   const schoolData = useSchool();
   const [performance, setPerformance] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [latestRanking, setLatestRanking] = useState(null);
 
   useEffect(() => {
     if (!schoolData?.id || session?.user?.role !== 'STUDENT') return;
@@ -47,6 +48,13 @@ export default function StudentDashboardPage() {
         if (!res.ok) throw new Error('Failed to load performance');
         const data = await res.json();
         if (!cancelled) setPerformance(data);
+        // Fetch latest ranking snapshot (if any)
+        const rRes = await fetch(`/api/schools/${schoolData.id}/students/me/rankings`);
+        if (rRes.ok) {
+          const rData = await rRes.json();
+          const first = (rData.rankings || [])[0] || null; // ordered by computedAt desc in API
+          if (!cancelled) setLatestRanking(first);
+        }
       } catch (e) {
         if (!cancelled) {
           toast.error('Could not load performance metrics', { description: e.message });
@@ -91,6 +99,27 @@ export default function StudentDashboardPage() {
           loading={loading}
           description="Terms contributing to average"
         />
+        {/* Latest Ranking Card (full width on mobile, 1 column on md) */}
+        <div className="md:col-span-3">
+          <div className={`${glassCardClasses} flex items-center justify-between`}>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Trophy className={`h-5 w-5 ${descriptionTextClasses}`} />
+                <p className="text-sm font-medium">My Latest Ranking</p>
+              </div>
+              {loading ? (
+                <Skeleton className="h-7 w-40" />
+              ) : latestRanking ? (
+                <div>
+                  <p className="text-2xl font-bold">#{latestRanking.position} <span className="text-base font-medium text-muted-foreground">out of {latestRanking.sectionTotal ?? '—'}</span></p>
+                  <p className="text-xs text-muted-foreground mt-1">{latestRanking.academicYear?.name} • {latestRanking.term?.name} • {latestRanking.section?.class?.name} - {latestRanking.section?.name}</p>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No published rankings yet.</p>
+              )}
+            </div>
+          </div>
+        </div>
       </section>
 
       <section className="space-y-4">

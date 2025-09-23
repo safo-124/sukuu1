@@ -11,7 +11,7 @@ export async function PATCH(request, { params }) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { schoolId } = params;
+  const { schoolId } = await params;
 
   if (!schoolId) {
     return NextResponse.json({ error: 'School ID is required' }, { status: 400 });

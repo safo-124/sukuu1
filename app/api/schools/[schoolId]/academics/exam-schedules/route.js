@@ -38,7 +38,7 @@ export async function GET(request, { params }) {
 
 // POST handler to create a new exam schedule for a specific school
 export async function POST(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId } = await params;
   const session = await getServerSession(authOptions);
 
   if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {

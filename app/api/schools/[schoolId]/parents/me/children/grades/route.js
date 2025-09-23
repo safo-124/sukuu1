@@ -2,10 +2,15 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getApiSession } from '@/lib/apiAuth';
+import { corsHeaders } from '@/lib/cors';
 
 // Returns children with their published grades for the authenticated parent
 // Shape:
 // { children: [ { studentId, name, grades: [ { marksObtained, comments, subject, examSchedule, term, academicYear } ] } ] }
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 export async function GET(request, { params }) {
   try {
     const session = await getApiSession(request);
@@ -13,13 +18,13 @@ export async function GET(request, { params }) {
     const schoolId = p?.schoolId?.toString();
 
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
     }
     if (session.user.role !== 'PARENT') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403, headers: corsHeaders });
     }
     if (!schoolId || session.user.schoolId !== schoolId) {
-      return NextResponse.json({ error: 'Wrong school' }, { status: 403 });
+      return NextResponse.json({ error: 'Wrong school' }, { status: 403, headers: corsHeaders });
     }
 
     // Locate the parent profile
@@ -27,7 +32,7 @@ export async function GET(request, { params }) {
       where: { userId: session.user.id, schoolId },
       select: { id: true },
     });
-    if (!parent) return NextResponse.json({ children: [] });
+  if (!parent) return NextResponse.json({ children: [] }, { headers: corsHeaders });
 
     // Get linked student IDs
     const links = await prisma.parentStudent.findMany({
@@ -35,7 +40,7 @@ export async function GET(request, { params }) {
       select: { studentId: true },
     });
     const studentIds = links.map((l) => l.studentId);
-    if (studentIds.length === 0) return NextResponse.json({ children: [] });
+  if (studentIds.length === 0) return NextResponse.json({ children: [] }, { headers: corsHeaders });
 
     // Get student names for display
     const students = await prisma.student.findMany({
@@ -83,10 +88,10 @@ export async function GET(request, { params }) {
       if (entry) entry.grades.push(g);
     }
 
-    return NextResponse.json({ children: Array.from(byStudent.values()) });
+    return NextResponse.json({ children: Array.from(byStudent.values()) }, { headers: corsHeaders });
   } catch (e) {
     console.error('parents/me/children/grades error', e);
-    return NextResponse.json({ error: 'Failed to load grades' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to load grades' }, { status: 500, headers: corsHeaders });
   }
 
 }

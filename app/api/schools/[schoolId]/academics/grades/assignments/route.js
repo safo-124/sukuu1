@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { assignmentGradesSchema } from '@/validators/grades.validators';
+import { upsertSectionRankings } from '@/lib/analytics/grades';
 
 // POST /api/schools/[schoolId]/academics/grades/assignments
 // Body: { assignmentId, termId, academicYearId, subjectId, sectionId?, grades: [{ studentId, marksObtained }] }
@@ -68,24 +69,42 @@ export async function POST(request, { params }) {
     const validEnrollments = await prisma.studentEnrollment.findMany({ where: enrollmentWhere, select: { studentId: true } });
     const validStudentIds = new Set(validEnrollments.map(e => e.studentId));
 
+    const isAdmin = ['SCHOOL_ADMIN','SUPER_ADMIN'].includes(session.user?.role);
     await prisma.$transaction(async (tx) => {
       for (const g of grades) {
         if (!validStudentIds.has(g.studentId)) continue;
-        await tx.grade.create({
-          data: {
-            studentId: g.studentId,
-            subjectId,
-            termId,
-            academicYearId,
-            schoolId,
-            sectionId: effectiveSectionId ?? (assignment.sectionId || (assignment.class ? undefined : undefined)),
-            assignmentId,
-            marksObtained: g.marksObtained,
-          },
+        const existing = await tx.grade.findFirst({
+          where: { studentId: g.studentId, assignmentId, subjectId, termId, academicYearId },
         });
+        if (existing) {
+          if (isAdmin) {
+            await tx.grade.update({ where: { id: existing.id }, data: { marksObtained: g.marksObtained } });
+          } else {
+            // Teachers cannot modify existing assignment grade entry
+            continue;
+          }
+        } else {
+          await tx.grade.create({
+            data: {
+              studentId: g.studentId,
+              subjectId,
+              termId,
+              academicYearId,
+              schoolId,
+              sectionId: effectiveSectionId ?? (assignment.sectionId || (assignment.class ? undefined : undefined)),
+              assignmentId,
+              marksObtained: g.marksObtained,
+            },
+          });
+        }
       }
     });
 
+    try {
+      await upsertSectionRankings({ schoolId, sectionId: effectiveSectionId || assignment.sectionId, termId, academicYearId, publish: false });
+    } catch (e) {
+      console.warn('Ranking recompute skipped (assignment):', e?.message || e);
+    }
     return NextResponse.json({ success: true, message: 'Assignment grades saved.' }, { status: 200 });
   } catch (error) {
     console.error('POST assignment grades error:', error);

@@ -23,6 +23,7 @@ export default function TeacherExamGradesPage() {
 	const [allowedSubjectsForSection, setAllowedSubjectsForSection] = useState(null);
 	const [marks, setMarks] = useState({});
 	const [remarks, setRemarks] = useState({});
+		const [locked, setLocked] = useState({}); // studentId -> true if grade exists (teachers cannot edit)
 
 	const inputRefs = useRef({});
 	const dirtyIdsRef = useRef(new Set());
@@ -94,7 +95,7 @@ export default function TeacherExamGradesPage() {
 
 	// Prefill marks and remarks from existing grades for the chosen exam schedule
 	useEffect(() => {
-		const run = async () => {
+			const run = async () => {
 			if (!school?.id || !selected.examScheduleId || !selected.sectionId) return;
 			try {
 				const res = await fetch(`/api/schools/${school.id}/academics/exam-schedules/${selected.examScheduleId}/grade-entry-data`);
@@ -102,12 +103,15 @@ export default function TeacherExamGradesPage() {
 				const d = await res.json();
 				const nextMarks = {};
 				const nextRemarks = {};
+					const nextLocked = {};
 				(d.students || []).forEach(st => {
 					if (st.marksObtained !== null && st.marksObtained !== undefined) nextMarks[st.id] = st.marksObtained;
 					if (st.comments) nextRemarks[st.id] = st.comments;
+						if (st.marksObtained !== null && st.marksObtained !== undefined) nextLocked[st.id] = true;
 				});
 				setMarks(nextMarks);
 				setRemarks(nextRemarks);
+					setLocked(nextLocked);
 			} catch (e) {
 				// best-effort prefill; no toast to avoid noise
 			}
@@ -165,24 +169,55 @@ export default function TeacherExamGradesPage() {
 		autosaveTimer.current = setTimeout(async () => {
 			const job = buildPayload(); if (!job) return;
 			setSaving('saving'); setSaveMessage('Saving changes...');
-			try {
-				const res = await fetch(job.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(job.payload) });
-				if (!res.ok) throw new Error('Failed to save');
-				const savedIds = new Set(job.payload.grades.map(g => g.studentId));
-				dirtyIdsRef.current.forEach(id => { if (savedIds.has(id)) dirtyIdsRef.current.delete(id); });
-				setSaving('saved'); setSaveMessage('All changes saved');
-			} catch (err) {
+					try {
+						const res = await fetch(job.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(job.payload) });
+						const out = await res.json().catch(()=>({}));
+						if (!res.ok) throw new Error(out.error || 'Failed to save');
+						// For teachers, some entries may be skipped; refetch to sync UI and locks
+						if (isTeacher) {
+							try {
+								const ref = await fetch(`/api/schools/${school.id}/academics/exam-schedules/${selected.examScheduleId}/grade-entry-data`);
+								if (ref.ok) {
+									const d = await ref.json();
+									const nextMarks = {}; const nextRemarks = {}; const nextLocked = {};
+									(d.students || []).forEach(st => {
+										if (st.marksObtained !== null && st.marksObtained !== undefined) nextMarks[st.id] = st.marksObtained;
+										if (st.comments) nextRemarks[st.id] = st.comments;
+										if (st.marksObtained !== null && st.marksObtained !== undefined) nextLocked[st.id] = true;
+									});
+									setMarks(nextMarks); setRemarks(nextRemarks); setLocked(nextLocked);
+								}
+							} catch {}
+						}
+						dirtyIdsRef.current.clear();
+						setSaving('saved'); setSaveMessage(out.message || 'All changes saved');
+					} catch (err) {
 				setSaving('error'); setSaveMessage('Failed to save');
 			}
 		}, 800);
 		return () => clearTimeout(autosaveTimer.current);
 	}, [marks, selected.examScheduleId, selected.sectionId, termYear.termId, termYear.academicYearId]);
 
-	const submitExamGrades = async () => {
+		const submitExamGrades = async () => {
 		const job = buildPayload(); if (!job) return;
-		const res = await fetch(job.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(job.payload) });
-		const data = await res.json(); if (!res.ok) return toast.error(data.error || 'Failed to save exam grades');
-		toast.success('Exam grades saved');
+			const res = await fetch(job.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(job.payload) });
+			const data = await res.json().catch(()=>({})); if (!res.ok) return toast.error(data.error || 'Failed to save exam grades');
+			// Refetch to sync and lock
+			try {
+				const ref = await fetch(`/api/schools/${school.id}/academics/exam-schedules/${selected.examScheduleId}/grade-entry-data`);
+				if (ref.ok) {
+					const d = await ref.json();
+					const nextMarks = {}; const nextRemarks = {}; const nextLocked = {};
+					(d.students || []).forEach(st => {
+						if (st.marksObtained !== null && st.marksObtained !== undefined) nextMarks[st.id] = st.marksObtained;
+						if (st.comments) nextRemarks[st.id] = st.comments;
+						if (st.marksObtained !== null && st.marksObtained !== undefined) nextLocked[st.id] = true;
+					});
+					setMarks(nextMarks); setRemarks(nextRemarks); setLocked(nextLocked);
+				}
+			} catch {}
+			dirtyIdsRef.current.clear();
+			toast.success(data.message || 'Exam grades saved');
 	};
 
 	const availableSections = useMemo(() => sections, [sections]);
@@ -231,7 +266,7 @@ export default function TeacherExamGradesPage() {
 					<thead>
 						<tr className="text-left border-b">
 							<th className="py-2 pr-4">Student</th>
-							<th className="py-2">Marks</th>
+							  <th className="py-2">Marks</th>
 							<th className="py-2 pl-4">Remarks</th>
 						</tr>
 					</thead>
@@ -239,7 +274,7 @@ export default function TeacherExamGradesPage() {
 						{students.map((st, idx) => (
 							<tr key={st.id} className="border-b hover:bg-zinc-50 dark:hover:bg-zinc-900">
 								<td className="py-2 pr-4">{st.lastName}, {st.firstName}</td>
-								<td className="py-2">
+												<td className="py-2">
 									<Input
 										ref={(el) => { if (el) inputRefs.current[st.id] = el; }}
 										type="number"
@@ -247,6 +282,8 @@ export default function TeacherExamGradesPage() {
 										onChange={(e) => onChangeMark(st.id, e.target.value)}
 										onKeyDown={(e) => handleKeyDown(e, idx)}
 										placeholder="e.g., 78"
+														disabled={isTeacher && !!locked[st.id]}
+														title={isTeacher && !!locked[st.id] ? 'Locked: contact school admin to modify.' : ''}
 									/>
 								</td>
 								<td className="py-2 pl-4">
@@ -254,6 +291,8 @@ export default function TeacherExamGradesPage() {
 										value={remarks[st.id] ?? ''}
 										onChange={(e) => onChangeRemark(st.id, e.target.value)}
 										placeholder="Optional notes"
+														disabled={isTeacher && !!locked[st.id]}
+														title={isTeacher && !!locked[st.id] ? 'Locked: contact school admin to modify.' : ''}
 									/>
 								</td>
 							</tr>

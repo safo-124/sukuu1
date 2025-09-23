@@ -133,10 +133,11 @@ export default function TeacherContinuousGradesPage() {
       setSaving('saving'); setSaveMessage('Saving changes...');
       try {
         const res = await fetch(job.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(job.payload) });
-        if (!res.ok) throw new Error('Failed to save');
+        const out = await res.json().catch(()=>({}));
+        if (!res.ok) throw new Error(out.error || 'Failed to save');
         const savedIds = new Set(job.payload.grades.map(g => g.studentId));
         dirtyIdsRef.current.forEach(id => { if (savedIds.has(id)) dirtyIdsRef.current.delete(id); });
-        setSaving('saved'); setSaveMessage('All changes saved');
+        setSaving('saved'); setSaveMessage(out.message || 'All changes saved');
       } catch (err) { setSaving('error'); setSaveMessage('Failed to save'); }
     }, 800);
     return () => clearTimeout(autosaveTimer.current);
@@ -144,16 +145,16 @@ export default function TeacherContinuousGradesPage() {
 
   const submitAssignment = async () => {
     const job = buildAssignmentJob(); if (!job) return;
-    const res = await fetch(job.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(job.payload) });
-    const data = await res.json(); if (!res.ok) return toast.error(data.error || 'Failed to save assignment grades');
-    toast.success('Assignment grades saved');
+  const res = await fetch(job.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(job.payload) });
+  const data = await res.json().catch(()=>({})); if (!res.ok) return toast.error(data.error || 'Failed to save assignment grades');
+  toast.success(data.message || 'Assignment grades saved');
   };
 
   const submitTest = async () => {
     const job = buildTestJob(); if (!job) return;
-    const res = await fetch(job.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(job.payload) });
-    const data = await res.json(); if (!res.ok) return toast.error(data.error || 'Failed to save test grades');
-    toast.success('Test grades saved');
+  const res = await fetch(job.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(job.payload) });
+  const data = await res.json().catch(()=>({})); if (!res.ok) return toast.error(data.error || 'Failed to save test grades');
+  toast.success(data.message || 'Test grades saved');
   };
 
   const availableSections = useMemo(() => sections, [sections]);

@@ -7,6 +7,7 @@ export default function RequireRole({ role, children, fallback = null }) {
   const { data: session, status } = useSession();
   const router = useRouter();
   const params = useParams();
+  const roleList = Array.isArray(role) ? role : (role ? [role] : null);
 
   useEffect(() => {
     if (status === 'loading') return;
@@ -15,7 +16,7 @@ export default function RequireRole({ role, children, fallback = null }) {
       router.replace(sd);
       return;
     }
-    if (role && session.user.role !== role) {
+    if (roleList && !roleList.includes(session.user.role)) {
       // Redirect by role to the correct entry point
       const sd = params?.subdomain ? `/${params.subdomain}` : '';
       if (session.user.role === 'TEACHER') router.replace(`${sd}/dashboard/teacher`);
@@ -25,6 +26,6 @@ export default function RequireRole({ role, children, fallback = null }) {
 
   if (status === 'loading') return fallback;
   if (!session?.user) return fallback;
-  if (role && session.user.role !== role) return fallback;
+  if (roleList && !roleList.includes(session.user.role)) return fallback;
   return children;
 }

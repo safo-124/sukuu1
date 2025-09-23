@@ -1,8 +1,13 @@
 // app/api/auth/mobile-login/route.js
 import { NextResponse } from 'next/server';
 import { issueMobileToken } from '@/lib/apiAuth';
+import { corsHeaders } from '@/lib/cors';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
 
 export async function POST(request) {
   try {
@@ -41,8 +46,8 @@ export async function POST(request) {
       parentProfileId: user.parentProfile?.id || null,
     };
     const token = await issueMobileToken(payload, '30d');
-    return NextResponse.json({ token, user: payload });
+    return NextResponse.json({ token, user: payload }, { headers: corsHeaders });
   } catch (e) {
-    return NextResponse.json({ error: 'Login failed.' }, { status: 500 });
+    return NextResponse.json({ error: 'Login failed.' }, { status: 500, headers: corsHeaders });
   }
 }

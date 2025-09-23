@@ -131,10 +131,13 @@ export default function GradeSummaryPage() {
         </div>
         <div>
           <label className="block text-sm mb-1">Exam Schedule (optional)</label>
-          <Select value={selected.examScheduleId} onValueChange={(v) => setSelected(s => ({ ...s, examScheduleId: v }))}>
+          <Select
+            value={selected.examScheduleId || '__ALL__'}
+            onValueChange={(v) => setSelected(s => ({ ...s, examScheduleId: v === '__ALL__' ? '' : v }))}
+          >
             <SelectTrigger><SelectValue placeholder="All exams" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All exams</SelectItem>
+              <SelectItem value="__ALL__">All exams</SelectItem>
               {examSchedules.map(es => (<SelectItem key={es.id} value={es.id}>{es.label}</SelectItem>))}
             </SelectContent>
           </Select>

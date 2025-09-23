@@ -247,6 +247,7 @@ model School {
   timetableRuns              TimetableRun[]
   absenceExplanations        AbsenceExplanation[]
   incomingRequests           SchoolRequest[]
+  rankingSnapshots           RankingSnapshot[]
 
   @@index([subdomain])
   @@index([customDomain])
@@ -433,6 +434,7 @@ model AcademicYear {
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
   GradingWeightConfig GradingWeightConfig[]
+  rankingSnapshots   RankingSnapshot[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -452,6 +454,7 @@ model Term {
   exams     Exam[]   @relation("TermExams")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  rankingSnapshots RankingSnapshot[]
 
   @@unique([academicYearId, name])
   @@index([schoolId])
@@ -520,6 +523,7 @@ model Section {
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   Grade              Grade[]
+  rankingSnapshots   RankingSnapshot[]
   
 
   @@unique([classId, name], map: "UQ_Section_Class_Name")
@@ -610,6 +614,7 @@ model Student {
   paymentRequests      PaymentRequest[]
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
+  rankingSnapshots     RankingSnapshot[]
 
   hostelRoomId String?
   hostelRoom   HostelRoom? @relation(fields: [hostelRoomId], references: [id], onDelete: SetNull)
@@ -927,6 +932,9 @@ model GradingWeightConfig {
   classworkWeight  Float
   assignmentWeight Float
 
+  // Enable overall ranking for this scope (year/class/subject). Admin-controlled.
+  overallRankingEnabled Boolean @default(false)
+
   isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -937,6 +945,32 @@ model GradingWeightConfig {
   @@index([classId])
   @@index([subjectId])
   @@index([gradingScaleId]) // NEW INDEX
+}
+
+// Snapshot of computed rankings for a section in a specific term and academic year
+model RankingSnapshot {
+  id             String       @id @default(cuid())
+  schoolId       String
+  school         School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYearId String
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  termId         String
+  term           Term         @relation(fields: [termId], references: [id], onDelete: Cascade)
+  sectionId      String
+  section        Section      @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  studentId      String
+  student        Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  totalScore     Float?
+  average        Float?
+  totalSubjects  Int?
+  position       Int
+  computedAt     DateTime     @default(now())
+  published      Boolean      @default(false)
+
+  @@unique([sectionId, termId, studentId])
+  @@index([schoolId])
+  @@index([academicYearId])
 }
 
 model Exam {

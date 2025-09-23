@@ -1633,20 +1633,20 @@ function AdminTimetablePage() {
                 </div>
                 <div>
                   <Label className={titleTextClasses}>Teacher (optional)</Label>
-                  <Select value={pinnedFormData.staffId || ''} onValueChange={(v) => handlePinnedSelectChange('staffId', v)}>
+                  <Select value={pinnedFormData.staffId || '__NONE__'} onValueChange={(v) => handlePinnedSelectChange('staffId', v === '__NONE__' ? '' : v)}>
                     <SelectTrigger className={`${filterInputClasses} mt-1`}><SelectValue placeholder="Select teacher (optional)"/></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="__NONE__">None</SelectItem>
                       {teachers.map(t => (<SelectItem key={t.id} value={t.id}>{getTeacherFullName(t.id)}</SelectItem>))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
                   <Label className={titleTextClasses}>Room (optional)</Label>
-                  <Select value={pinnedFormData.roomId || ''} onValueChange={(v) => handlePinnedSelectChange('roomId', v)}>
+                  <Select value={pinnedFormData.roomId || '__NONE__'} onValueChange={(v) => handlePinnedSelectChange('roomId', v === '__NONE__' ? '' : v)}>
                     <SelectTrigger className={`${filterInputClasses} mt-1`}><SelectValue placeholder="Select room (optional)"/></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="__NONE__">None</SelectItem>
                       {rooms.map(r => (<SelectItem key={r.id} value={r.id}>{getRoomNameDisplay(r.id)}</SelectItem>))}
                     </SelectContent>
                   </Select>

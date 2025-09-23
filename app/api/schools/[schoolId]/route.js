@@ -9,7 +9,7 @@ import { schoolIdSchema } from '@/validators/academics.validators'; // Re-use sc
 // GET /api/schools/[schoolId]
 // Fetches a single school by its ID
 export async function GET(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId } = await params;
   const session = await getServerSession(authOptions);
 
   // Authorization: All authenticated users who belong to this school can fetch basic school data
@@ -64,7 +64,7 @@ export async function GET(request, { params }) {
 // PUT /api/schools/[schoolId]
 // Placeholder for updating general school settings (use /profile for detailed profile updates)
 export async function PUT(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId } = await params;
   const session = await getServerSession(authOptions);
 
   // Only SUPER_ADMIN or SCHOOL_ADMIN can perform this action
@@ -105,7 +105,7 @@ export async function PUT(request, { params }) {
 // DELETE /api/schools/[schoolId]
 // Placeholder for deleting a school (typically for SUPER_ADMIN only)
 export async function DELETE(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId } = await params;
   const session = await getServerSession(authOptions);
 
   // Only SUPER_ADMIN can delete schools

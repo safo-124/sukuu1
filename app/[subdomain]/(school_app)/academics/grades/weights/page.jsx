@@ -105,40 +105,52 @@ export default function GradingWeightsPage() {
         </div>
         <div>
           <label className="block text-sm mb-1">School Level (optional)</label>
-          <Select value={form.schoolLevelId} onValueChange={(v) => setForm(f => ({ ...f, schoolLevelId: v, classId: '' }))}>
+          <Select
+            value={form.schoolLevelId || '__ALL__'}
+            onValueChange={(v) => setForm(f => ({ ...f, schoolLevelId: v === '__ALL__' ? '' : v, classId: '' }))}
+          >
             <SelectTrigger><SelectValue placeholder="All levels" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All levels</SelectItem>
+              <SelectItem value="__ALL__">All levels</SelectItem>
               {levels.map(l => (<SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>))}
             </SelectContent>
           </Select>
         </div>
         <div>
           <label className="block text-sm mb-1">Class (optional)</label>
-          <Select value={form.classId} onValueChange={(v) => setForm(f => ({ ...f, classId: v }))}>
+          <Select
+            value={form.classId || '__ALL__'}
+            onValueChange={(v) => setForm(f => ({ ...f, classId: v === '__ALL__' ? '' : v }))}
+          >
             <SelectTrigger><SelectValue placeholder="All classes" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All classes</SelectItem>
+              <SelectItem value="__ALL__">All classes</SelectItem>
               {filteredClasses.map(c => (<SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>))}
             </SelectContent>
           </Select>
         </div>
         <div>
           <label className="block text-sm mb-1">Subject (optional)</label>
-          <Select value={form.subjectId} onValueChange={(v) => setForm(f => ({ ...f, subjectId: v }))}>
+          <Select
+            value={form.subjectId || '__ALL__'}
+            onValueChange={(v) => setForm(f => ({ ...f, subjectId: v === '__ALL__' ? '' : v }))}
+          >
             <SelectTrigger><SelectValue placeholder="All subjects" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All subjects</SelectItem>
+              <SelectItem value="__ALL__">All subjects</SelectItem>
               {subjects.map(su => (<SelectItem key={su.id} value={su.id}>{su.name}</SelectItem>))}
             </SelectContent>
           </Select>
         </div>
         <div>
           <label className="block text-sm mb-1">Grading Scale (optional)</label>
-          <Select value={form.gradingScaleId} onValueChange={(v) => setForm(f => ({ ...f, gradingScaleId: v }))}>
+          <Select
+            value={form.gradingScaleId || '__NONE__'}
+            onValueChange={(v) => setForm(f => ({ ...f, gradingScaleId: v === '__NONE__' ? '' : v }))}
+          >
             <SelectTrigger><SelectValue placeholder="No scale" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">No scale</SelectItem>
+              <SelectItem value="__NONE__">No scale</SelectItem>
               {scales.map(gs => (<SelectItem key={gs.id} value={gs.id}>{gs.name}</SelectItem>))}
             </SelectContent>
           </Select>

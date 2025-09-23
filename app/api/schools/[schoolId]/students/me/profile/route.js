@@ -6,7 +6,7 @@ import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 
 export async function GET(request, { params }) {
-  const { schoolId } = params;
+  const { schoolId } = await params;
   const session = await getServerSession(authOptions);
   if (!session || session.user?.role !== 'STUDENT' || session.user?.schoolId !== schoolId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
