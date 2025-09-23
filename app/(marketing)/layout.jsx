@@ -1,5 +1,3 @@
-"use client";
-
 import { MarketingFooter } from '@/components/marketing/Footer';
 
 export default function MarketingLayout({ children }) {
