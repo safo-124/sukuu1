@@ -53,3 +53,4 @@ export async function GET(request, { params }) {
     return NextResponse.json({ error: 'Failed to fetch profile' }, { status: 500 });
   }
 }
+  
