@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/card"; // Using parts of Shadcn Card for structure
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { Users, UserCog, Building, CalendarDays, BellPlus, DollarSign, BarChart3, PieChart as PieIcon, ListChecks, Receipt, Clock3 } from 'lucide-react';
+import { Users, UserCog, Building, CalendarDays, BellPlus, DollarSign, BarChart3, PieChart as PieIcon, ListChecks, Receipt, Clock3, Trophy, Megaphone, BookOpen } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 
 // --- Helper: StatCard Component (Ensure it's robust for undefined values during loading) ---
@@ -89,6 +89,16 @@ export default function SchoolAdminDashboardPage() {
   const [loadingFinance, setLoadingFinance] = useState(false);
   const [financeRange, setFinanceRange] = useState(30); // 7 | 30 | 90
 
+  // Admin dashboard extras
+  const [adminFinance, setAdminFinance] = useState(null);
+  const [loadingAdminFinance, setLoadingAdminFinance] = useState(false);
+  const [libraryStats, setLibraryStats] = useState(null);
+  const [loadingLibrary, setLoadingLibrary] = useState(false);
+  const [rankingsSummary, setRankingsSummary] = useState({ totalSnapshots: 0, published: 0, groups: 0, items: [] });
+  const [loadingRankings, setLoadingRankings] = useState(false);
+  const [announcements, setAnnouncements] = useState([]);
+  const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
+
   // Tailwind class constants
   const pageTitleClasses = "text-zinc-900 dark:text-zinc-50";
   const descriptionTextClasses = "text-zinc-600 dark:text-zinc-400";
@@ -134,6 +144,70 @@ export default function SchoolAdminDashboardPage() {
       fetchDashboardStats();
     }
   }, [schoolData, fetchDashboardStats, session?.user?.role]);
+
+  // Load admin summaries (finance-lite, library stats, rankings overview, announcements)
+  useEffect(() => {
+    const role = session?.user?.role;
+    if (!schoolData?.id || !role || ['STUDENT','ACCOUNTANT','PROCUREMENT_OFFICER'].includes(role)) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoadingAdminFinance(true);
+        const res = await fetch(`/api/schools/${schoolData.id}/dashboard/finance?range=30`);
+        if (!cancelled && res.ok) setAdminFinance(await res.json());
+      } catch (e) {
+        console.error('Admin finance load error', e);
+      } finally {
+        if (!cancelled) setLoadingAdminFinance(false);
+      }
+    })();
+    (async () => {
+      try {
+        setLoadingLibrary(true);
+        const res = await fetch(`/api/schools/${schoolData.id}/resources/library/stats`);
+        if (!cancelled && res.ok) setLibraryStats(await res.json());
+      } catch (e) {
+        console.error('Library stats load error', e);
+      } finally {
+        if (!cancelled) setLoadingLibrary(false);
+      }
+    })();
+    (async () => {
+      try {
+        setLoadingRankings(true);
+        const res = await fetch(`/api/schools/${schoolData.id}/academics/rankings/overview`);
+        if (!cancelled && res.ok) {
+          const data = await res.json();
+          const items = data?.items || [];
+          const totals = items.reduce((acc, it) => {
+            acc.totalSnapshots += Number(it.totalSnapshots || 0);
+            acc.published += Number(it.publishedCount || 0);
+            return acc;
+          }, { totalSnapshots: 0, published: 0 });
+          setRankingsSummary({ ...totals, groups: items.length, items });
+        }
+      } catch (e) {
+        console.error('Rankings overview load error', e);
+      } finally {
+        if (!cancelled) setLoadingRankings(false);
+      }
+    })();
+    (async () => {
+      try {
+        setLoadingAnnouncements(true);
+        const res = await fetch(`/api/schools/${schoolData.id}/communications/announcements?limit=5&publishedOnly=true`);
+        if (!cancelled && res.ok) {
+          const data = await res.json();
+          setAnnouncements(data?.announcements || []);
+        }
+      } catch (e) {
+        console.error('Announcements load error', e);
+      } finally {
+        if (!cancelled) setLoadingAnnouncements(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [schoolData?.id, session?.user?.role]);
 
   // Load accountant finance dashboard stats
   useEffect(() => {
@@ -491,17 +565,13 @@ export default function SchoolAdminDashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className={`text-3xl font-bold ${pageTitleClasses}`}>
-          {schoolData?.name} Dashboard
-        </h1>
-        <p className={descriptionTextClasses}>
-          Welcome back, {session?.user?.name || 'Administrator'}! Here's an overview of your school.
-        </p>
+      <div className="flex flex-col gap-2">
+        <h1 className={`text-3xl font-bold ${pageTitleClasses}`}>{schoolData?.name} Dashboard</h1>
+        <p className={descriptionTextClasses}>Welcome back, {session?.user?.name || 'Administrator'}! Here's an overview of your school.</p>
       </div>
 
-      {/* Stats Cards Section */}
-      <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {/* Core Stats */}
+      <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard 
           title="Total Students" 
           value={dashboardStats.totalStudents} 
@@ -526,10 +596,18 @@ export default function SchoolAdminDashboardPage() {
           linkTo={`/${subdomain}/academics/classes`}
           description="View all classes"
         />
+        <StatCard
+          title="Outstanding Invoices"
+          value={adminFinance?.invoices?.outstandingAmount != null ? `GHS ${Number(adminFinance?.invoices?.outstandingAmount || 0).toLocaleString()}` : '-'}
+          icon={<DollarSign className={`h-5 w-5 ${descriptionTextClasses}`} />}
+          isLoading={loadingAdminFinance}
+          linkTo={`/${subdomain}/finance/invoices`}
+          description="Unpaid balance across invoices"
+        />
       </section>
 
-      {/* Quick Actions & Other Sections */}
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+      {/* Quick Actions & At-a-glance */}
+      <section className="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8">
         <div className={`lg:col-span-2 ${glassCardClasses}`}>
           <h2 className={`${sectionTitleClasses} mb-4 border-none pb-0`}>Quick Actions</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -553,29 +631,146 @@ export default function SchoolAdminDashboardPage() {
                 <BellPlus className="mr-2 h-4 w-4" /> Send Announcement
               </Link>
             </Button>
+            <Button asChild variant="outline" className={`${outlineButtonClasses} justify-start text-sm py-3`}>
+              <Link href={`/${subdomain}/academics/rankings`}>
+                <Trophy className="mr-2 h-4 w-4" /> Manage Rankings
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className={`${outlineButtonClasses} justify-start text-sm py-3`}>
+              <Link href={`/${subdomain}/resources/library`}>
+                <BookOpen className="mr-2 h-4 w-4" /> Library Overview
+              </Link>
+            </Button>
           </div>
         </div>
 
         <div className={glassCardClasses}>
-          <h2 className={`${sectionTitleClasses} mb-4 border-none pb-0`}>Upcoming Events</h2>
-          <div className={`text-center py-8 ${descriptionTextClasses}`}>
-            <CalendarDays className="mx-auto h-12 w-12 opacity-50" />
-            <p className="mt-2 text-sm">No upcoming events scheduled yet.</p>
-            {/* <p className="text-xs">Events module coming soon!</p> */}
-          </div>
+          <h2 className={`${sectionTitleClasses} mb-4 border-none pb-0 flex items-center`}>
+            <Megaphone className={`mr-2 h-5 w-5 ${descriptionTextClasses}`} /> Announcements
+          </h2>
+          {loadingAnnouncements ? (
+            <div className="space-y-2">
+              {[1,2,3].map(i => (<Skeleton key={i} className="h-10 w-full" />))}
+            </div>
+          ) : (
+            <ul className="space-y-2 text-sm">
+              {(!announcements?.length) && <li className="text-zinc-500">No announcements yet.</li>}
+              {announcements?.map(a => (
+                <li key={a.id} className="flex items-start justify-between gap-3 border rounded-md px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{a.title}</p>
+                    <p className="text-xs text-zinc-500 truncate">{a.publishedAt ? new Date(a.publishedAt).toLocaleString() : 'Draft'}</p>
+                  </div>
+                  <Link href={`/${subdomain}/communication/announcements`} className="text-xs underline whitespace-nowrap">Open</Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </section>
       
-      <section className={glassCardClasses}>
-        <h2 className={`${sectionTitleClasses} mb-4 border-none pb-0 flex items-center`}>
-            <DollarSign className={`mr-2 h-5 w-5 ${descriptionTextClasses}`}/>
-            Financial Snapshot
-        </h2>
-        <div className={`text-center py-8 ${descriptionTextClasses}`}>
-            <PieChart className="mx-auto h-12 w-12 opacity-50" />
-            <p className="mt-2 text-sm">Financial overview will be displayed here.</p>
-            {/* <p className="text-xs">Finance module integration coming soon!</p> */}
+      {/* Finance, Library, Rankings */}
+      <section className="grid gap-6 lg:grid-cols-3">
+        <div className={`${glassCardClasses} lg:col-span-2`}>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-semibold flex items-center"><DollarSign className={`mr-2 h-5 w-5 ${descriptionTextClasses}`} /> Finance (30 days)</h2>
+          </div>
+          <div className="h-72 w-full">
+            {loadingAdminFinance ? (
+              <Skeleton className="h-full w-full" />
+            ) : (() => {
+              const payments = adminFinance?.payments?.series || [];
+              const expenses = adminFinance?.expenses?.series || [];
+              if (!payments.length && !expenses.length) return <div className="h-full flex items-center justify-center text-sm text-zinc-500">No data for the last 30 days.</div>;
+              const map = new Map();
+              payments.forEach(p => map.set(p.date, { date: p.date, payments: p.total, expenses: 0 }));
+              expenses.forEach(e => { if (map.has(e.date)) map.get(e.date).expenses = e.total; else map.set(e.date, { date: e.date, payments: 0, expenses: e.total }); });
+              const data = Array.from(map.values()).sort((a,b)=>a.date.localeCompare(b.date));
+              return (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={data} margin={{ top: 10, right: 20, bottom: 0, left: 0 }}>
+                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                    <YAxis tickFormatter={v=>Number(v).toLocaleString()} width={70} />
+                    <Tooltip formatter={(v)=>Number(v).toLocaleString()} />
+                    <Legend />
+                    <Area type="monotone" dataKey="payments" stroke="#0ea5e9" fill="#0ea5e9" fillOpacity={0.2} name="Payments" />
+                    <Area type="monotone" dataKey="expenses" stroke="#ef4444" fill="#ef4444" fillOpacity={0.15} name="Expenses" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              );
+            })()}
+          </div>
         </div>
+        <div className={glassCardClasses}>
+          <h2 className={`${sectionTitleClasses} mb-4 border-none pb-0 flex items-center`}>
+            <BookOpen className={`mr-2 h-5 w-5 ${descriptionTextClasses}`} /> Library Snapshot
+          </h2>
+          {loadingLibrary ? (
+            <div className="space-y-2">
+              {[1,2,3,4].map(i => (<Skeleton key={i} className="h-8 w-full" />))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-md border p-3">
+                <div className="text-xs text-zinc-500 mb-1">Titles</div>
+                <div className="text-lg font-semibold">{Number(libraryStats?.titles || 0).toLocaleString()}</div>
+              </div>
+              <div className="rounded-md border p-3">
+                <div className="text-xs text-zinc-500 mb-1">Available Copies</div>
+                <div className="text-lg font-semibold">{Number(libraryStats?.available || 0).toLocaleString()}</div>
+              </div>
+              <div className="rounded-md border p-3">
+                <div className="text-xs text-zinc-500 mb-1">Borrowed</div>
+                <div className="text-lg font-semibold">{Number(libraryStats?.borrowed || 0).toLocaleString()}</div>
+              </div>
+              <div className="rounded-md border p-3">
+                <div className="text-xs text-zinc-500 mb-1">Active Borrowers</div>
+                <div className="text-lg font-semibold">{Number(libraryStats?.activeBorrowers || 0).toLocaleString()}</div>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Rankings quick status */}
+      <section className={`${glassCardClasses}`}>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-base font-semibold flex items-center"><Trophy className={`mr-2 h-5 w-5 ${descriptionTextClasses}`} /> Rankings Status</h2>
+          <Link href={`/${subdomain}/academics/rankings`} className="text-xs underline">Open rankings</Link>
+        </div>
+        {loadingRankings ? (
+          <Skeleton className="h-16 w-full" />
+        ) : (!rankingsSummary.groups ? (
+          <div className="text-sm text-zinc-500">No ranking snapshots yet.</div>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-md border p-3">
+                <div className="text-xs text-zinc-500 mb-1">Groups</div>
+                <div className="text-lg font-semibold">{rankingsSummary.groups}</div>
+              </div>
+              <div className="rounded-md border p-3">
+                <div className="text-xs text-zinc-500 mb-1">Snapshots</div>
+                <div className="text-lg font-semibold">{Number(rankingsSummary.totalSnapshots).toLocaleString()}</div>
+              </div>
+              <div className="rounded-md border p-3">
+                <div className="text-xs text-zinc-500 mb-1">Published</div>
+                <div className="text-lg font-semibold">{Number(rankingsSummary.published).toLocaleString()}</div>
+              </div>
+            </div>
+            <ul className="space-y-2 text-sm">
+              {rankingsSummary.items.slice(0,5).map((it, idx) => (
+                <li key={`${it.sectionId}|${it.termId}|${it.academicYearId}|${idx}`} className="flex items-center justify-between border rounded-md px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{it.section?.class?.name} {it.section?.name}</p>
+                    <p className="text-xs text-zinc-500 truncate">{it.academicYear?.name} · {it.term?.name}</p>
+                  </div>
+                  <div className="text-xs whitespace-nowrap">{it.publishedCount}/{it.totalSnapshots} published</div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </section>
     </div>
   );
