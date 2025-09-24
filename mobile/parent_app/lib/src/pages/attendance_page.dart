@@ -328,7 +328,8 @@ class _AttendancePageState extends State<AttendancePage> {
                               padding: const EdgeInsets.only(right: 8),
                               child: ChoiceChip(
                                 label: Text(
-                                  _dateFilter == 'CUSTOM' && _customRange != null
+                                  _dateFilter == 'CUSTOM' &&
+                                          _customRange != null
                                       ? '${DateFormat('MMM d').format(_customRange!.start)} – ${DateFormat('MMM d').format(_customRange!.end)}'
                                       : 'Custom range',
                                 ),
@@ -341,8 +342,8 @@ class _AttendancePageState extends State<AttendancePage> {
                                     lastDate: DateTime(now.year + 1),
                                     initialDateRange: _customRange ??
                                         DateTimeRange(
-                                          start:
-                                              now.subtract(const Duration(days: 7)),
+                                          start: now.subtract(
+                                              const Duration(days: 7)),
                                           end: now,
                                         ),
                                   );
@@ -422,19 +423,22 @@ class _AttendancePageState extends State<AttendancePage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const Text('Attendance alert',
-                                      style: TextStyle(fontWeight: FontWeight.w600)),
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.w600)),
                                   const SizedBox(height: 6),
                                   Wrap(
                                     spacing: 8,
                                     runSpacing: 6,
                                     children: [
                                       if (_attendanceRate < 90)
-                                        _badge('Rate ${_attendanceRate.toStringAsFixed(1)}%',
+                                        _badge(
+                                            'Rate ${_attendanceRate.toStringAsFixed(1)}%',
                                             Theme.of(context)
                                                 .colorScheme
                                                 .error),
                                       if (_maxAbsentStreak >= 3)
-                                        _badge('Absent ${_maxAbsentStreak} days in a row',
+                                        _badge(
+                                            'Absent ${_maxAbsentStreak} days in a row',
                                             Theme.of(context)
                                                 .colorScheme
                                                 .error),
@@ -777,12 +781,8 @@ class _AttendancePageState extends State<AttendancePage> {
                         Text('${day.day}',
                             style: TextStyle(
                                 color: isOutMonth
-                                    ? Theme.of(context)
-                                        .colorScheme
-                                        .outline
-                                    : Theme.of(context)
-                                        .colorScheme
-                                        .onSurface)),
+                                    ? Theme.of(context).colorScheme.outline
+                                    : Theme.of(context).colorScheme.onSurface)),
                         const Spacer(),
                         if (entries.isNotEmpty)
                           Align(
@@ -1068,8 +1068,7 @@ class _AttendancePageState extends State<AttendancePage> {
       case 'PRESENT':
         return CircleAvatar(
           backgroundColor: scheme.primary.withOpacity(0.12),
-          child:
-              Icon(Icons.check_circle_outline, color: scheme.primary),
+          child: Icon(Icons.check_circle_outline, color: scheme.primary),
         );
       case 'ABSENT':
         return CircleAvatar(
@@ -1084,8 +1083,7 @@ class _AttendancePageState extends State<AttendancePage> {
       case 'EXCUSED':
         return CircleAvatar(
           backgroundColor: scheme.secondary.withOpacity(0.12),
-          child:
-              Icon(Icons.assignment_turned_in, color: scheme.secondary),
+          child: Icon(Icons.assignment_turned_in, color: scheme.secondary),
         );
       default:
         return CircleAvatar(
