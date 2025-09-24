@@ -27,6 +27,7 @@ class _FeesPageState extends State<FeesPage> {
   String? _baseUrl;
   String? _token;
   String? _schoolId;
+  String _statusFilter = 'ALL';
 
   Future<void> _load() async {
     setState(() {
@@ -42,9 +43,14 @@ class _FeesPageState extends State<FeesPage> {
       _token = token;
       _baseUrl = baseUrl;
       _schoolId = schoolId;
+      final uri = Uri.parse(
+              '$baseUrl/api/schools/$schoolId/parents/me/children/invoices')
+          .replace(
+        queryParameters:
+            _statusFilter == 'ALL' ? null : {'status': _statusFilter},
+      );
       final res = await http.get(
-        Uri.parse(
-            '$baseUrl/api/schools/$schoolId/parents/me/children/invoices'),
+        uri,
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json'
@@ -106,6 +112,34 @@ class _FeesPageState extends State<FeesPage> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          Row(
+            children: [
+              const Text('Filter:',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(width: 8),
+              DropdownButton<String>(
+                value: _statusFilter,
+                items: const [
+                  DropdownMenuItem(value: 'ALL', child: Text('All')),
+                  DropdownMenuItem(value: 'PAID', child: Text('Paid')),
+                  DropdownMenuItem(value: 'SENT', child: Text('Sent')),
+                  DropdownMenuItem(
+                      value: 'PARTIALLY_PAID', child: Text('Partially Paid')),
+                  DropdownMenuItem(value: 'OVERDUE', child: Text('Overdue')),
+                  DropdownMenuItem(value: 'DRAFT', child: Text('Draft')),
+                  DropdownMenuItem(value: 'VOID', child: Text('Void')),
+                  DropdownMenuItem(
+                      value: 'CANCELLED', child: Text('Cancelled')),
+                ],
+                onChanged: (v) {
+                  if (v == null) return;
+                  setState(() => _statusFilter = v);
+                  _load();
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
           _SummaryCard(total: _total, paid: _paid, due: _due),
           const SizedBox(height: 16),
           const Text('Invoices',

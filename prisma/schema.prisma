@@ -102,6 +102,13 @@ enum PurchaseOrderStatus {
   CANCELLED
 }
 
+// Parent to Teacher messaging statuses
+enum ParentMessageStatus {
+  OPEN
+  REPLIED
+  CLOSED
+}
+
 // Inventory Transactions
 enum InventoryTransactionType {
   IN      // stock received into store
@@ -239,6 +246,7 @@ model School {
   paymentRequests         PaymentRequest[]
   HostelRoom              HostelRoom[]
   inventoryTransactions   InventoryTransaction[]
+  parentTeacherMessages   ParentTeacherMessage[]
   // Advanced Timetable relations
   sectionSubjectRequirements SectionSubjectRequirement[]
   staffUnavailabilities      StaffUnavailability[]
@@ -303,6 +311,7 @@ model Parent {
   announcementReads AnnouncementRead[]
   absenceExplanationsResponded AbsenceExplanation[] @relation("AbsenceRespondedBy")
   paymentRequests PaymentRequest[]
+  parentMessages ParentTeacherMessage[]
 
   @@index([userId])
   @@index([schoolId])
@@ -555,6 +564,7 @@ model Subject {
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
   GradingWeightConfig GradingWeightConfig[]
+  parentMessages ParentTeacherMessage[]
 
   @@unique([schoolId, name])
   @@unique([schoolId, subjectCode])
@@ -612,6 +622,7 @@ model Student {
   scholarships         Scholarship[]
   bookLoans            BookLoan[]
   paymentRequests      PaymentRequest[]
+  parentMessages       ParentTeacherMessage[]
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   rankingSnapshots     RankingSnapshot[]
@@ -677,6 +688,7 @@ model Staff {
   pinnedTimetableSlots      PinnedTimetableSlot[]
   hostels                   Hostel[]
   drivers                   Driver[]
+  parentMessagesReceived    ParentTeacherMessage[]
   maxWeeklyTeachingHours    Float?
   createdAt                 DateTime               @default(now())
   updatedAt                 DateTime               @updatedAt
@@ -1245,6 +1257,32 @@ model AnnouncementRead {
   @@index([schoolId])
   @@index([userId])
   @@index([parentId])
+}
+
+// Direct messages initiated by Parents to Teachers (or class teachers) regarding a student
+model ParentTeacherMessage {
+  id          String             @id @default(cuid())
+  schoolId    String
+  school      School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  parentId    String
+  parent      Parent             @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  studentId   String
+  student     Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subjectId   String?
+  subject     Subject?           @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  teacherId   String?            // Staff.id of the teacher recipient (optional if routed to class teacher)
+  teacher     Staff?             @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  title       String
+  content     String             @db.Text
+  status      ParentMessageStatus @default(OPEN)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([schoolId])
+  @@index([parentId])
+  @@index([studentId])
+  @@index([subjectId])
+  @@index([teacherId])
 }
 
 // --------------------

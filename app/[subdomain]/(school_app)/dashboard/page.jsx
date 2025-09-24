@@ -612,13 +612,13 @@ export default function SchoolAdminDashboardPage() {
           <h2 className={`${sectionTitleClasses} mb-4 border-none pb-0`}>Quick Actions</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Button asChild className={`${primaryButtonClasses} justify-start text-sm py-3`}>
-              <Link href={`/${subdomain}/people/students/add`}> 
-                <Users className="mr-2 h-4 w-4" /> Add New Student
+              <Link href={`/${subdomain}/people/students?page=1`}> 
+                <Users className="mr-2 h-4 w-4" /> View Students
               </Link>
             </Button>
             <Button asChild className={`${primaryButtonClasses} justify-start text-sm py-3`}>
-              <Link href={`/${subdomain}/people/teachers/add`}>
-                <UserCog className="mr-2 h-4 w-4" /> Add New Teacher
+              <Link href={`/${subdomain}/people/teachers?page=1`}>
+                <UserCog className="mr-2 h-4 w-4" /> View Teachers
               </Link>
             </Button>
             <Button asChild className={`${primaryButtonClasses} justify-start text-sm py-3`}>
@@ -627,7 +627,7 @@ export default function SchoolAdminDashboardPage() {
               </Link>
             </Button>
             <Button asChild className={`${primaryButtonClasses} justify-start text-sm py-3`}>
-              <Link href={`/${subdomain}/communication/announcements/create`}>
+              <Link href={`/${subdomain}/communication/announcements`}>
                 <BellPlus className="mr-2 h-4 w-4" /> Send Announcement
               </Link>
             </Button>

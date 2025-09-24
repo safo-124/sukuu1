@@ -62,4 +62,42 @@ class ParentsApiClient {
     }
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
+
+  Future<Map<String, dynamic>> getParentMessagesToTeacher(
+      {int limit = 50}) async {
+    final uri = Uri.parse(
+            '$baseUrl/api/schools/$schoolId/parents/me/messages-to-teacher')
+        .replace(queryParameters: {'limit': '$limit'});
+    final res = await http.get(uri, headers: _headers);
+    if (res.statusCode != 200) {
+      throw Exception('Messages fetch failed: ${res.statusCode} ${res.body}');
+    }
+    return jsonDecode(res.body) as Map<String, dynamic>;
+  }
+
+  Future<bool> sendMessageToTeacher({
+    required String studentId,
+    String? subjectId,
+    String? teacherId,
+    required String title,
+    required String content,
+  }) async {
+    final uri = Uri.parse(
+        '$baseUrl/api/schools/$schoolId/parents/me/messages-to-teacher');
+    final res = await http.post(
+      uri,
+      headers: _headers,
+      body: jsonEncode({
+        'studentId': studentId,
+        if (subjectId != null) 'subjectId': subjectId,
+        if (teacherId != null) 'teacherId': teacherId,
+        'title': title,
+        'content': content,
+      }),
+    );
+    if (res.statusCode != 201) {
+      throw Exception('Send message failed: ${res.statusCode} ${res.body}');
+    }
+    return true;
+  }
 }

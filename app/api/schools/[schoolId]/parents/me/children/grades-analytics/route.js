@@ -43,15 +43,42 @@ export async function GET(request, { params }) {
         },
         orderBy: { createdAt: 'asc' },
       });
+      // Attendance summary for correlation (last 60 days)
+      const enrollment = await prisma.studentEnrollment.findFirst({ where: { studentId: sid, schoolId, isCurrent: true }, select: { id: true, sectionId: true } });
+      let attendanceSummary = null;
+      if (enrollment?.id) {
+        const since = new Date(); since.setDate(since.getDate() - 60);
+        const attRows = await prisma.attendance.findMany({ where: { schoolId, studentEnrollmentId: enrollment.id, date: { gte: since } }, select: { status: true } });
+        const total = attRows.length || 0;
+        const present = attRows.filter(a => a.status === 'PRESENT').length;
+        const late = attRows.filter(a => a.status === 'LATE').length;
+        const absent = attRows.filter(a => a.status === 'ABSENT').length;
+        attendanceSummary = { total, present, late, absent, attendanceRate: total ? (present / total) : null };
+      }
       const dist = aggregateDistributions(grades);
       const series = buildSubjectSeries(grades);
       const predictions = computePredictionsPerSubject(series);
+      // Simple class benchmark: average per subject for the student's section in same term/year
+      let benchmarks = [];
+      if (enrollment?.sectionId && (termId || academicYearId)) {
+        const whereBench = { schoolId, sectionId: enrollment.sectionId, isPublished: true, ...(academicYearId ? { academicYearId } : {}), ...(termId ? { termId } : {}) };
+        const cohort = await prisma.grade.findMany({ where: whereBench, select: { subjectId: true, marksObtained: true, subject: { select: { id: true, name: true } } } });
+        const sums = new Map();
+        for (const g of cohort) {
+          if (g.marksObtained == null || !g.subjectId) continue;
+          const s = sums.get(g.subjectId) || { total: 0, count: 0, name: g.subject?.name || 'Subject' };
+          s.total += Number(g.marksObtained); s.count += 1; sums.set(g.subjectId, s);
+        }
+        benchmarks = Array.from(sums.entries()).map(([subjectId, s]) => ({ subjectId, subjectName: s.name, classAverage: s.count ? s.total / s.count : null }));
+      }
       children.push({
         student: stuMap.get(sid) || { id: sid },
         analytics: {
           average: dist.average,
           subjects: (dist.subjects || []).map(s => ({ subjectId: s.subjectId, subjectName: s.subjectName, average: s.average })),
           predictions: predictions,
+          attendance: attendanceSummary,
+          benchmarks,
         },
       });
     }
