@@ -36,6 +36,15 @@
 				"$eslint-stylish"
 			],
 			"group": "build"
+		},
+		{
+			"label": "Prisma migrate dev",
+			"type": "shell",
+			"command": "npx prisma migrate dev --name platform_settings",
+			"problemMatcher": [
+				"$eslint - stylish"
+			],
+			"group": "build"
 		}
 	]
 }

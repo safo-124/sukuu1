@@ -73,15 +73,25 @@ export async function GET(request) {
   const search = searchParams.get('search') || '';
   const sortBy = searchParams.get('sortBy') || 'createdAt';
   const sortOrder = searchParams.get('sortOrder') || 'desc';
+  const status = searchParams.get('status') || 'all';
 
   const skip = (page - 1) * limit;
 
-  const whereClause = search ? {
-    OR: [
-      { name: { contains: search, mode: 'insensitive' } }, // mode: 'insensitive' for case-insensitive search (check DB compatibility)
-      { subdomain: { contains: search, mode: 'insensitive' } },
-    ],
-  } : {};
+  const whereClause = {
+    ...(search
+      ? {
+          OR: [
+            { name: { contains: search, mode: 'insensitive' } },
+            { subdomain: { contains: search, mode: 'insensitive' } },
+          ],
+        }
+      : {}),
+    ...(status === 'active'
+      ? { isActive: true }
+      : status === 'inactive'
+      ? { isActive: false }
+      : {}),
+  };
 
   const orderByClause = {
     [sortBy]: sortOrder,
@@ -93,6 +103,11 @@ export async function GET(request) {
       skip: skip,
       take: limit,
       orderBy: orderByClause,
+      include: {
+        _count: {
+          select: { users: true },
+        },
+      },
     });
 
     const totalSchools = await prisma.school.count({ where: whereClause });

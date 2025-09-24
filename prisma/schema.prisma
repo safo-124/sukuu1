@@ -158,6 +158,17 @@ enum ScholarshipType {
 // CORE TENANCY & USERS
 // --------------------
 
+// Key-Value store for global platform settings (for Super Admin)
+model PlatformSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+}
+
 model School {
   id           String   @id @default(cuid())
   name         String   @unique
