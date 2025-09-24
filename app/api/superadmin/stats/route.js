@@ -22,6 +22,7 @@ export async function GET(request) {
     const totalSchoolAdmins = await prisma.user.count({
       where: { role: 'SCHOOL_ADMIN' },
     });
+    const totalUsers = await prisma.user.count();
 
     // You could add more stats here, e.g., total students, teachers across all schools
     // but be mindful of query performance if data grows very large.
@@ -32,6 +33,7 @@ export async function GET(request) {
       activeSchools,
       inactiveSchools,
       totalSchoolAdmins,
+      totalUsers,
     };
 
     return NextResponse.json(stats, { status: 200 });

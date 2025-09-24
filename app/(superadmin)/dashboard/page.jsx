@@ -136,7 +136,7 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!session?.user?.role === 'SUPER_ADMIN') {
+    if (session && session.user?.role !== 'SUPER_ADMIN') {
       router.push('/login');
       return;
     }
@@ -162,7 +162,9 @@ export default function DashboardPage() {
       }
     };
 
-    fetchData();
+    if (session?.user?.role === 'SUPER_ADMIN') {
+      fetchData();
+    }
   }, [session, router]);
 
   const recentActivity = [
