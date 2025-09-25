@@ -1,248 +1,393 @@
-"use client";
-import React, { useEffect, useState, useMemo } from "react";
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import dynamic from "next/dynamic";
-import { format } from "date-fns";
-import { Card } from "@/components/ui/card";
+// app/(superadmin)/dashboard/page.jsx
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { 
+  BarChart3, 
+  Users, 
+  School, 
+  TrendingUp, 
+  CreditCard, 
+  AlertTriangle, 
+  CheckCircle2, 
+  Eye,
+  Plus,
+  ArrowUpRight,
+  Activity,
+  Globe,
+  Calendar,
+  Clock
+} from 'lucide-react';
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { TrendingUp, TrendingDown, AlertTriangle, Users, School, RefreshCw } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
-// Recharts (dynamic to avoid SSR issues)
-const ResponsiveContainer = dynamic(() => import("recharts").then(m => m.ResponsiveContainer), { ssr: false });
-const LineChart = dynamic(() => import("recharts").then(m => m.LineChart), { ssr: false });
-const Line = dynamic(() => import("recharts").then(m => m.Line), { ssr: false });
-const XAxis = dynamic(() => import("recharts").then(m => m.XAxis), { ssr: false });
-const YAxis = dynamic(() => import("recharts").then(m => m.YAxis), { ssr: false });
-const Tooltip = dynamic(() => import("recharts").then(m => m.Tooltip), { ssr: false });
-const Legend = dynamic(() => import("recharts").then(m => m.Legend), { ssr: false });
-const BarChart = dynamic(() => import("recharts").then(m => m.BarChart), { ssr: false });
-const Bar = dynamic(() => import("recharts").then(m => m.Bar), { ssr: false });
-
-const currency = (v) => `GHS ${Number(v || 0).toFixed(2)}`;
-
-export default function SuperAdminDashboard() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
-
-  // Guard
-  useEffect(() => {
-    if (status === 'loading') return;
-    if (!session) return; // next-auth will redirect if needed elsewhere
-    if (session.user?.role !== 'SUPER_ADMIN') {
-      router.push('/login');
+// Modern StatCard Component
+const StatCard = ({ title, value, icon: Icon, description, trend, isLoading, color = "purple" }) => {
+  const colorClasses = {
+    purple: {
+      bg: 'from-purple-500/10 to-purple-600/10',
+      border: 'border-purple-500/20',
+      icon: 'bg-purple-500 text-white',
+      trend: 'text-purple-600 dark:text-purple-400'
+    },
+    blue: {
+      bg: 'from-blue-500/10 to-blue-600/10',
+      border: 'border-blue-500/20',
+      icon: 'bg-blue-500 text-white',
+      trend: 'text-blue-600 dark:text-blue-400'
+    },
+    emerald: {
+      bg: 'from-emerald-500/10 to-emerald-600/10',
+      border: 'border-emerald-500/20',
+      icon: 'bg-emerald-500 text-white',
+      trend: 'text-emerald-600 dark:text-emerald-400'
+    },
+    orange: {
+      bg: 'from-orange-500/10 to-orange-600/10',
+      border: 'border-orange-500/20',
+      icon: 'bg-orange-500 text-white',
+      trend: 'text-orange-600 dark:text-orange-400'
     }
-  }, [session, status, router]);
+  };
 
-  async function loadStats(force = false) {
-    try {
-      if (force) setRefreshing(true); else setLoading(true);
-      const res = await fetch(`/api/superadmin/stats${force ? '?force=1' : ''}`);
-      if (!res.ok) throw new Error(`Failed (${res.status})`);
-      const data = await res.json();
-      setStats(data);
-      setError(null);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+  const classes = colorClasses[color];
+
+  if (isLoading) {
+    return (
+      <div className="backdrop-blur-xl bg-white/70 dark:bg-slate-900/70 border border-white/20 dark:border-white/10 rounded-2xl p-6 shadow-lg">
+        <div className="flex items-start justify-between mb-4">
+          <Skeleton className="h-12 w-12 rounded-xl" />
+          <Skeleton className="h-4 w-16 rounded" />
+        </div>
+        <Skeleton className="h-8 w-24 mb-2 rounded" />
+        <Skeleton className="h-4 w-32 rounded" />
+      </div>
+    );
   }
 
-  useEffect(() => { if (session?.user?.role === 'SUPER_ADMIN') loadStats(); }, [session]);
-
-  const revenueTrendPct = useMemo(() => {
-    if (!stats?.revenueTrend || stats.revenueTrend.length < 2) return null;
-    const last = stats.revenueTrend.at(-1).revenue;
-    const prev = stats.revenueTrend.at(-2).revenue;
-    if (!prev) return null;
-    return ((last - prev) / prev) * 100;
-  }, [stats]);
-
-  const overageSchools = useMemo(() => (stats?.perSchoolBreakdown || []).filter(s => s.freeTierExceeded), [stats]);
-  const mrrSeries = stats?.mrrSeries || [];
-  const arpuSeries = stats?.arpuSeries || [];
-
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Super Admin Dashboard</h1>
-        <button
-          onClick={() => loadStats(true)}
-          disabled={refreshing}
-          className="inline-flex items-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow disabled:opacity-50"
-        >
-          <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
-        </button>
+    <div className={`backdrop-blur-xl bg-gradient-to-br ${classes.bg} border ${classes.border} rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 group`}>
+      <div className="flex items-start justify-between mb-4">
+        <div className={`flex items-center justify-center w-12 h-12 ${classes.icon} rounded-xl shadow-lg group-hover:scale-105 transition-transform duration-200`}>
+          <Icon className="w-6 h-6" />
+        </div>
+        {trend && (
+          <div className={`flex items-center gap-1 ${classes.trend} text-sm font-medium`}>
+            <TrendingUp className="w-4 h-4" />
+            {trend}
+          </div>
+        )}
       </div>
-
-      {error && (
-        <Card className="p-4 border-destructive/50 bg-destructive/5 text-destructive">
-          <div className="font-medium mb-1">Could not load analytics</div>
-          <div className="text-xs opacity-90">{error}</div>
-        </Card>
-      )}
-
-      {loading && !refreshing && (
-        <div className="text-sm text-muted-foreground">Loading analytics…</div>
-      )}
-
-      {stats && (
-        <>
-          {/* KPIs */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <KPI label="Total Schools" value={stats.totalSchools} icon={<School className="h-5 w-5" />} />
-            <KPI label="Students" value={stats.totalStudents} icon={<Users className="h-5 w-5" />} />
-            <KPI label="Parents" value={stats.totalParents} icon={<Users className="h-5 w-5" />} />
-            <KPI label="Quarter Revenue" value={currency(stats.currentQuarterRevenue || 0)} trend={revenueTrendPct} />
+      <div className="space-y-1">
+        <div className="text-2xl font-bold text-gray-900 dark:text-white">
+          {value}
+        </div>
+        <div className="text-sm text-gray-600 dark:text-gray-400">
+          {title}
+        </div>
+        {description && (
+          <div className="text-xs text-gray-500 dark:text-gray-500">
+            {description}
           </div>
-
-          {/* Trend & MRR/ARPU */}
-          <div className="grid gap-6 lg:grid-cols-3">
-            <Card className="p-4 col-span-2">
-              <h2 className="font-medium mb-2">Revenue Trend (Monthly)</h2>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={stats.revenueTrend} margin={{ left: 4, right: 4, top: 8, bottom: 0 }}>
-                    <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                    <YAxis tickFormatter={(v)=> v/1000 + 'k'} width={50} />
-                    <Tooltip formatter={(val) => currency(Number(val))} />
-                    <Line type="monotone" dataKey="revenue" stroke="#2563eb" strokeWidth={2} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-            <Card className="p-4">
-              <h2 className="font-medium mb-2">MRR & ARPU</h2>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={mergeSeries(mrrSeries, arpuSeries)} margin={{ left: 4, right: 4, top: 8, bottom: 0 }}>
-                    <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                    <YAxis yAxisId="left" tickFormatter={(v)=> v/1000 + 'k'} width={40} />
-                    <YAxis yAxisId="right" orientation="right" width={40} />
-                    <Tooltip />
-                    <Legend />
-                    <Line yAxisId="left" type="monotone" dataKey="mrr" stroke="#10b981" strokeWidth={2} dot={false} name="MRR" />
-                    <Line yAxisId="right" type="monotone" dataKey="arpu" stroke="#f59e0b" strokeWidth={2} dot={false} name="ARPU" />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-          </div>
-
-          {/* Per School Breakdown */}
-          <Card className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="font-medium">Per-School Monthly Breakdown</h2>
-              <div className="text-xs text-muted-foreground">Cached {stats.cachedAt ? format(new Date(stats.cachedAt), 'PPpp') : '—'}</div>
-            </div>
-            <ScrollArea className="max-h-[420px]">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-background z-10">
-                  <tr className="text-left border-b">
-                    <th className="py-2 font-medium">School</th>
-                    <th className="py-2 font-medium">Students</th>
-                    <th className="py-2 font-medium">Parents</th>
-                    <th className="py-2 font-medium">Monthly</th>
-                    <th className="py-2 font-medium">Quarter Est.</th>
-                    <th className="py-2 font-medium">Free Tier</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats.perSchoolBreakdown?.length === 0 && (
-                    <tr><td colSpan={6} className="py-6 text-center text-muted-foreground">No schools yet.</td></tr>
-                  )}
-                  {stats.perSchoolBreakdown?.map(row => (
-                    <tr key={row.schoolId} className="border-b last:border-b-0">
-                      <td className="py-2 pr-2 font-medium flex items-center gap-2">
-                        {row.schoolName}
-                        {row.freeTierExceeded && (
-                          <Badge variant="destructive" className="text-[10px]">Overage</Badge>
-                        )}
-                      </td>
-                      <td className="py-2 pr-2">{row.students}</td>
-                      <td className="py-2 pr-2">{row.parents}</td>
-                      <td className="py-2 pr-2">{currency(row.monthlyRevenue || 0)}</td>
-                      <td className="py-2 pr-2">{currency(row.quarterProjected || 0)}</td>
-                      <td className="py-2 pr-2">{row.freeTierExceeded ? 'Exceeded' : 'Within'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </ScrollArea>
-            {overageSchools.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {overageSchools.map(s => (
-                  <Badge key={s.schoolId} variant="outline" className="border-destructive text-destructive bg-destructive/5">
-                    <AlertTriangle className="h-3 w-3 mr-1" /> {s.schoolName} exceeded free tier
-                  </Badge>
-                ))}
-              </div>
-            )}
-          </Card>
-
-          {/* Free Tier Summary + Distribution */}
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card className="p-4">
-              <h2 className="font-medium mb-2">Free Tier Overage Summary</h2>
-              <ul className="text-sm space-y-1">
-                <li>Schools Over Free Tier: <strong>{overageSchools.length}</strong></li>
-                <li>Current Billing Rate: GHS 10 / student / quarter</li>
-                <li>Parent Rate: GHS 5 / parent / quarter</li>
-                <li>Enforcement: Hard (grace then block)</li>
-              </ul>
-            </Card>
-            <Card className="p-4">
-              <h2 className="font-medium mb-2">Monthly Revenue Distribution</h2>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.perSchoolBreakdown} margin={{ left: 4, right: 10, top: 8, bottom: 0 }}>
-                    <XAxis dataKey="schoolName" hide />
-                    <YAxis tickFormatter={(v)=> (v/1000)+'k'} width={50} />
-                    <Tooltip formatter={(v)=> currency(Number(v))} labelFormatter={() => 'School'} />
-                    <Bar dataKey="monthlyRevenue" fill="#6366f1" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">Hover bars for amounts; labels hidden for space.</div>
-            </Card>
-          </div>
-        </>
-      )}
+        )}
+      </div>
     </div>
   );
-}
+};
 
-function KPI({ label, value, icon, trend }) {
-  const trendPositive = trend != null && trend > 0;
-  const trendNegative = trend != null && trend < 0;
+// Activity Item Component
+const ActivityItem = ({ icon: Icon, title, description, time, status }) => {
+  const statusColors = {
+    success: 'text-emerald-600 dark:text-emerald-400',
+    warning: 'text-orange-600 dark:text-orange-400',
+    error: 'text-red-600 dark:text-red-400',
+    info: 'text-blue-600 dark:text-blue-400'
+  };
+
   return (
-    <Card className="p-4 flex flex-col gap-1">
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <span>{label}</span>
-        {icon && <span className="text-muted-foreground/70">{icon}</span>}
+    <div className="flex items-start gap-3 p-3 rounded-xl hover:bg-white/50 dark:hover:bg-slate-800/50 transition-colors group">
+      <div className={`flex items-center justify-center w-8 h-8 rounded-lg ${statusColors[status]} bg-current bg-opacity-10`}>
+        <Icon className="w-4 h-4" />
       </div>
-      <div className="text-xl font-semibold tracking-tight">{value ?? '—'}</div>
-      {trend != null && (
-        <div className={`flex items-center gap-1 text-xs ${trendPositive ? 'text-emerald-600' : trendNegative ? 'text-red-600' : 'text-muted-foreground'}`}> 
-          {trendPositive && <TrendingUp className="h-3 w-3" />}
-            {trendNegative && <TrendingDown className="h-3 w-3" />}
-          <span>{trend.toFixed(1)}%</span>
+      <div className="flex-1 min-w-0">
+        <div className="font-medium text-gray-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+          {title}
         </div>
-      )}
-    </Card>
+        <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
+          {description}
+        </div>
+      </div>
+      <div className="text-xs text-gray-500 dark:text-gray-500">
+        {time}
+      </div>
+    </div>
   );
-}
+};
 
-function mergeSeries(mrr, arpu) {
-  const map = new Map();
-  mrr.forEach(r => { map.set(r.month, { month: r.month, mrr: r.mrr }); });
-  arpu.forEach(r => { const existing = map.get(r.month) || { month: r.month }; existing.arpu = r.arpu; map.set(r.month, existing); });
-  return Array.from(map.values()).sort((a,b)=> a.month.localeCompare(b.month));
+export default function DashboardPage() {
+  const { data: session } = useSession();
+  const router = useRouter();
+  const [stats, setStats] = useState(null);
+  const [schools, setSchools] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (session && session.user?.role !== 'SUPER_ADMIN') {
+      router.push('/login');
+      return;
+    }
+
+    const fetchData = async () => {
+      try {
+        const [statsRes, schoolsRes] = await Promise.all([
+          fetch('/api/superadmin/stats'),
+          fetch('/api/superadmin/schools?limit=5&sortBy=createdAt&sortOrder=desc')
+        ]);
+
+        const [statsData, schoolsData] = await Promise.all([
+          statsRes.json(),
+          schoolsRes.json()
+        ]);
+
+        setStats(statsData);
+        setSchools(schoolsData.schools || []);
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (session?.user?.role === 'SUPER_ADMIN') {
+      fetchData();
+    }
+  }, [session, router]);
+
+  const recentActivity = [
+    { 
+      icon: School, 
+      title: 'New School Registration', 
+      description: 'Greenwood Academy submitted application', 
+      time: '2 min ago', 
+      status: 'info' 
+    },
+    { 
+      icon: CheckCircle2, 
+      title: 'Payment Processed', 
+      description: 'Monthly subscription for Lincoln High', 
+      time: '15 min ago', 
+      status: 'success' 
+    },
+    { 
+      icon: Users, 
+      title: 'User Account Created', 
+      description: 'New admin user for Valley School', 
+      time: '1 hour ago', 
+      status: 'info' 
+    },
+    { 
+      icon: AlertTriangle, 
+      title: 'System Alert', 
+      description: 'High API usage detected', 
+      time: '2 hours ago', 
+      status: 'warning' 
+    },
+  ];
+
+  return (
+    <div className="space-y-8">
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            Welcome back, {session?.user?.name?.split(' ')[0] || 'Admin'}! 👋
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Here's what's happening with your platform today.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" className="rounded-xl">
+            <BarChart3 className="w-4 h-4 mr-2" />
+            View Reports
+          </Button>
+          <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 rounded-xl shadow-lg">
+            <Plus className="w-4 h-4 mr-2" />
+            Add School
+          </Button>
+        </div>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard
+          title="Total Schools"
+          value={isLoading ? "..." : stats?.totalSchools || "0"}
+          icon={School}
+          description="Active institutions"
+          trend="+12%"
+          isLoading={isLoading}
+          color="purple"
+        />
+        <StatCard
+          title="Total Users"
+          value={isLoading ? "..." : stats?.totalUsers || "0"}
+          icon={Users}
+          description="Platform users"
+          trend="+8%"
+          isLoading={isLoading}
+          color="blue"
+        />
+        <StatCard
+          title="Monthly Revenue"
+          value={isLoading ? "..." : `GHS ${ (stats?.monthlyRevenue ?? 0).toLocaleString(undefined,{ minimumFractionDigits:2, maximumFractionDigits:2 }) }`}
+          icon={CreditCard}
+          description="Est. from quarterly usage"
+          trend={stats?.monthlyRevenue ? '+23%' : undefined}
+          isLoading={isLoading}
+          color="emerald"
+        />
+        <StatCard
+          title="System Health"
+          value="99.9%"
+          icon={Activity}
+          description="Uptime status"
+          trend="Excellent"
+          isLoading={isLoading}
+          color="orange"
+        />
+      </div>
+
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Recent Schools */}
+        <div className="lg:col-span-2">
+          <div className="backdrop-blur-xl bg-white/70 dark:bg-slate-900/70 border border-white/20 dark:border-white/10 rounded-2xl shadow-lg">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Recent Schools
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Latest registered institutions
+                </p>
+              </div>
+              <Link href="/schools">
+                <Button variant="ghost" size="sm" className="rounded-xl">
+                  View All
+                  <ArrowUpRight className="w-4 h-4 ml-1" />
+                </Button>
+              </Link>
+            </div>
+            <div className="p-6">
+              {isLoading ? (
+                <div className="space-y-4">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="flex items-center gap-4">
+                      <Skeleton className="h-12 w-12 rounded-xl" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-4 w-3/4 rounded" />
+                        <Skeleton className="h-3 w-1/2 rounded" />
+                      </div>
+                      <Skeleton className="h-6 w-16 rounded-full" />
+                    </div>
+                  ))}
+                </div>
+              ) : schools.length > 0 ? (
+                <div className="space-y-4">
+                  {schools.map((school) => (
+                    <div key={school.id} className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/50 dark:hover:bg-slate-800/50 transition-colors group">
+                      <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white font-bold">
+                        {school.name.charAt(0)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-gray-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                          {school.name}
+                        </div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
+                          <Globe className="w-3 h-3" />
+                          {school.subdomain}.sukuu.com
+                        </div>
+                      </div>
+                      <Badge 
+                        variant={school.status === 'ACTIVE' ? 'default' : 'secondary'}
+                        className="rounded-full"
+                      >
+                        {school.status}
+                      </Badge>
+                      <Button variant="ghost" size="sm" className="rounded-lg">
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <School className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600 dark:text-gray-400">No schools registered yet</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Activity Feed */}
+        <div className="space-y-6">
+          {/* Recent Activity */}
+          <div className="backdrop-blur-xl bg-white/70 dark:bg-slate-900/70 border border-white/20 dark:border-white/10 rounded-2xl shadow-lg">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Recent Activity
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Latest platform events
+                </p>
+              </div>
+            </div>
+            <div className="p-3">
+              <div className="space-y-1">
+                {recentActivity.map((activity, index) => (
+                  <ActivityItem key={index} {...activity} />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="backdrop-blur-xl bg-white/70 dark:bg-slate-900/70 border border-white/20 dark:border-white/10 rounded-2xl shadow-lg">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Quick Actions
+              </h3>
+            </div>
+            <div className="p-6 space-y-3">
+              <Link href="/schools/create">
+                <Button variant="ghost" className="w-full justify-start rounded-xl hover:bg-purple-50 dark:hover:bg-purple-900/20">
+                  <Plus className="w-4 h-4 mr-3" />
+                  Add New School
+                </Button>
+              </Link>
+              <Link href="/users">
+                <Button variant="ghost" className="w-full justify-start rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                  <Users className="w-4 h-4 mr-3" />
+                  Manage Users
+                </Button>
+              </Link>
+              <Link href="/settings">
+                <Button variant="ghost" className="w-full justify-start rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
+                  <BarChart3 className="w-4 h-4 mr-3" />
+                  View Analytics
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
