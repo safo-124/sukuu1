@@ -227,6 +227,7 @@ export default function DashboardPage() {
   ];
 
   return (
+    <>
     <div className="space-y-8">
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -514,46 +515,45 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+    {deleteTarget && (
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open)=> !open && !isDeleting && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete “{deleteTarget.name}” permanently?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove the school and all cascading related data. Restricted relations will block the delete unless force is applied.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+              onClick={async()=>{
+                setIsDeleting(true);
+                try {
+                  const res = await fetch(`/api/superadmin/schools/${deleteTarget.id}?force=1`, { method: 'DELETE' });
+                  if(!res.ok){
+                    const data = await res.json().catch(()=>({}));
+                    alert(`Delete failed: ${data.error || res.status}`);
+                  } else {
+                    // Refresh lists
+                    setSchools(prev => prev.filter(s=> s.id !== deleteTarget.id));
+                    // Refresh stats silently
+                    fetch('/api/superadmin/stats').then(r=>r.json()).then(d=> setStats(d)).catch(()=>{});
+                  }
+                } finally {
+                  setIsDeleting(false);
+                  setDeleteTarget(null);
+                }
+              }}
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    )}
+    </>
   );
 }
-
-// Delete confirmation dialog
-{deleteTarget && (
-  <AlertDialog open={!!deleteTarget} onOpenChange={(open)=> !open && !isDeleting && setDeleteTarget(null)}>
-    <AlertDialogContent>
-      <AlertDialogHeader>
-        <AlertDialogTitle>Delete “{deleteTarget.name}” permanently?</AlertDialogTitle>
-        <AlertDialogDescription>
-          This will permanently remove the school and all cascading related data. Restricted relations will block the delete unless force is applied.
-        </AlertDialogDescription>
-      </AlertDialogHeader>
-      <AlertDialogFooter>
-        <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-        <AlertDialogAction
-          disabled={isDeleting}
-          className="bg-red-600 hover:bg-red-700"
-          onClick={async()=>{
-            setIsDeleting(true);
-            try {
-              const res = await fetch(`/api/superadmin/schools/${deleteTarget.id}?force=1`, { method: 'DELETE' });
-              if(!res.ok){
-                const data = await res.json().catch(()=>({}));
-                alert(`Delete failed: ${data.error || res.status}`);
-              } else {
-                // Refresh lists
-                setSchools(prev => prev.filter(s=> s.id !== deleteTarget.id));
-                // Refresh stats silently
-                fetch('/api/superadmin/stats').then(r=>r.json()).then(d=> setStats(d)).catch(()=>{});
-              }
-            } finally {
-              setIsDeleting(false);
-              setDeleteTarget(null);
-            }
-          }}
-        >
-          {isDeleting ? 'Deleting...' : 'Delete'}
-        </AlertDialogAction>
-      </AlertDialogFooter>
-    </AlertDialogContent>
-  </AlertDialog>
-)}
