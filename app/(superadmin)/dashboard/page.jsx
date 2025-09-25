@@ -333,6 +333,68 @@ export default function DashboardPage() {
               )}
             </div>
           </div>
+
+          {/* Top Monthly Contributors (Per-School Monthly Breakdown) */}
+          <div className="mt-8 backdrop-blur-xl bg-white/70 dark:bg-slate-900/70 border border-white/20 dark:border-white/10 rounded-2xl shadow-lg">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Top Monthly Contributors</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Prorated monthly revenue derived from current quarter usage</p>
+              </div>
+              {stats?.perSchoolMonthly?.length ? (
+                <span className="text-xs text-gray-500 dark:text-gray-400">{stats.perSchoolMonthly.length} schools</span>
+              ) : null}
+            </div>
+            <div className="p-6 overflow-x-auto">
+              {isLoading ? (
+                <div className="space-y-2">
+                  {[...Array(4)].map((_,i)=> <Skeleton key={i} className="h-8 w-full" />)}
+                </div>
+              ) : stats?.perSchoolMonthly?.length ? (
+                <table className="min-w-full text-sm">
+                  <thead className="text-left text-gray-500 dark:text-gray-400">
+                    <tr>
+                      <th className="py-2 pr-4">#</th>
+                      <th className="py-2 pr-4">School</th>
+                      <th className="py-2 pr-4 text-right">Students</th>
+                      <th className="py-2 pr-4 text-right">Parents</th>
+                      <th className="py-2 pr-4 text-right">Monthly</th>
+                      <th className="py-2 pr-4 text-right">Quarter</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.perSchoolMonthly
+                      .slice()
+                      .sort((a,b)=> b.monthlyAmount - a.monthlyAmount)
+                      .slice(0,10)
+                      .map((row, idx) => {
+                        const rank = idx + 1;
+                        const highlight = rank <= 3;
+                        return (
+                          <tr key={row.schoolId} className={`border-t border-gray-100 dark:border-gray-800 hover:bg-white/40 dark:hover:bg-slate-800/40 transition-colors ${highlight ? 'bg-gradient-to-r from-amber-50/60 to-transparent dark:from-amber-500/5' : ''}`}> 
+                            <td className="py-2 pr-4 font-medium text-gray-700 dark:text-gray-300">
+                              {highlight ? (
+                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-500 text-white text-xs font-bold shadow">{rank}</span>
+                              ) : rank}
+                            </td>
+                            <td className="py-2 pr-4 font-medium text-gray-900 dark:text-white">{row.schoolName}</td>
+                            <td className="py-2 pr-4 text-right text-gray-700 dark:text-gray-300">{row.studentCount}</td>
+                            <td className="py-2 pr-4 text-right text-gray-700 dark:text-gray-300">{row.parentCount}</td>
+                            <td className="py-2 pr-4 text-right font-semibold text-gray-900 dark:text-white">GHS {row.monthlyAmount.toFixed(2)}</td>
+                            <td className="py-2 pr-4 text-right text-gray-600 dark:text-gray-400">GHS {row.quarterAmount.toFixed(2)}</td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="text-sm text-gray-500 dark:text-gray-400">No usage snapshots yet.</div>
+              )}
+            </div>
+            <div className="px-6 pb-4 text-xs text-gray-500 dark:text-gray-500 flex items-center gap-2">
+              <AlertTriangle className="h-3 w-3" /> Figures are approximate until invoices are generated (quarterly).
+            </div>
+          </div>
         </div>
 
         {/* Activity Feed */}
