@@ -43,6 +43,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { 
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction
+} from '@/components/ui/alert-dialog';
 import {
   Select,
   SelectContent,
@@ -69,6 +79,8 @@ export default function ManageSchoolsPage() {
   const [successMessage, setSuccessMessage] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedSchools, setSelectedSchools] = useState([]);
+  const [deleteTarget, setDeleteTarget] = useState(null); // {id, name}
+  const [isDeleting, setIsDeleting] = useState(false);
 
 
   // --- Data Fetching and Handlers ---
@@ -510,7 +522,10 @@ export default function ManageSchoolsPage() {
                           <Settings2 className="w-4 h-4 mr-2" />
                           Settings
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-red-600 dark:text-red-400">
+                        <DropdownMenuItem 
+                          className="text-red-600 dark:text-red-400"
+                          onClick={() => setDeleteTarget({ id: school.id, name: school.name })}
+                        >
                           <Trash2 className="w-4 h-4 mr-2" />
                           Delete
                         </DropdownMenuItem>
@@ -618,3 +633,49 @@ export default function ManageSchoolsPage() {
     </div>
   );
 }
+
+{/* Hard Delete Confirmation Dialog */}
+{deleteTarget && (
+  <AlertDialog open={!!deleteTarget} onOpenChange={(open)=> !open && !isDeleting && setDeleteTarget(null)}>
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Delete “{deleteTarget.name}” permanently?</AlertDialogTitle>
+        <AlertDialogDescription>
+          This action cannot be undone. It will permanently remove the school and all associated cascading data. Restrictive relations will be purged because force deletion is used.
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+        <AlertDialogAction
+          disabled={isDeleting}
+          className="bg-red-600 hover:bg-red-700"
+          onClick={async()=>{
+            setIsDeleting(true);
+            try {
+              const res = await fetch(`/api/superadmin/schools/${deleteTarget.id}?force=1`, { method: 'DELETE' });
+              const data = await res.json().catch(()=>({}));
+              if(!res.ok){
+                alert(data.error || 'Delete failed');
+              } else {
+                setSuccessMessage(`School “${deleteTarget.name}” deleted.`);
+                setSchools(prev => prev.filter(s=> s.id !== deleteTarget.id));
+                // Refresh pagination if current page empties
+                if (schools.length === 1 && pagination.currentPage > 1) {
+                  fetchData(pagination.currentPage - 1, debouncedSearchTerm);
+                }
+              }
+            } catch(e){
+              console.error(e);
+              alert('Unexpected error deleting school');
+            } finally {
+              setIsDeleting(false);
+              setDeleteTarget(null);
+            }
+          }}
+        >
+          {isDeleting ? 'Deleting...' : 'Delete'}
+        </AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
+)}
