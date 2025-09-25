@@ -79,7 +79,7 @@ export default function SuperAdminLayout({ children }) {
         className="fixed left-0 top-0 z-50 h-screen w-2 md:w-3"
         onMouseEnter={handleEdgeEnter}
       />
-
+  
       <div className="relative flex flex-1 pt-20">
         <Sidebar isOpen={isSidebarOpen} onClose={handleSidebarClose} />
 
