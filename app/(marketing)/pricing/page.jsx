@@ -3,9 +3,12 @@ export const metadata = {
   description: 'Simple, transparent pricing that scales with your school. Start free or choose a plan that fits your needs.'
 };
 
+import React, { Suspense } from 'react';
 import Link from 'next/link';
-import { Check, ArrowRight, Star, Zap, Shield, Users, Building, Crown } from 'lucide-react';
+import { Check, ArrowRight, Star, Zap, Shield, Users, Building, Crown, Calculator } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { getAllPlatformSettings } from '@/lib/platformSettings';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 // Convert a Quarterly (3‑month) fee into a per-month display (rounded) when desired.
 function formatMonthlyFromQuarter(quarterFee) {
@@ -182,6 +185,34 @@ export default async function PricingPage() {
         </div>
       </section>
 
+      {/* Estimator + Simple Charts */}
+      <section className="px-4 py-16 border-t border-white/10">
+        <div className="mx-auto max-w-6xl grid gap-10 lg:grid-cols-2">
+          {/* Cost Estimator */}
+          <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-zinc-900/60 to-zinc-900/30 p-8 relative overflow-hidden">
+            <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_30%_30%,rgba(56,189,248,0.08),transparent)]" />
+            <div className="flex items-center gap-3 mb-6">
+              <div className="h-12 w-12 rounded-2xl bg-sky-500/20 flex items-center justify-center text-sky-400">
+                <Calculator className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold text-white">Quarterly Cost Estimator</h3>
+                <p className="text-sm text-zinc-400">Model your expected usage-based billing.</p>
+              </div>
+            </div>
+            <Estimator initialStudentFee={studentQuarter} initialParentFee={parentQuarter} />
+          </div>
+          {/* Charts */}
+          <div className="space-y-6">
+            <h3 className="text-xl font-semibold text-white">Illustrative Usage Scaling</h3>
+            <p className="text-sm text-zinc-400">Example cumulative quarterly cost vs active users (students + parents). Real analytics appear after you start using the platform.</p>
+            <Suspense fallback={<div className='text-zinc-500 text-sm'>Loading charts…</div>}>
+              <Charts studentFee={studentQuarter} parentFee={parentQuarter} />
+            </Suspense>
+          </div>
+        </div>
+      </section>
+
       {/* Features comparison */}
       <section className="px-4 py-16 border-t border-white/10">
         <div className="mx-auto max-w-6xl">
@@ -282,3 +313,73 @@ export default async function PricingPage() {
     </div>
   );
 }
+
+// Client components (dynamic) -------------------------------------------
+const Estimator = dynamic(() => Promise.resolve(EstimatorImpl), { ssr: false });
+const Charts = dynamic(() => Promise.resolve(ChartsImpl), { ssr: false });
+
+function EstimatorImpl({ initialStudentFee, initialParentFee }) {
+  const [students, setStudents] = React.useState(120);
+  const [parents, setParents] = React.useState(90);
+  const [studentFee, setStudentFee] = React.useState(initialStudentFee);
+  const [parentFee, setParentFee] = React.useState(initialParentFee);
+  const total = (students * studentFee) + (parents * parentFee);
+  const perStudentMonthly = (studentFee / 3).toFixed(2);
+  const perParentMonthly = (parentFee / 3).toFixed(2);
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Students" value={students} onChange={setStudents} />
+        <Field label="Parents" value={parents} onChange={setParents} />
+        <Field label="Student Fee / Quarter (GHS)" value={studentFee} onChange={setStudentFee} step={0.5} />
+        <Field label="Parent Fee / Quarter (GHS)" value={parentFee} onChange={setParentFee} step={0.5} />
+      </div>
+      <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-sm text-zinc-300 space-y-2">
+        <div className="flex justify-between"><span>Quarterly Total</span><span className="font-semibold text-white">GHS {total.toFixed(2)}</span></div>
+        <div className="flex justify-between"><span>Approx Monthly (all)</span><span>GHS {(total/3).toFixed(2)}</span></div>
+        <div className="text-xs text-zinc-500">Student monthly ≈ GHS {perStudentMonthly} • Parent monthly ≈ GHS {perParentMonthly}</div>
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, value, onChange, step=1 }) {
+  return (
+    <label className="flex flex-col gap-1 text-xs font-medium text-zinc-400">
+      {label}
+      <input type="number" value={value} step={step} min={0}
+        onChange={(e)=> onChange(Number(e.target.value))}
+        className="w-full rounded-lg bg-zinc-800/60 text-white border border-white/10 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-600" />
+    </label>
+  );
+}
+
+function ChartsImpl({ studentFee, parentFee }) {
+  const data = React.useMemo(()=>{
+    const rows = [];
+    for (let i=0;i<=5;i++) { // 6 sample points (quarters)
+      const qStudents = 50 + i*40; // hypothetical growth
+      const qParents = Math.round(qStudents*0.75);
+      const total = (qStudents*studentFee)+(qParents*parentFee);
+      rows.push({ quarter: `Q${i+1}`, students: qStudents, parents: qParents, total });
+    }
+    return rows;
+  }, [studentFee, parentFee]);
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 h-[320px] flex flex-col">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+            <XAxis dataKey="quarter" stroke="#888" />
+            <YAxis stroke="#888" />
+            <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8 }} />
+            <Legend />
+            <Line type="monotone" dataKey="students" stroke="#38bdf8" strokeWidth={2} />
+            <Line type="monotone" dataKey="parents" stroke="#a855f7" strokeWidth={2} />
+            <Line type="monotone" dataKey="total" stroke="#22c55e" strokeWidth={2} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+

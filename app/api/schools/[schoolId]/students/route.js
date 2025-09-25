@@ -1,5 +1,6 @@
 // app/api/schools/[schoolId]/students/route.js
 import prisma from '@/lib/prisma';
+import { assertCanAddStudent, BillingEnforcementError } from '@/lib/billingEnforcement';
 // Ensure this path is correct and schemas are properly exported from the validator file
 import { createStudentSchema } from '@/validators/student.validators'; 
 import bcrypt from 'bcryptjs';
@@ -87,6 +88,15 @@ export async function POST(request, { params }) {
   }
 
   try {
+    // Hard enforcement: block if free tier exceeded & unpaid
+    try {
+      await assertCanAddStudent(schoolId);
+    } catch (e) {
+      if (e instanceof BillingEnforcementError) {
+        return NextResponse.json({ error: e.message, code: e.details.code, details: e.details }, { status: e.status });
+      }
+      throw e;
+    }
     const body = await request.json();
     // The error "u.partial is not a function" suggests 'createStudentSchema' might be undefined here
     // or not a valid Zod object schema.
