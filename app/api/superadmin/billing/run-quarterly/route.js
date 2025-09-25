@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { runQuarterlyBilling } from '@/lib/usageBilling';
+import prisma from '@/lib/prisma'; // FIX: was missing, caused route to error silently client-side
 
 export async function POST() {
   const session = await getServerSession(authOptions);
@@ -10,9 +11,7 @@ export async function POST() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {
-    if (!('school' in prisma)) {
-      return NextResponse.json({ error: 'Prisma client not refreshed after migration. Restart server.' }, { status: 200 });
-    }
+    // Run full quarterly billing (captures snapshots + generates invoices)
     const result = await runQuarterlyBilling({});
     return NextResponse.json(result, { status: 201 });
   } catch (e) {
