@@ -12,7 +12,9 @@ export async function GET(request, ctx) {
   const { schoolId } = params;
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'TEACHER' && session.user?.role !== 'SECRETARY' && session.user?.role !== 'ACCOUNTANT')) {
+  const role = session?.user?.role;
+  const isSuperAdmin = role === 'SUPER_ADMIN';
+  if (!session || (!isSuperAdmin && (session.user?.schoolId !== schoolId || (role !== 'SCHOOL_ADMIN' && role !== 'TEACHER' && role !== 'SECRETARY' && role !== 'ACCOUNTANT')))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -99,7 +101,9 @@ export async function POST(request, ctx) {
   const { schoolId } = params;
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) {
+  const role = session?.user?.role;
+  const isSuperAdmin = role === 'SUPER_ADMIN';
+  if (!session || (!isSuperAdmin && (session.user?.schoolId !== schoolId || role !== 'SCHOOL_ADMIN'))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

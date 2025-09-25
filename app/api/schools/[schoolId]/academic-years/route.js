@@ -12,7 +12,9 @@ export async function GET(request, { params }) {
   const { schoolId } = await params; // This is the line generating the Next.js warning
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'TEACHER' && session.user?.role !== 'PARENT')) {
+  const role = session?.user?.role;
+  const isSuperAdmin = role === 'SUPER_ADMIN';
+  if (!session || (!isSuperAdmin && (session.user?.schoolId !== schoolId || (role !== 'SCHOOL_ADMIN' && role !== 'TEACHER' && role !== 'PARENT')))) {
     console.warn(`Unauthorized access attempt to /api/schools/${schoolId}/academic-years by user: ${session?.user?.id}, role: ${session?.user?.role}, schoolId: ${session?.user?.schoolId}`);
     return NextResponse.json({ error: 'Unauthorized access.' }, { status: 401 });
   }
@@ -56,7 +58,9 @@ export async function POST(request, { params }) {
   const { schoolId } = await params;
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN')) { // Only admin can create academic years
+  const role = session?.user?.role;
+  const isSuperAdmin = role === 'SUPER_ADMIN';
+  if (!session || (!isSuperAdmin && (session.user?.schoolId !== schoolId || role !== 'SCHOOL_ADMIN'))) { // SUPER_ADMIN bypass for creation
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
