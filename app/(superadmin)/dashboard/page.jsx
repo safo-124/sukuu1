@@ -24,6 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 
 // Modern StatCard Component
 const StatCard = ({ title, value, icon: Icon, description, trend, isLoading, color = "purple" }) => {
@@ -134,6 +135,8 @@ export default function DashboardPage() {
   const [stats, setStats] = useState(null);
   const [schools, setSchools] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: 'monthlyAmount', direction: 'desc' });
 
   const handleSort = (key) => {
@@ -344,9 +347,20 @@ export default function DashboardPage() {
                       >
                         {school.status}
                       </Badge>
-                      <Button variant="ghost" size="sm" className="rounded-lg">
-                        <Eye className="w-4 h-4" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="sm" className="rounded-lg" title="View">
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="rounded-lg text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-500/10"
+                          title="Delete school"
+                          onClick={() => setDeleteTarget({ id: school.id, name: school.name })}
+                        >
+                          ✕
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -502,3 +516,44 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+// Delete confirmation dialog
+{deleteTarget && (
+  <AlertDialog open={!!deleteTarget} onOpenChange={(open)=> !open && !isDeleting && setDeleteTarget(null)}>
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Delete “{deleteTarget.name}” permanently?</AlertDialogTitle>
+        <AlertDialogDescription>
+          This will permanently remove the school and all cascading related data. Restricted relations will block the delete unless force is applied.
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+        <AlertDialogAction
+          disabled={isDeleting}
+          className="bg-red-600 hover:bg-red-700"
+          onClick={async()=>{
+            setIsDeleting(true);
+            try {
+              const res = await fetch(`/api/superadmin/schools/${deleteTarget.id}?force=1`, { method: 'DELETE' });
+              if(!res.ok){
+                const data = await res.json().catch(()=>({}));
+                alert(`Delete failed: ${data.error || res.status}`);
+              } else {
+                // Refresh lists
+                setSchools(prev => prev.filter(s=> s.id !== deleteTarget.id));
+                // Refresh stats silently
+                fetch('/api/superadmin/stats').then(r=>r.json()).then(d=> setStats(d)).catch(()=>{});
+              }
+            } finally {
+              setIsDeleting(false);
+              setDeleteTarget(null);
+            }
+          }}
+        >
+          {isDeleting ? 'Deleting...' : 'Delete'}
+        </AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
+)}

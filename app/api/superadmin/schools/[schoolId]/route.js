@@ -103,3 +103,65 @@ export async function PUT(request, { params }) {
 
 // (Optional) DELETE handler can also be added here later
 // export async function DELETE(request, { params }) { ... }
+export async function DELETE(request, { params }) {
+  const session = await getServerSession(authOptions);
+  if (!session || session.user?.role !== 'SUPER_ADMIN') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  const { searchParams } = new URL(request.url);
+  const force = searchParams.get('force') === '1';
+  const { schoolId } = params;
+  if (!schoolId) {
+    return NextResponse.json({ error: 'School ID is required' }, { status: 400 });
+  }
+  try {
+    const school = await prisma.school.findUnique({ where: { id: schoolId } });
+    if (!school) return NextResponse.json({ error: 'School not found' }, { status: 404 });
+
+    // Models with onDelete: Restrict that block direct deletion. We count them.
+    const blockers = await Promise.all([
+      prisma.class.count({ where: { schoolId } }),
+      prisma.section.count({ where: { schoolId } }),
+      prisma.studentEnrollment.count({ where: { schoolId } }),
+      prisma.staffLevelAssignment.count({ where: { schoolId } }),
+      prisma.staffSubjectLevel.count({ where: { schoolId } }),
+      prisma.attendance.count({ where: { schoolId } }),
+      prisma.staffAttendance.count({ where: { schoolId } }),
+      prisma.inventoryTransaction.count({ where: { schoolId } }),
+      prisma.expense.count({ where: { schoolId } }),
+      prisma.payment.count({ where: { schoolId } }),
+    ]);
+    const blockerNames = [
+      'class','section','studentEnrollment','staffLevelAssignment','staffSubjectLevel','attendance','staffAttendance','inventoryTransaction','expense','payment'
+    ];
+    const blocking = blockerNames.map((n,i)=> ({ model: n, count: blockers[i] })).filter(b=> b.count>0);
+    if (blocking.length && !force) {
+      return NextResponse.json({
+        error: 'Delete blocked by related records. Re-run with ?force=1 to purge.',
+        blocking
+      }, { status: 409 });
+    }
+    if (force) {
+      // Order of deletions: deepest leaves first to satisfy FK constraints.
+      // Wrap in transaction.
+      await prisma.$transaction(async(tx)=>{
+        await tx.payment.deleteMany({ where: { schoolId }}).catch(()=>{});
+        await tx.expense.deleteMany({ where: { schoolId }}).catch(()=>{});
+        await tx.inventoryTransaction.deleteMany({ where: { schoolId }}).catch(()=>{});
+        await tx.staffAttendance.deleteMany({ where: { schoolId }}).catch(()=>{});
+        await tx.attendance.deleteMany({ where: { schoolId }}).catch(()=>{});
+        await tx.staffSubjectLevel.deleteMany({ where: { schoolId }}).catch(()=>{});
+        await tx.staffLevelAssignment.deleteMany({ where: { schoolId }}).catch(()=>{});
+        await tx.studentEnrollment.deleteMany({ where: { schoolId }}).catch(()=>{});
+        await tx.section.deleteMany({ where: { schoolId }}).catch(()=>{});
+        await tx.class.deleteMany({ where: { schoolId }}).catch(()=>{});
+      });
+    }
+    // Finally delete the school (cascades will clear remaining dependent rows where onDelete: Cascade)
+    await prisma.school.delete({ where: { id: schoolId } });
+    return NextResponse.json({ success: true, deleted: schoolId, forced: force });
+  } catch (error) {
+    console.error('Hard delete failed', error);
+    return NextResponse.json({ error: 'Failed to delete school', detail: error.message }, { status: 500 });
+  }
+}
