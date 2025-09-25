@@ -16,6 +16,9 @@ export async function GET(request) {
   const skip = (page - 1) * limit;
 
   try {
+    if (!prisma.usageSnapshot) {
+      return NextResponse.json({ snapshots: [], warning: 'Prisma client not yet updated with billing models (restart dev server).' });
+    }
     const [rows, total] = await prisma.$transaction([
       prisma.usageSnapshot.findMany({
         orderBy: { capturedAt: 'desc' },

@@ -10,6 +10,9 @@ export async function POST() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {
+    if (!('school' in prisma)) {
+      return NextResponse.json({ error: 'Prisma client not refreshed after migration. Restart server.' }, { status: 200 });
+    }
     const result = await runQuarterlyBilling({});
     return NextResponse.json(result, { status: 201 });
   } catch (e) {

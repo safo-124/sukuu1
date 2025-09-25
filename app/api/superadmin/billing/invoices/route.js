@@ -22,6 +22,9 @@ export async function GET(request) {
   };
 
   try {
+    if (!prisma.billingInvoice) {
+      return NextResponse.json({ invoices: [], warning: 'Prisma client not yet updated with billing models (restart dev server after migration).'}, { status: 200 });
+    }
     const [rows, total] = await prisma.$transaction([
       prisma.billingInvoice.findMany({
         where,

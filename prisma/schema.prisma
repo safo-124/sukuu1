@@ -1982,6 +1982,7 @@ model BillingInvoice {
 
   @@index([schoolId, periodStart, periodEnd])
   @@index([status])
+  @@unique([schoolId, periodStart, periodEnd])
 }
 
 model BillingInvoiceLine {
