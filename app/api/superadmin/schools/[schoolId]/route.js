@@ -103,14 +103,16 @@ export async function PUT(request, { params }) {
 
 // (Optional) DELETE handler can also be added here later
 // export async function DELETE(request, { params }) { ... }
-export async function DELETE(request, { params }) {
+export async function DELETE(request, contextPromise) {
+  // Next.js 15 may pass a promise-like for the context; ensure it's resolved before use.
+  const { params } = await contextPromise;
   const session = await getServerSession(authOptions);
   if (!session || session.user?.role !== 'SUPER_ADMIN') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const { searchParams } = new URL(request.url);
   const force = searchParams.get('force') === '1';
-  const { schoolId } = params;
+  const { schoolId } = params || {};
   if (!schoolId) {
     return NextResponse.json({ error: 'School ID is required' }, { status: 400 });
   }
