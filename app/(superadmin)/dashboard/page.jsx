@@ -19,7 +19,9 @@ import {
   Activity,
   Globe,
   Calendar,
-  Clock
+  Clock,
+  FileText,
+  ClipboardList
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -129,12 +131,38 @@ const ActivityItem = ({ icon: Icon, title, description, time, status }) => {
   );
 };
 
+function timeAgo(ts){
+  if(!ts) return '';
+  const d = typeof ts === 'string' ? new Date(ts) : ts;
+  const diff = Date.now() - d.getTime();
+  const sec = Math.floor(diff/1000);
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec/60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min/60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr/24);
+  if (day < 7) return `${day}d ago`;
+  return d.toLocaleDateString();
+}
+
+const iconMap = {
+  SCHOOL_CREATED: School,
+  USER_CREATED: Users,
+  PAYMENT_PROCESSED: CreditCard,
+  INVOICE_CREATED: FileText,
+  ASSIGNMENT_CREATED: ClipboardList,
+  EXAM_CREATED: Calendar
+};
+
 export default function DashboardPage() {
   const { data: session } = useSession();
   const router = useRouter();
   const [stats, setStats] = useState(null);
   const [schools, setSchools] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [activity, setActivity] = useState([]);
+  const [activityLoading, setActivityLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: 'monthlyAmount', direction: 'desc' });
@@ -171,20 +199,25 @@ export default function DashboardPage() {
 
     const fetchData = async () => {
       try {
-        const [statsRes, schoolsRes] = await Promise.all([
+        const [statsRes, schoolsRes, activityRes] = await Promise.all([
           fetch('/api/superadmin/stats'),
-          fetch('/api/superadmin/schools?limit=5&sortBy=createdAt&sortOrder=desc')
+          fetch('/api/superadmin/schools?limit=5&sortBy=createdAt&sortOrder=desc'),
+          fetch('/api/superadmin/activity?limit=30')
         ]);
 
-        const [statsData, schoolsData] = await Promise.all([
+        const [statsData, schoolsData, activityData] = await Promise.all([
           statsRes.json(),
-          schoolsRes.json()
+          schoolsRes.json(),
+          activityRes.json()
         ]);
 
         setStats(statsData);
         setSchools(schoolsData.schools || []);
+        if (!activityData.error) setActivity(activityData.events || []);
+        setActivityLoading(false);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
+        setActivityLoading(false);
       } finally {
         setIsLoading(false);
       }
@@ -195,36 +228,13 @@ export default function DashboardPage() {
     }
   }, [session, router]);
 
-  const recentActivity = [
-    { 
-      icon: School, 
-      title: 'New School Registration', 
-      description: 'Greenwood Academy submitted application', 
-      time: '2 min ago', 
-      status: 'info' 
-    },
-    { 
-      icon: CheckCircle2, 
-      title: 'Payment Processed', 
-      description: 'Monthly subscription for Lincoln High', 
-      time: '15 min ago', 
-      status: 'success' 
-    },
-    { 
-      icon: Users, 
-      title: 'User Account Created', 
-      description: 'New admin user for Valley School', 
-      time: '1 hour ago', 
-      status: 'info' 
-    },
-    { 
-      icon: AlertTriangle, 
-      title: 'System Alert', 
-      description: 'High API usage detected', 
-      time: '2 hours ago', 
-      status: 'warning' 
-    },
-  ];
+  const recentActivity = activity.map(ev => ({
+    icon: iconMap[ev.type] || Activity,
+    title: ev.title,
+    description: ev.description,
+    time: timeAgo(ev.ts),
+    status: ev.status || 'info'
+  }));
 
   return (
     <>
@@ -477,9 +487,26 @@ export default function DashboardPage() {
             </div>
             <div className="p-3">
               <div className="space-y-1">
-                {recentActivity.map((activity, index) => (
-                  <ActivityItem key={index} {...activity} />
-                ))}
+                {activityLoading ? (
+                  <div className="space-y-2 p-2">
+                    {[...Array(5)].map((_,i)=>(
+                      <div key={i} className="flex items-start gap-3 p-3 rounded-xl">
+                        <Skeleton className="w-8 h-8 rounded-lg" />
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-4 w-2/3" />
+                          <Skeleton className="h-3 w-1/2" />
+                        </div>
+                        <Skeleton className="h-3 w-10" />
+                      </div>
+                    ))}
+                  </div>
+                ) : recentActivity.length ? (
+                  recentActivity.slice(0,15).map((a, idx)=>(
+                    <ActivityItem key={idx} {...a} />
+                  ))
+                ) : (
+                  <div className="text-xs text-gray-500 dark:text-gray-400 p-3">No recent activity.</div>
+                )}
               </div>
             </div>
           </div>
