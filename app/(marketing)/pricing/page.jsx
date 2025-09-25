@@ -5,16 +5,31 @@ export const metadata = {
 
 import Link from 'next/link';
 import { Check, ArrowRight, Star, Zap, Shield, Users, Building, Crown } from 'lucide-react';
+import { getAllPlatformSettings } from '@/lib/platformSettings';
 
-export default function PricingPage() {
+// Convert a Quarterly (3‑month) fee into a per-month display (rounded) when desired.
+function formatMonthlyFromQuarter(quarterFee) {
+  const monthly = quarterFee / 3;
+  return monthly.toFixed(monthly < 10 ? 2 : 0); // show 2dp for small numbers
+}
+
+export const revalidate = 3600; // cache for an hour (Static-like with ISR)
+
+export default async function PricingPage() {
+  const settings = await getAllPlatformSettings();
+  const studentQuarter = Number(settings.studentQuarterFee || 10);
+  const parentQuarter = Number(settings.parentQuarterFee || 5);
+  const studentMonthly = formatMonthlyFromQuarter(studentQuarter);
+  const parentMonthly = formatMonthlyFromQuarter(parentQuarter);
+
   const tiers = [
     { 
-      name: 'Starter', 
-      price: '$0', 
+      name: 'Starter',
+      price: 'GHS 0',
       period: 'Forever free',
       desc: 'Perfect for small schools getting started', 
       features: [
-        'Up to 50 students',
+        'Up to 50 students (no billing)',
         'Core academics module',
         'Basic finance tracking',
         'Email support',
@@ -26,18 +41,18 @@ export default function PricingPage() {
       icon: Users
     },
     { 
-      name: 'Professional', 
-      price: '$99', 
-      period: 'per month',
-      desc: 'For growing schools that need more power', 
+      name: 'Usage Based',
+      price: `GHS ${studentQuarter} / student`,
+      period: 'per 3 months',
+      desc: 'Simple usage billing as you grow',
       features: [
-        'Up to 1,000 students',
-        'All modules included',
-        'Advanced reporting',
-        'Priority support',
+        `≈ GHS ${studentMonthly} per student monthly (billed quarterly)`,
+        `Parent app: GHS ${parentQuarter} per parent / 3 months (≈ GHS ${parentMonthly}/mo)`,
+        'All core & advanced modules',
+        'Advanced reporting & analytics',
+        'Priority support SLA',
         'Custom branding',
-        'API access',
-        'Advanced integrations',
+        'API & integrations',
         'Multi-campus support'
       ],
       cta: 'Start free trial',
@@ -64,7 +79,6 @@ export default function PricingPage() {
       icon: Crown
     },
   ];
-
   return (
     <div>
       {/* Hero */}

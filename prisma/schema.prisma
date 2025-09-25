@@ -181,6 +181,17 @@ model School {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  // --------------------
+  // Billing / Subscription fields
+  // --------------------
+  billingPlan           String?   @default("USAGE") // Future: ENTERPRISE, CUSTOM
+  trialEndsAt           DateTime?
+  paidThrough           DateTime? // If set & in future, school considered in good standing
+  lastUsageSnapshotAt   DateTime?
+  freeTierStudentLimit  Int       @default(50)
+  // Soft flag if we blocked actions due to overage (can drive UI prompts)
+  upgradeRequired       Boolean   @default(false)
+
   // Feature flags
   hasParentAppAccess      Boolean @default(false)
   hasAutoTimetable        Boolean @default(false)
@@ -258,6 +269,8 @@ model School {
   HostelRoom              HostelRoom[]
   inventoryTransactions   InventoryTransaction[]
   parentTeacherMessages   ParentTeacherMessage[]
+  usageSnapshots          UsageSnapshot[]
+  billingInvoices         BillingInvoice[]
   // Advanced Timetable relations
   sectionSubjectRequirements SectionSubjectRequirement[]
   staffUnavailabilities      StaffUnavailability[]
@@ -1916,4 +1929,87 @@ model BookLoan {
   @@index([bookId])
   @@index([studentId])
   @@index([status])
+}
+
+// --------------------
+// PLATFORM BILLING MODELS (Usage-based per quarter)
+// --------------------
+
+// Periodic snapshot of billable usage (students & parents) for a school
+model UsageSnapshot {
+  id          String   @id @default(cuid())
+  schoolId    String
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  capturedAt  DateTime @default(now())
+  periodStart DateTime // inclusive quarter start
+  periodEnd   DateTime // inclusive quarter end
+  studentCount Int
+  parentCount  Int
+  notes       String?
+
+  billingInvoice BillingInvoice?
+
+  @@unique([schoolId, periodStart, periodEnd])
+  @@index([schoolId, capturedAt])
+}
+
+enum BillingInvoiceStatus {
+  DRAFT
+  GENERATED
+  SENT
+  PAID
+  VOID
+}
+
+// Invoice generated for platform usage (not the same as school internal finance Invoice)
+model BillingInvoice {
+  id            String              @id @default(cuid())
+  schoolId      String
+  school        School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  usageSnapshotId String?           @unique
+  usageSnapshot UsageSnapshot?      @relation(fields: [usageSnapshotId], references: [id], onDelete: SetNull)
+  periodStart   DateTime
+  periodEnd     DateTime
+  issueDate     DateTime            @default(now())
+  dueDate       DateTime
+  totalAmount   Float               @default(0)
+  status        BillingInvoiceStatus @default(DRAFT)
+  currency      String              @default("GHS")
+  meta          Json?
+  lines         BillingInvoiceLine[]
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@index([schoolId, periodStart, periodEnd])
+  @@index([status])
+}
+
+model BillingInvoiceLine {
+  id        String         @id @default(cuid())
+  billingInvoiceId String
+  billingInvoice   BillingInvoice @relation(fields: [billingInvoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Int      @default(0)
+  unitPrice   Float    @default(0)
+  lineTotal   Float    @default(0)
+  meta        Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([billingInvoiceId])
+}
+
+// Audit log of automated billing runs (cron / manual trigger)
+model BillingRunLog {
+  id         String   @id @default(cuid())
+  ranAt      DateTime @default(now())
+  periodStart DateTime
+  periodEnd   DateTime
+  schoolsProcessed Int
+  invoicesCreated  Int
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  @@index([ranAt])
+  @@index([periodStart, periodEnd])
 }

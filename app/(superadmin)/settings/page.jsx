@@ -23,6 +23,9 @@ export default function SuperAdminSettingsPage() {
   const [supportEmail, setSupportEmail] = useState('support@sukuu.com');
   const [allowSchoolSignup, setAllowSchoolSignup] = useState(true);
   const [enableParentApp, setEnableParentApp] = useState(true);
+  // Billing settings (GHS)
+  const [studentQuarterFee, setStudentQuarterFee] = useState(10); // GHS per student per 3 months
+  const [parentQuarterFee, setParentQuarterFee] = useState(5);    // GHS per parent per 3 months
 
   useEffect(() => {
     if (status === 'loading') return;
@@ -45,6 +48,8 @@ export default function SuperAdminSettingsPage() {
         if (typeof s.supportEmail === 'string') setSupportEmail(s.supportEmail);
         if (typeof s.allowSchoolSignup === 'boolean') setAllowSchoolSignup(s.allowSchoolSignup);
         if (typeof s.enableParentApp === 'boolean') setEnableParentApp(s.enableParentApp);
+  if (typeof s.studentQuarterFee === 'number') setStudentQuarterFee(s.studentQuarterFee);
+  if (typeof s.parentQuarterFee === 'number') setParentQuarterFee(s.parentQuarterFee);
       } catch (e) {
         setError(e.message);
       } finally {
@@ -62,6 +67,8 @@ export default function SuperAdminSettingsPage() {
           supportEmail,
           allowSchoolSignup,
           enableParentApp,
+          studentQuarterFee: Number(studentQuarterFee) || 0,
+          parentQuarterFee: Number(parentQuarterFee) || 0,
         },
       };
       const res = await fetch('/api/superadmin/settings', {
@@ -147,6 +154,22 @@ export default function SuperAdminSettingsPage() {
             </div>
             <Switch checked={enableParentApp} onCheckedChange={setEnableParentApp} />
           </div>
+        </div>
+
+        {/* Billing: Student Fee */}
+        <div className="backdrop-blur-xl bg-white/70 dark:bg-slate-900/70 border border-white/20 dark:border-white/10 rounded-2xl p-6">
+          <div className="mb-2 text-sm text-gray-600 dark:text-gray-400">Billing</div>
+          <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">Student Fee (GHS / 3 months)</label>
+          <Input type="number" min="0" step="0.01" value={studentQuarterFee} onChange={(e) => setStudentQuarterFee(e.target.value)} />
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Charged per active student each quarter (term). Default: 10 GHS.</p>
+        </div>
+
+        {/* Billing: Parent App Fee */}
+        <div className="backdrop-blur-xl bg-white/70 dark:bg-slate-900/70 border border-white/20 dark:border-white/10 rounded-2xl p-6">
+          <div className="mb-2 text-sm text-gray-600 dark:text-gray-400">Billing</div>
+          <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">Parent App Fee (GHS / 3 months)</label>
+            <Input type="number" min="0" step="0.01" value={parentQuarterFee} onChange={(e) => setParentQuarterFee(e.target.value)} />
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Charged per connected parent each quarter. Default: 5 GHS.</p>
         </div>
       </div>
 
