@@ -244,10 +244,10 @@ export default function DashboardPage() {
         />
         <StatCard
           title="Monthly Revenue"
-          value={isLoading ? "..." : "$24,750"}
+          value={isLoading ? "..." : `GHS ${ (stats?.monthlyRevenue ?? 0).toLocaleString(undefined,{ minimumFractionDigits:2, maximumFractionDigits:2 }) }`}
           icon={CreditCard}
-          description="This month"
-          trend="+23%"
+          description="Est. from quarterly usage"
+          trend={stats?.monthlyRevenue ? '+23%' : undefined}
           isLoading={isLoading}
           color="emerald"
         />

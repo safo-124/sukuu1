@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth"; // Adjust path as needed
+import { computeQuarterBounds } from '@/lib/usageBilling';
 
 export async function GET(request) {
   const session = await getServerSession(authOptions);
@@ -28,12 +29,51 @@ export async function GET(request) {
     // but be mindful of query performance if data grows very large.
     // For now, these are good starting stats.
 
+    // ---------- Billing (Monthly) ----------
+    // We store quarterly snapshots; convert latest quarter usage into a monthly figure
+    // Strategy: for each school, take its snapshot for the current quarter (if any),
+    // compute invoice amount (students * studentFee + parents * parentFee), divide by 3.
+    // Fees are in PlatformSetting or default 10 (student) / 5 (parent).
+    let monthlyRevenue = 0;
+    let perSchoolMonthly = [];
+    try {
+      const settingsRows = await prisma.platformSetting.findMany({
+        where: { key: { in: ['studentQuarterFee', 'parentQuarterFee'] } }
+      });
+      const getSetting = (k) => settingsRows.find(r => r.key === k)?.value;
+      const studentFee = Number(getSetting('studentQuarterFee') ?? 10);
+      const parentFee = Number(getSetting('parentQuarterFee') ?? 5);
+      const { periodStart, periodEnd } = computeQuarterBounds(new Date());
+      if (prisma.usageSnapshot) {
+        const snapshots = await prisma.usageSnapshot.findMany({
+          where: { periodStart, periodEnd },
+          include: { school: { select: { id: true, name: true } } }
+        });
+        perSchoolMonthly = snapshots.map(s => {
+          const quarterAmount = (s.studentCount * studentFee) + (s.parentCount * parentFee);
+            return {
+              schoolId: s.schoolId,
+              schoolName: s.school?.name || 'School',
+              studentCount: s.studentCount,
+              parentCount: s.parentCount,
+              quarterAmount,
+              monthlyAmount: quarterAmount / 3
+            };
+        });
+        monthlyRevenue = perSchoolMonthly.reduce((sum, r) => sum + r.monthlyAmount, 0);
+      }
+    } catch (e) {
+      console.warn('Billing monthly revenue calc failed (non-fatal)', e);
+    }
+
     const stats = {
       totalSchools,
       activeSchools,
       inactiveSchools,
       totalSchoolAdmins,
       totalUsers,
+      monthlyRevenue: Number(monthlyRevenue.toFixed(2)),
+      perSchoolMonthly
     };
 
     return NextResponse.json(stats, { status: 200 });
