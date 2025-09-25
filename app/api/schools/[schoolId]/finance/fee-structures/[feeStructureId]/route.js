@@ -95,6 +95,10 @@ export async function PUT(request, { params }) {
       const classExists = await prisma.class.findUnique({ where: { id: validation.data.classId, schoolId: schoolId } });
       if (!classExists) return NextResponse.json({ error: 'Class not found or does not belong to this school.' }, { status: 400 });
     }
+    if (validation.data.schoolLevelId !== undefined && validation.data.schoolLevelId !== null) {
+      const levelExists = await prisma.schoolLevel.findUnique({ where: { id: validation.data.schoolLevelId, schoolId: schoolId } });
+      if (!levelExists) return NextResponse.json({ error: 'School Level not found or does not belong to this school.' }, { status: 400 });
+    }
 
 
     const { components, componentUpdateMode, amount, ...simpleFields } = validation.data;
