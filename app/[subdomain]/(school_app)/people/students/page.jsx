@@ -27,9 +27,10 @@ import { ScrollArea } from '@/components/ui/scroll-area'; // Added ScrollArea
 
 // Lucide React Icons
 import { 
-    UserPlus, Edit3, Eye, Search, AlertTriangle, Users as UsersIcon, 
-    ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Loader2 
+  UserPlus, Edit3, Eye, Search, AlertTriangle, Users as UsersIcon, 
+  ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Loader2, ArrowUpRight, Repeat2 
 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const initialStudentFormData = {
   firstName: '', lastName: '', middleName: '', 
@@ -175,6 +176,13 @@ export default function ManageStudentsPage() {
   const [sections, setSections] = useState([]);
   const [isLoadingDropdowns, setIsLoadingDropdowns] = useState(false);
 
+  // Promotion / Transfer state
+  const [selectedStudentIds, setSelectedStudentIds] = useState([]);
+  const [isPromotionDialogOpen, setIsPromotionDialogOpen] = useState(false);
+  const [promotionForm, setPromotionForm] = useState({ targetAcademicYearId: '', targetClassId: '', targetSectionId: '', mode: 'AUTO' });
+  const [isPromoting, setIsPromoting] = useState(false);
+  const [promotionError, setPromotionError] = useState('');
+
   // Tailwind class constants
   const titleTextClasses = "text-black dark:text-white";
   const descriptionTextClasses = "text-zinc-600 dark:text-zinc-400";
@@ -258,6 +266,57 @@ export default function ManageStudentsPage() {
       fetchDropdownData();
     }
   }, [schoolData, session, fetchStudents, fetchDropdownData, searchParams]);
+
+  // Derived list filters for promotion target
+  const promotionTargetClasses = promotionForm.targetAcademicYearId ? classes.filter(c => c.academicYearId === promotionForm.targetAcademicYearId) : [];
+  const promotionTargetSections = promotionForm.targetClassId ? sections.filter(s => s.classId === promotionForm.targetClassId) : [];
+
+  const toggleSelectAllStudents = (checked) => {
+    if (checked) setSelectedStudentIds(students.map(s => s.id)); else setSelectedStudentIds([]);
+  };
+  const toggleSelectStudent = (id, checked) => {
+    setSelectedStudentIds(prev => checked ? [...prev, id] : prev.filter(sid => sid !== id));
+  };
+  const openPromotionDialog = () => {
+    setPromotionError('');
+    setPromotionForm({ targetAcademicYearId: '', targetClassId: '', targetSectionId: '', mode: 'AUTO' });
+    setIsPromotionDialogOpen(true);
+  };
+  const handlePromotionField = (field, value) => {
+    setPromotionForm(prev => {
+      const next = { ...prev, [field]: value };
+      if (field === 'targetAcademicYearId') { next.targetClassId = ''; next.targetSectionId=''; }
+      if (field === 'targetClassId') { next.targetSectionId=''; }
+      return next;
+    });
+  };
+  const submitPromotion = async (e) => {
+    e.preventDefault();
+    if (!schoolData?.id) return;
+    if (selectedStudentIds.length === 0) { toast.error('No students selected'); return; }
+    if (!promotionForm.targetAcademicYearId || !promotionForm.targetSectionId) {
+      const msg='Academic Year, Class and Section are required.';
+      setPromotionError(msg); toast.error('Validation Error', { description: msg }); return;
+    }
+    setIsPromoting(true); setPromotionError('');
+    try {
+      const payload = { studentIds: selectedStudentIds, targetSectionId: promotionForm.targetSectionId, targetAcademicYearId: promotionForm.targetAcademicYearId, mode: promotionForm.mode };
+      const res = await fetch(`/api/schools/${schoolData.id}/students/promotions`, { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (!res.ok) {
+        let msg = data.error || 'Failed to process promotions';
+        if (data.issues) msg = data.issues.map(i=> i.message).join('; ');
+        setPromotionError(msg); toast.error('Promotion Failed', { description: msg });
+      } else {
+        const promoted = data.processed?.filter(p=> p.action==='PROMOTED').length || 0;
+        const transferred = data.processed?.filter(p=> p.action==='TRANSFERRED').length || 0;
+        toast.success('Batch Complete', { description: `${promoted} promoted, ${transferred} transferred, ${data.skipped?.length||0} skipped.` });
+        setIsPromotionDialogOpen(false); setSelectedStudentIds([]); fetchStudents(pagination.currentPage);
+      }
+    } catch (err) {
+      console.error('Promotion error', err); setPromotionError('Unexpected error'); toast.error('Unexpected error');
+    } finally { setIsPromoting(false); }
+  };
 
   const handleAddStudentFormChange = (e) => {
     const { name, value } = e.target;
@@ -482,6 +541,13 @@ export default function ManageStudentsPage() {
           </h1>
           <p className={descriptionTextClasses}>Enroll new students and manage existing student records for {schoolData?.name}.</p>
         </div>
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          {selectedStudentIds.length > 0 && (
+            <Button variant="outline" className={outlineButtonClasses} onClick={openPromotionDialog}>
+              <ArrowUpRight className="h-4 w-4 mr-2"/> Promote / Transfer ({selectedStudentIds.length})
+            </Button>
+          )}
+        </div>
         <Dialog open={isAddStudentDialogOpen} onOpenChange={setIsAddStudentDialogOpen}>
           <DialogTrigger asChild>
             <Button className={primaryButtonClasses} onClick={() => {setAddStudentFormData({...initialStudentFormData}); setAddFormError(''); setIsAddStudentDialogOpen(true);}}> 
@@ -564,7 +630,7 @@ export default function ManageStudentsPage() {
       <div className="mb-6">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-400 dark:text-zinc-500" />
-          <Input type="search" placeholder="Search students by name, admission no..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`pl-10 w-full md:w-1/2 lg:w-1/3 ${inputTextClasses}`} />
+          <Input type="search" placeholder="Search students by name, admission no, class, section..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`pl-10 w-full md:w-1/2 lg:w-1/3 ${inputTextClasses}`} />
         </div>
       </div>
 
@@ -619,6 +685,13 @@ export default function ManageStudentsPage() {
         <Table>
           <TableHeader>
             <TableRow className="border-zinc-200/80 dark:border-zinc-700/80">
+              <TableHead className="w-10">
+                <Checkbox
+                  checked={students.length>0 && selectedStudentIds.length === students.length}
+                  onCheckedChange={v=> toggleSelectAllStudents(!!v)}
+                  aria-label="Select all students"
+                />
+              </TableHead>
               <TableHead className={`${titleTextClasses} font-semibold`}>Adm. No.</TableHead>
               <TableHead className={`${titleTextClasses} font-semibold`}>Name</TableHead>
               <TableHead className={`${titleTextClasses} font-semibold hidden md:table-cell`}>Class & Section</TableHead>
@@ -639,6 +712,13 @@ export default function ManageStudentsPage() {
               ))
             ) : students.length > 0 ? students.map((student) => (
               <TableRow key={student.id} className="border-zinc-200/50 dark:border-zinc-800/50 hover:bg-zinc-500/5 dark:hover:bg-white/5">
+                <TableCell>
+                  <Checkbox
+                    checked={selectedStudentIds.includes(student.id)}
+                    onCheckedChange={v=> toggleSelectStudent(student.id, !!v)}
+                    aria-label={`Select ${student.firstName} ${student.lastName}`}
+                  />
+                </TableCell>
                 <TableCell className={`${descriptionTextClasses} font-mono text-xs`}>{student.studentIdNumber}</TableCell>
                 <TableCell className={`${descriptionTextClasses} font-medium`}>{student.firstName} {student.lastName}</TableCell>
                 <TableCell className={`${descriptionTextClasses} hidden md:table-cell`}>{student.currentClassDisplay || 'N/A'}</TableCell>
@@ -675,7 +755,75 @@ export default function ManageStudentsPage() {
           </div>
         </div>
       )}
-       {/* TODO: Add Edit Student Dialog, similar to Add Student Dialog but for updating */}
+      {/* Promotion / Transfer Dialog */}
+      <Dialog open={isPromotionDialogOpen} onOpenChange={setIsPromotionDialogOpen}>
+        <DialogContent className="sm:max-w-lg bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+          <DialogHeader>
+            <DialogTitle className={titleTextClasses}>Promote / Transfer Students</DialogTitle>
+            <DialogDescription className={descriptionTextClasses}>Move {selectedStudentIds.length} selected student(s) to another section / academic year.</DialogDescription>
+          </DialogHeader>
+          {promotionError && (
+            <Alert variant="destructive" className="bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300 dark:border-red-700/50 mb-3">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{promotionError}</AlertDescription>
+            </Alert>
+          )}
+          <form onSubmit={submitPromotion} className="space-y-5">
+            <div className="space-y-4">
+              <div>
+                <Label className="text-sm font-medium text-black dark:text-white">Target Academic Year <span className="text-red-500">*</span></Label>
+                <Select value={promotionForm.targetAcademicYearId} onValueChange={v=> handlePromotionField('targetAcademicYearId', v)}>
+                  <SelectTrigger className="mt-1 bg-white/50 dark:bg-zinc-800/50"><SelectValue placeholder="Select Academic Year" /></SelectTrigger>
+                  <SelectContent className="bg-white dark:bg-zinc-900">
+                    {academicYears.map(y => <SelectItem key={y.id} value={y.id}>{y.name}{y.isCurrent && ' (Current)'}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-black dark:text-white">Target Class <span className="text-red-500">*</span></Label>
+                <Select value={promotionForm.targetClassId} onValueChange={v=> handlePromotionField('targetClassId', v)} disabled={!promotionForm.targetAcademicYearId || promotionTargetClasses.length===0}>
+                  <SelectTrigger className="mt-1 bg-white/50 dark:bg-zinc-800/50"><SelectValue placeholder="Select Class" /></SelectTrigger>
+                  <SelectContent className="bg-white dark:bg-zinc-900">
+                    {promotionForm.targetAcademicYearId && promotionTargetClasses.length === 0 && <SelectItem value="no-classes" disabled>No classes</SelectItem>}
+                    {promotionTargetClasses.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-black dark:text-white">Target Section <span className="text-red-500">*</span></Label>
+                <Select value={promotionForm.targetSectionId} onValueChange={v=> handlePromotionField('targetSectionId', v)} disabled={!promotionForm.targetClassId || promotionTargetSections.length===0}>
+                  <SelectTrigger className="mt-1 bg-white/50 dark:bg-zinc-800/50"><SelectValue placeholder="Select Section" /></SelectTrigger>
+                  <SelectContent className="bg-white dark:bg-zinc-900">
+                    {promotionForm.targetClassId && promotionTargetSections.length === 0 && <SelectItem value="no-sections" disabled>No sections</SelectItem>}
+                    {promotionTargetSections.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-black dark:text-white">Mode</Label>
+                <Select value={promotionForm.mode} onValueChange={v=> handlePromotionField('mode', v)}>
+                  <SelectTrigger className="mt-1 bg-white/50 dark:bg-zinc-800/50"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-white dark:bg-zinc-900">
+                    <SelectItem value="AUTO">Auto (Promote or Transfer)</SelectItem>
+                    <SelectItem value="PROMOTE_ONLY">Promote Only (Year Change)</SelectItem>
+                    <SelectItem value="TRANSFER_ONLY">Transfer Only (Same Year)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs mt-1 text-zinc-500 dark:text-zinc-400">Promotion = different academic year. Transfer = same academic year.</p>
+              </div>
+            </div>
+            <DialogFooter className="pt-2">
+              <DialogClose asChild>
+                <Button type="button" variant="outline" className={outlineButtonClasses} disabled={isPromoting}>Cancel</Button>
+              </DialogClose>
+              <Button type="submit" className={primaryButtonClasses} disabled={isPromoting || selectedStudentIds.length===0}>
+                {isPromoting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Processing...</> : 'Apply Changes'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

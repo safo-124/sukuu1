@@ -135,3 +135,13 @@ export const updateStudentSchema = z.object({
   // (e.g., promotion, transfer) and not part of a simple profile update.
   // If you need to update current enrollment via student edit, those fields could be added here as optional.
 });
+
+// --- Student Promotion / Transfer ---
+// Bulk promotion or intra-year transfer of students to a target section (and optionally academic year)
+export const promotionRequestSchema = z.object({
+  studentIds: z.array(z.string().cuid()).min(1, { message: 'At least one student must be selected.' }),
+  targetSectionId: z.string().cuid({ message: 'A valid target Section must be selected.' }),
+  targetAcademicYearId: z.string().cuid({ message: 'A valid target Academic Year must be selected.' }),
+  mode: z.enum(['AUTO','PROMOTE_ONLY','TRANSFER_ONLY']).optional().default('AUTO')
+});
+

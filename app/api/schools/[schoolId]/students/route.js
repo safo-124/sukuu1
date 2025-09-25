@@ -30,6 +30,10 @@ export async function GET(request, { params }) {
         { firstName: { contains: searchTerm, mode: 'insensitive' } },
         { lastName: { contains: searchTerm, mode: 'insensitive' } },
         { studentIdNumber: { contains: searchTerm, mode: 'insensitive' } },
+        // Search by current class name
+        { enrollments: { some: { isCurrent: true, section: { class: { name: { contains: searchTerm, mode: 'insensitive' } } } } } },
+        // Also allow searching by current section name
+        { enrollments: { some: { isCurrent: true, section: { name: { contains: searchTerm, mode: 'insensitive' } } } } },
       ],
     }),
   };
