@@ -12,8 +12,10 @@ import { updateFeeStructureSchema, feeStructureIdSchema } from '@/validators/fin
 export async function GET(request, { params }) {
   const { schoolId, feeStructureId } = params;
   const session = await getServerSession(authOptions);
-
-  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'ACCOUNTANT' && session.user?.role !== 'SECRETARY')) {
+  const role = session?.user?.role;
+  const isSuperAdmin = role === 'SUPER_ADMIN';
+  const allowedRoles = ['SCHOOL_ADMIN','ACCOUNTANT','SECRETARY'];
+  if (!session || (!isSuperAdmin && (session.user?.schoolId !== schoolId || !allowedRoles.includes(role)))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -57,8 +59,10 @@ export async function GET(request, { params }) {
 export async function PUT(request, { params }) {
   const { schoolId, feeStructureId } = params;
   const session = await getServerSession(authOptions);
-
-  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'ACCOUNTANT')) {
+  const role = session?.user?.role;
+  const isSuperAdmin = role === 'SUPER_ADMIN';
+  const allowedRoles = ['SCHOOL_ADMIN','ACCOUNTANT'];
+  if (!session || (!isSuperAdmin && (session.user?.schoolId !== schoolId || !allowedRoles.includes(role)))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -212,8 +216,10 @@ export async function PUT(request, { params }) {
 export async function DELETE(request, { params }) {
   const { schoolId, feeStructureId } = params;
   const session = await getServerSession(authOptions);
-
-  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'ACCOUNTANT')) {
+  const role = session?.user?.role;
+  const isSuperAdmin = role === 'SUPER_ADMIN';
+  const allowedRoles = ['SCHOOL_ADMIN','ACCOUNTANT'];
+  if (!session || (!isSuperAdmin && (session.user?.schoolId !== schoolId || !allowedRoles.includes(role)))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
