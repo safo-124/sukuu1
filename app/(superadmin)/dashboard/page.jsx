@@ -1,7 +1,7 @@
 // app/(superadmin)/dashboard/page.jsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -134,6 +134,31 @@ export default function DashboardPage() {
   const [stats, setStats] = useState(null);
   const [schools, setSchools] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [sortConfig, setSortConfig] = useState({ key: 'monthlyAmount', direction: 'desc' });
+
+  const handleSort = (key) => {
+    setSortConfig(prev => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: 'desc' };
+    });
+  };
+
+  const sortedRows = useMemo(() => {
+    if (!stats?.perSchoolMonthly) return [];
+    const rows = [...stats.perSchoolMonthly];
+    const { key, direction } = sortConfig;
+    rows.sort((a,b) => {
+      const av = a[key] ?? 0;
+      const bv = b[key] ?? 0;
+      if (typeof av === 'string' && typeof bv === 'string') {
+        return direction === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+      }
+      return direction === 'asc' ? av - bv : bv - av;
+    });
+    return rows;
+  }, [stats, sortConfig]);
 
   useEffect(() => {
     if (session && session.user?.role !== 'SUPER_ADMIN') {
@@ -341,9 +366,12 @@ export default function DashboardPage() {
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Top Monthly Contributors</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Prorated monthly revenue derived from current quarter usage</p>
               </div>
-              {stats?.perSchoolMonthly?.length ? (
-                <span className="text-xs text-gray-500 dark:text-gray-400">{stats.perSchoolMonthly.length} schools</span>
-              ) : null}
+              <div className="flex items-center gap-4">
+                {stats?.perSchoolMonthly?.length ? (
+                  <span className="text-xs text-gray-500 dark:text-gray-400">{stats.perSchoolMonthly.length} schools</span>
+                ) : null}
+                <Link href="/superadmin/billing" className="text-xs font-medium text-purple-600 dark:text-purple-400 hover:underline">Billing / Usage →</Link>
+              </div>
             </div>
             <div className="p-6 overflow-x-auto">
               {isLoading ? (
@@ -352,39 +380,60 @@ export default function DashboardPage() {
                 </div>
               ) : stats?.perSchoolMonthly?.length ? (
                 <table className="min-w-full text-sm">
-                  <thead className="text-left text-gray-500 dark:text-gray-400">
+                  <thead className="text-left text-gray-500 dark:text-gray-400 select-none">
                     <tr>
-                      <th className="py-2 pr-4">#</th>
-                      <th className="py-2 pr-4">School</th>
-                      <th className="py-2 pr-4 text-right">Students</th>
-                      <th className="py-2 pr-4 text-right">Parents</th>
-                      <th className="py-2 pr-4 text-right">Monthly</th>
-                      <th className="py-2 pr-4 text-right">Quarter</th>
+                      {[
+                        ['rank', '#'],
+                        ['schoolName', 'School'],
+                        ['studentCount', 'Students'],
+                        ['parentCount', 'Parents'],
+                        ['monthlyAmount', 'Monthly'],
+                        ['monthlyPercent', '% of Total'],
+                        ['quarterAmount', 'Quarter']
+                      ].map(([key, label]) => (
+                        <th
+                          key={key}
+                          onClick={() => key !== 'rank' && handleSort(key)}
+                          className={`py-2 pr-4 ${key !== 'rank' ? 'cursor-pointer hover:text-gray-700 dark:hover:text-gray-300 transition-colors' : ''} ${['studentCount','parentCount','monthlyAmount','monthlyPercent','quarterAmount'].includes(key) ? 'text-right' : ''}`}
+                        >
+                          <span className="inline-flex items-center gap-1">
+                            {label}
+                            {sortConfig.key === key && (
+                              <span className="text-[10px] font-medium">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
+                            )}
+                          </span>
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {stats.perSchoolMonthly
-                      .slice()
-                      .sort((a,b)=> b.monthlyAmount - a.monthlyAmount)
-                      .slice(0,10)
-                      .map((row, idx) => {
-                        const rank = idx + 1;
-                        const highlight = rank <= 3;
-                        return (
-                          <tr key={row.schoolId} className={`border-t border-gray-100 dark:border-gray-800 hover:bg-white/40 dark:hover:bg-slate-800/40 transition-colors ${highlight ? 'bg-gradient-to-r from-amber-50/60 to-transparent dark:from-amber-500/5' : ''}`}> 
-                            <td className="py-2 pr-4 font-medium text-gray-700 dark:text-gray-300">
-                              {highlight ? (
-                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-500 text-white text-xs font-bold shadow">{rank}</span>
-                              ) : rank}
-                            </td>
-                            <td className="py-2 pr-4 font-medium text-gray-900 dark:text-white">{row.schoolName}</td>
-                            <td className="py-2 pr-4 text-right text-gray-700 dark:text-gray-300">{row.studentCount}</td>
-                            <td className="py-2 pr-4 text-right text-gray-700 dark:text-gray-300">{row.parentCount}</td>
-                            <td className="py-2 pr-4 text-right font-semibold text-gray-900 dark:text-white">GHS {row.monthlyAmount.toFixed(2)}</td>
-                            <td className="py-2 pr-4 text-right text-gray-600 dark:text-gray-400">GHS {row.quarterAmount.toFixed(2)}</td>
-                          </tr>
-                        );
-                      })}
+                    {sortedRows.slice(0,10).map((row, idx) => {
+                      const rank = idx + 1;
+                      const highlight = rank <= 3;
+                      return (
+                        <tr key={row.schoolId} className={`border-t border-gray-100 dark:border-gray-800 hover:bg-white/40 dark:hover:bg-slate-800/40 transition-colors ${highlight ? 'bg-gradient-to-r from-amber-50/60 to-transparent dark:from-amber-500/5' : ''}`}> 
+                          <td className="py-2 pr-4 font-medium text-gray-700 dark:text-gray-300">
+                            {highlight ? (
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-500 text-white text-xs font-bold shadow">{rank}</span>
+                            ) : rank}
+                          </td>
+                          <td className="py-2 pr-4 font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                            {row.schoolName}
+                            {row.overFreeTier && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20">Over</span>
+                            )}
+                            {row.upgradeRequired && !row.overFreeTier && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">Action</span>
+                            )}
+                          </td>
+                          <td className="py-2 pr-4 text-right text-gray-700 dark:text-gray-300">{row.studentCount}</td>
+                          <td className="py-2 pr-4 text-right text-gray-700 dark:text-gray-300">{row.parentCount}</td>
+                          <td className="py-2 pr-4 text-right font-semibold text-gray-900 dark:text-white">GHS {row.monthlyAmount.toFixed(2)}</td>
+                          <td className="py-2 pr-4 text-right text-gray-700 dark:text-gray-300">{row.monthlyPercent != null ? row.monthlyPercent.toFixed(2) + '%' : '—'}</td>
+                          <td className="py-2 pr-4 text-right text-gray-600 dark:text-gray-400">GHS {row.quarterAmount.toFixed(2)}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               ) : (

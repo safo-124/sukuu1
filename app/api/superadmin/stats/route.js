@@ -34,8 +34,8 @@ export async function GET(request) {
     // Strategy: for each school, take its snapshot for the current quarter (if any),
     // compute invoice amount (students * studentFee + parents * parentFee), divide by 3.
     // Fees are in PlatformSetting or default 10 (student) / 5 (parent).
-    let monthlyRevenue = 0;
-    let perSchoolMonthly = [];
+  let monthlyRevenue = 0;
+  let perSchoolMonthly = [];
     try {
       const settingsRows = await prisma.platformSetting.findMany({
         where: { key: { in: ['studentQuarterFee', 'parentQuarterFee'] } }
@@ -47,20 +47,32 @@ export async function GET(request) {
       if (prisma.usageSnapshot) {
         const snapshots = await prisma.usageSnapshot.findMany({
           where: { periodStart, periodEnd },
-          include: { school: { select: { id: true, name: true } } }
+          include: { school: { select: { id: true, name: true, freeTierStudentLimit: true, upgradeRequired: true } } }
         });
         perSchoolMonthly = snapshots.map(s => {
           const quarterAmount = (s.studentCount * studentFee) + (s.parentCount * parentFee);
-            return {
-              schoolId: s.schoolId,
-              schoolName: s.school?.name || 'School',
-              studentCount: s.studentCount,
-              parentCount: s.parentCount,
-              quarterAmount,
-              monthlyAmount: quarterAmount / 3
-            };
+          const monthlyAmount = quarterAmount / 3;
+          const overFreeTier = s.studentCount > (s.school?.freeTierStudentLimit ?? 50);
+          return {
+            schoolId: s.schoolId,
+            schoolName: s.school?.name || 'School',
+            studentCount: s.studentCount,
+            parentCount: s.parentCount,
+            quarterAmount,
+            monthlyAmount,
+            overFreeTier,
+            freeTierLimit: s.school?.freeTierStudentLimit ?? 50,
+            upgradeRequired: s.school?.upgradeRequired ?? false
+          };
         });
         monthlyRevenue = perSchoolMonthly.reduce((sum, r) => sum + r.monthlyAmount, 0);
+        // Add percentage contribution now that we know total
+        if (monthlyRevenue > 0) {
+          perSchoolMonthly = perSchoolMonthly.map(r => ({
+            ...r,
+            monthlyPercent: Number(((r.monthlyAmount / monthlyRevenue) * 100).toFixed(2))
+          }));
+        }
       }
     } catch (e) {
       console.warn('Billing monthly revenue calc failed (non-fatal)', e);
