@@ -33,8 +33,12 @@ export async function GET(request, { params }) {
   const { schoolId } = await params;
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user?.schoolId !== schoolId || (session.user?.role !== 'SCHOOL_ADMIN' && session.user?.role !== 'TEACHER')) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const isSuper = session.user?.role === 'SUPER_ADMIN';
+  if (!isSuper) {
+    if (session.user?.schoolId !== schoolId || !['SCHOOL_ADMIN','TEACHER'].includes(session.user?.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
   }
 
   try {
