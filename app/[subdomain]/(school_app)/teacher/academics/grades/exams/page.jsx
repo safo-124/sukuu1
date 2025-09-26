@@ -219,7 +219,6 @@ export default function TeacherExamGradesPage() {
 			dirtyIdsRef.current.clear();
 		toast.success(data.message || 'Exam grades saved');
 	};
-	};
 	const publishExamGrades = async () => {
 		if (!school?.id || !selected.examScheduleId || !selected.sectionId) return;
 		const res = await fetch(`/api/schools/${school.id}/academics/grades/publish/by-target`, {
@@ -319,3 +318,4 @@ export default function TeacherExamGradesPage() {
 			</div>
 		</div>
 	);
+}
