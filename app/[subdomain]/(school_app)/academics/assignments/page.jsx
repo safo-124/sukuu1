@@ -292,6 +292,11 @@ const AssignmentFormFields = ({ formData, onFormChange, onSelectChange, onFileCh
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 max-h-[70vh] overflow-y-auto p-1 custom-scrollbar">
+      {/* Title */}
+      <div className="sm:col-span-2">
+        <Label htmlFor="title" className={labelTextClasses}>Title <span className="text-red-500">*</span></Label>
+        <Input id="title" name="title" value={formData.title || ''} onChange={onFormChange} placeholder="e.g., Algebra Homework 1" required className={`${inputTextClasses} mt-1`} />
+      </div>
       <div className="sm:col-span-2">
         <Label htmlFor="type" className={labelTextClasses}>Assignment Type <span className="text-red-500">*</span></Label>
         <Select name="type" value={formData.type || 'SUBJECT'} onValueChange={v => onSelectChange('type', v)}>
@@ -597,6 +602,8 @@ export default function ManageAssignmentsPage() {
       teacherId: assignment.teacherId || '',
       maxMarks: assignment.maxMarks?.toString() || '',
       attachments: assignment.attachments || [], // Existing attachments
+      type: assignment.type || 'SUBJECT',
+      objectives: assignment.objectives || [],
     });
     setSelectedFiles([]); // Clear selected files for edit; new uploads are handled separately
     setFormError('');
@@ -666,6 +673,28 @@ export default function ManageAssignmentsPage() {
         teacherId: formData.teacherId,
         maxMarks: formData.maxMarks ? parseFloat(formData.maxMarks) : null,
         attachments: finalAttachments.length > 0 ? finalAttachments : null, // Send null if no attachments
+        type: formData.type || 'SUBJECT',
+        objectives: (formData.type === 'OBJECTIVE'
+          ? (formData.objectives || [])
+              .map(o => {
+                const obj = {};
+                const q = (o.question || '').trim();
+                if (!q) return null; // skip empty questions
+                obj.question = q;
+                const ca = (o.correctAnswer || '').trim();
+                if (ca) obj.correctAnswer = ca;
+                if (o.marks !== undefined && o.marks !== null && String(o.marks).trim() !== '') {
+                  const num = Number(o.marks);
+                  if (!Number.isNaN(num)) obj.marks = num;
+                }
+                if (Array.isArray(o.options) && o.options.length > 0) {
+                  const opts = o.options.map(x => String(x)).filter(Boolean);
+                  if (opts.length) obj.options = opts;
+                }
+                return obj;
+              })
+              .filter(Boolean)
+          : undefined),
         schoolId: schoolData.id,
       };
 
@@ -758,7 +787,7 @@ export default function ManageAssignmentsPage() {
           <DialogTrigger asChild>
             <Button className={primaryButtonClasses} onClick={openAddDialog}> <FilePlus2 className="mr-2 h-4 w-4" /> Add New Assignment </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-lg md:max-w-2xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+          <DialogContent className="w-[95vw] sm:w-auto sm:max-w-2xl md:max-w-3xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className={titleTextClasses}>{editingAssignment ? 'Edit Assignment' : 'Create New Assignment'}</DialogTitle>
               <DialogDescription className={descriptionTextClasses}>
@@ -781,7 +810,7 @@ export default function ManageAssignmentsPage() {
               {formError && ( <p className="text-sm text-red-600 dark:text-red-400 md:col-span-full">{formError}</p> )}
               <DialogFooter className="pt-6">
                 <DialogClose asChild><Button type="button" variant="outline" className={outlineButtonClasses}>Cancel</Button></DialogClose>
-                <Button type="submit" className={primaryButtonClasses} disabled={isSubmitting || isLoadingDeps}>
+                <Button type="submit" className={primaryButtonClasses} disabled={isSubmitting || isLoadingDeps || !formData.title || !formData.subjectId || !formData.dueDate}>
                   {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>{editingAssignment ? 'Saving...' : 'Creating...'}</> : editingAssignment ? 'Save Changes' : 'Create Assignment'}
                 </Button>
               </DialogFooter>
