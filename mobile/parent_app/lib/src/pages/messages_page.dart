@@ -206,11 +206,10 @@ class _MessageDetailPageState extends State<_MessageDetailPage> {
     final url = Uri.parse(
         '$baseUrl/api/schools/$schoolId/parents/me/assignments/$assignmentId');
     try {
-      final res = await http.get(url,
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Accept': 'application/json'
-          });
+      final res = await http.get(url, headers: {
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json'
+      });
       if (res.statusCode != 200) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -235,9 +234,8 @@ class _MessageDetailPageState extends State<_MessageDetailPage> {
             a['teacher']?['user']?['lastName']
           ].whereType<String>().join(' ');
           return Padding(
-            padding: MediaQuery.of(context)
-                .viewInsets
-                .add(const EdgeInsets.all(16)),
+            padding:
+                MediaQuery.of(context).viewInsets.add(const EdgeInsets.all(16)),
             child: SafeArea(
               child: SingleChildScrollView(
                 child: Column(
@@ -252,8 +250,7 @@ class _MessageDetailPageState extends State<_MessageDetailPage> {
                     if (dueDt != null)
                       Text(
                           'Due: ${DateFormat('MMM d, yyyy h:mm a').format(dueDt)}'),
-                    if (teacherName.isNotEmpty)
-                      Text('Teacher: $teacherName'),
+                    if (teacherName.isNotEmpty) Text('Teacher: $teacherName'),
                     const Divider(height: 24),
                     if (a['description'] != null)
                       Text(a['description'].toString()),
@@ -276,9 +273,8 @@ class _MessageDetailPageState extends State<_MessageDetailPage> {
   @override
   Widget build(BuildContext context) {
     final df = DateFormat('EEEE, MMM d, yyyy h:mm a');
-    final dtStr =
-        (widget.message['publishedAt'] ?? widget.message['createdAt'])
-            ?.toString();
+    final dtStr = (widget.message['publishedAt'] ?? widget.message['createdAt'])
+        ?.toString();
     final dt = dtStr != null ? DateTime.tryParse(dtStr) : null;
     final content = widget.message['content']?.toString() ?? '';
     final deepLinkMatch =
@@ -292,8 +288,8 @@ class _MessageDetailPageState extends State<_MessageDetailPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(widget.message['title']?.toString() ?? 'Message',
-                style: const TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.bold)),
+                style:
+                    const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             if (dt != null)
               Text(df.format(dt),
