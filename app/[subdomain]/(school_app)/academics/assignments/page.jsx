@@ -776,7 +776,8 @@ export default function ModernAssignmentsPage() {
   // Filters
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [subjectFilter, setSubjectFilter] = useState('');
+  // Use a non-empty sentinel for "All Subjects" to satisfy Select's requirement
+  const [subjectFilter, setSubjectFilter] = useState('__all__');
   const [viewMode, setViewMode] = useState('cards'); // cards | list
 
   // Fetch assignments
@@ -789,7 +790,7 @@ export default function ModernAssignmentsPage() {
       const mine = session?.user?.role === 'TEACHER' ? '1' : '0';
       const params = new URLSearchParams({
         mine,
-        ...(subjectFilter && { subjectId: subjectFilter }),
+        ...(subjectFilter !== '__all__' && { subjectId: subjectFilter }),
         ...(search && { search }),
         ...(statusFilter !== 'all' && { status: statusFilter })
       });
@@ -1144,7 +1145,7 @@ export default function ModernAssignmentsPage() {
               <SelectValue placeholder="All Subjects" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Subjects</SelectItem>
+              <SelectItem value="__all__">All Subjects</SelectItem>
               {subjects.map(subject => (
                 <SelectItem key={subject.id} value={subject.id}>
                   {subject.name}
