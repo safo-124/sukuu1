@@ -8,9 +8,6 @@ import { toast } from 'sonner';
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow
-} from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose
@@ -19,241 +16,296 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { FilePlus2, Edit3, Trash2, CalendarDays, Loader2, AlertTriangle, BookOpen, Layers, Users, GraduationCap, CheckSquare, Paperclip, XCircle, Copy, Clock } from 'lucide-react'; // Added actions
-import { Card } from '@/components/ui/card';
+import { 
+  Plus, Search, Filter, Calendar, Clock, Users, BookOpen, CheckSquare, 
+  FileText, MoreVertical, Edit, Trash2, Eye, Copy, Share, Download,
+  AlertCircle, Target, Zap, Book, ChevronDown, ChevronRight, X,
+  Paperclip, Upload, Image, Video, File
+} from 'lucide-react';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Progress } from '@/components/ui/progress';
+import { 
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, 
+  DropdownMenuTrigger, DropdownMenuSeparator 
+} from '@/components/ui/dropdown-menu';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import RequireRole from '@/components/auth/RequireRole';
 
-// ---------------- STUDENT LIGHTWEIGHT VIEW ----------------
-// If the logged in role is STUDENT we render a simplified card list of their assignments
-// fetched from /students/me/assignments and skip all management UI below.
-
-function StudentAssignmentsLite() {
+// ---------------- MODERN STUDENT ASSIGNMENTS VIEW ----------------
+function StudentAssignmentsView() {
   const { data: session } = useSession();
   const school = useSchool();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [items, setItems] = useState([]);
-  const [active, setActive] = useState(null); // assignment currently opened
+  const [assignments, setAssignments] = useState([]);
+  const [selectedAssignment, setSelectedAssignment] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState('');
-  const [answers, setAnswers] = useState([]); // for OBJECTIVE
-  const [content, setContent] = useState(''); // for SUBJECT
+  const [answers, setAnswers] = useState([]);
+  const [content, setContent] = useState('');
   const [files, setFiles] = useState([]);
-  const [mySubmission, setMySubmission] = useState(null);
-  const [result, setResult] = useState(null);
-  const [activeAssignmentDetail, setActiveAssignmentDetail] = useState(null); // from GET submission
+  const [activeTab, setActiveTab] = useState('pending');
 
   useEffect(() => {
-    let ignore = false;
-    async function run() {
-      if (!session?.user?.schoolId || session.user.role !== 'STUDENT') { setLoading(false); return; }
-      try {
-        const res = await fetch(`/api/schools/${session.user.schoolId}/students/me/assignments`);
-        if (!res.ok) throw new Error('Failed to load assignments');
-        const data = await res.json();
-        if (!ignore) setItems(data.assignments || []);
-      } catch (e) {
-        if (!ignore) setError(e.message);
-      } finally {
-        if (!ignore) setLoading(false);
-      }
+    fetchAssignments();
+  }, []);
+
+  const fetchAssignments = async () => {
+    if (!session?.user?.schoolId) return;
+    try {
+      setLoading(true);
+      const res = await fetch(`/api/schools/${session.user.schoolId}/students/me/assignments`);
+      if (!res.ok) throw new Error('Failed to load assignments');
+      const data = await res.json();
+      setAssignments(data.assignments || []);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
     }
-    run();
-    return () => { ignore = true; };
-  }, [session?.user?.schoolId, session?.user?.role]);
-
-  const enriched = useMemo(() => items.map(a => {
-    const due = a.dueDate ? new Date(a.dueDate) : null;
-    const now = new Date();
-    const overdue = due && due < now;
-    return { ...a, overdue };
-  }), [items]);
-
-  const formatDate = (d) => {
-    if (!d) return '—';
-    const dt = new Date(d);
-    if (isNaN(dt)) return d;
-    return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   };
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <CheckSquare className="h-5 w-5 text-sky-600" />
-        <h1 className="text-xl font-semibold tracking-tight">My Assignments</h1>
-      </div>
-      {loading && (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 6 }).map((_,i) => <Skeleton key={i} className="h-32 w-full rounded-md" />)}
-        </div>
-      )}
-      {!loading && error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-      {!loading && !error && enriched.length === 0 && <div className="text-sm text-muted-foreground">No assignments found.</div>}
-      {!loading && !error && enriched.length > 0 && (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {enriched.map(a => (
-            <Card key={a.id} className="p-4 flex flex-col gap-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
-              <div className="flex items-start justify-between gap-2">
-                <div className="font-medium text-sm leading-snug line-clamp-2">{a.title || 'Untitled Assignment'}</div>
-                {a.subject && <Badge variant="outline" className="text-[10px] uppercase tracking-wide">{a.subject.name}</Badge>}
-              </div>
-              <div className="text-xs text-muted-foreground line-clamp-3 flex-1">{a.description || 'No description provided.'}</div>
-              <div className="flex items-center justify-between mt-1 pt-2 border-t border-zinc-200 dark:border-zinc-800">
-                <div className="flex items-center gap-1 text-xs text-zinc-600 dark:text-zinc-400">
-                  <Clock className="h-3.5 w-3.5" /> {formatDate(a.dueDate)}
-                </div>
-                {a.overdue ? (
-                  <Badge variant="destructive" className="text-[10px]">Overdue</Badge>
-                ) : (
-                  <Badge variant="secondary" className="text-[10px]">Due</Badge>
-                )}
-              </div>
-              <div className="flex gap-2 mt-2">
-                <Button size="sm" variant="secondary" onClick={async () => {
-                  setActive(a);
-                  setSubmitError(''); setResult(null); setMySubmission(null);
-                  setAnswers([]); setContent(''); setFiles([]);
-                  try {
-                    const res = await fetch(`/api/schools/${school.id}/students/me/assignments/${a.id}/submission`);
-                    if (res.ok) {
-                      const d = await res.json();
-                      setMySubmission(d.submission || null);
-                      setActiveAssignmentDetail(d.assignment || null);
-                      // Hydrate previous answers/content if present
-                      if (d.submission?.content) {
-                        try {
-                          const cj = JSON.parse(d.submission.content);
-                          if (cj.answers) setAnswers(cj.answers);
-                          if (typeof cj === 'string') setContent(cj);
-                        } catch {
-                          setContent(d.submission.content);
-                        }
-                      }
-                    }
-                  } catch {}
-                }}>Open</Button>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
+  const categorizedAssignments = useMemo(() => {
+    const now = new Date();
+    const pending = assignments.filter(a => new Date(a.dueDate) > now && !a.submitted);
+    const overdue = assignments.filter(a => new Date(a.dueDate) <= now && !a.submitted);
+    const completed = assignments.filter(a => a.submitted);
+    
+    return { pending, overdue, completed };
+  }, [assignments]);
 
-      {/* Simple modal-like panel for active assignment */}
-      {active && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="max-w-2xl w-full rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 space-y-3">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="text-base font-semibold">{active.title}</div>
-                <div className="text-xs text-muted-foreground">Due: {formatDate(active.dueDate)}</div>
-                <div className="text-xs text-muted-foreground">Type: {active.type || 'SUBJECT'}</div>
-              </div>
-              <Button size="icon" variant="ghost" onClick={() => { setActive(null); }}><XCircle className="h-5 w-5"/></Button>
-            </div>
-            <div className="text-sm whitespace-pre-wrap">{active.description || '—'}</div>
+  const getStatusColor = (assignment) => {
+    const now = new Date();
+    const dueDate = new Date(assignment.dueDate);
+    
+    if (assignment.submitted) return 'bg-green-500';
+    if (dueDate <= now) return 'bg-red-500';
+    if (dueDate - now < 24 * 60 * 60 * 1000) return 'bg-yellow-500';
+    return 'bg-blue-500';
+  };
 
-            {active.type === 'OBJECTIVE' ? (
-              <div className="space-y-2">
-                <div className="text-sm font-medium">Answer the questions</div>
-                <ObjectiveQuestionsInline objectives={activeAssignmentDetail?.objectives || []} answers={answers} setAnswers={setAnswers} />
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <div className="text-sm font-medium">Your answer</div>
-                <Textarea rows={6} value={content} onChange={e => setContent(e.target.value)} placeholder="Write your response here..."/>
-                <div>
-                  <Input type="file" multiple onChange={e => setFiles(Array.from(e.target.files || []))}/>
-                </div>
-              </div>
-            )}
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInHours = (date - now) / (1000 * 60 * 60);
+    
+    if (diffInHours < 24 && diffInHours > 0) {
+      return `Due in ${Math.ceil(diffInHours)} hours`;
+    } else if (diffInHours < 0) {
+      return `Overdue by ${Math.ceil(-diffInHours)} hours`;
+    }
+    
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined 
+    });
+  };
 
-            {submitError && <Alert variant="destructive"><AlertDescription>{submitError}</AlertDescription></Alert>}
-            {result && result.detail && (
-              <div className="rounded-md border p-2 text-sm">
-                <div className="font-semibold mb-1">Auto-marking Result</div>
-                <div>Total: {result.total}</div>
-                <div className="mt-1 space-y-1">
-                  {result.detail.map((d, i) => (
-                    <div key={i} className="text-xs">
-                      Q{i+1}: {d.question}
-                      <div className="ml-2">Your answer: {String(d.given ?? '—')} | Correct: {String(d.correct ?? '—')} | Marks: {d.awarded}/{d.max}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => { setActive(null); setActiveAssignmentDetail(null); }}>Close</Button>
-              <Button disabled={submitting} onClick={async () => {
-                setSubmitting(true); setSubmitError(''); setResult(null);
-                try {
-                  let attachments = [];
-                  if (files.length) {
-                    const fd = new FormData();
-                    files.forEach(f => fd.append('files', f));
-                    const up = await fetch('/api/upload-files', { method: 'POST', body: fd });
-                    const d = await up.json().catch(()=>({}));
-                    if (!up.ok) throw new Error(d.error || 'File upload failed');
-                    attachments = d.fileUrls || [];
-                  }
-                  const res = await fetch(`/api/schools/${school.id}/students/me/assignments/${active.id}/submission`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      content: active.type === 'SUBJECT' ? content : undefined,
-                      attachments,
-                      answers: active.type === 'OBJECTIVE' ? answers : undefined,
-                    })
-                  });
-                  const out = await res.json().catch(()=>({}));
-                  if (!res.ok) throw new Error(out.error || 'Failed to submit');
-                  setMySubmission(out.submission || null);
-                  if (out.result) setResult(out.result);
-                  toast.success('Submission saved');
-                } catch (e) {
-                  setSubmitError(e.message || 'Failed to submit');
-                } finally {
-                  setSubmitting(false);
-                }
-              }}>{submitting ? 'Submitting…' : 'Submit'}</Button>
-            </div>
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="h-8 w-48 bg-gray-200 rounded animate-pulse"></div>
+            <div className="h-4 w-64 bg-gray-100 rounded animate-pulse mt-2"></div>
           </div>
         </div>
+        <div className="grid gap-4">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-32 bg-gray-100 rounded-lg animate-pulse"></div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">My Assignments</h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            {categorizedAssignments.pending.length} pending, {categorizedAssignments.overdue.length} overdue
+          </p>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="pending" className="relative">
+            Pending
+            {categorizedAssignments.pending.length > 0 && (
+              <Badge variant="secondary" className="ml-2 h-5 w-5 rounded-full p-0 text-xs">
+                {categorizedAssignments.pending.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="overdue" className="relative">
+            Overdue
+            {categorizedAssignments.overdue.length > 0 && (
+              <Badge variant="destructive" className="ml-2 h-5 w-5 rounded-full p-0 text-xs">
+                {categorizedAssignments.overdue.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="completed">
+            Completed
+            {categorizedAssignments.completed.length > 0 && (
+              <Badge variant="outline" className="ml-2 h-5 w-5 rounded-full p-0 text-xs">
+                {categorizedAssignments.completed.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="pending" className="space-y-4">
+          <AssignmentsList assignments={categorizedAssignments.pending} onSelect={setSelectedAssignment} />
+        </TabsContent>
+        
+        <TabsContent value="overdue" className="space-y-4">
+          <AssignmentsList assignments={categorizedAssignments.overdue} onSelect={setSelectedAssignment} />
+        </TabsContent>
+        
+        <TabsContent value="completed" className="space-y-4">
+          <AssignmentsList assignments={categorizedAssignments.completed} onSelect={setSelectedAssignment} />
+        </TabsContent>
+      </Tabs>
+
+      {/* Assignment Detail Modal */}
+      {selectedAssignment && (
+        <AssignmentDetailModal
+          assignment={selectedAssignment}
+          isOpen={!!selectedAssignment}
+          onClose={() => setSelectedAssignment(null)}
+        />
       )}
     </div>
   );
 }
 
-// Inline renderer for objective questions
-function ObjectiveQuestionsInline({ objectives, answers, setAnswers }) {
-  const val = (q) => answers.find(a => a.question === q)?.answer || '';
-  const setVal = (q, v) => {
-    setAnswers(prev => {
-      const i = prev.findIndex(a => a.question === q);
-      if (i === -1) return [...prev, { question: q, answer: v }];
-      const copy = prev.slice(); copy[i] = { question: q, answer: v }; return copy;
+function AssignmentsList({ assignments, onSelect }) {
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInHours = (date - now) / (1000 * 60 * 60);
+    
+    if (diffInHours < 24 && diffInHours > 0) {
+      return `Due in ${Math.ceil(diffInHours)} hours`;
+    } else if (diffInHours < 0) {
+      return `Overdue by ${Math.ceil(-diffInHours)} hours`;
+    }
+    
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric'
     });
   };
-  if (!objectives?.length) return <div className="text-sm text-muted-foreground">No questions.</div>;
+
+  const getStatusColor = (assignment) => {
+    const now = new Date();
+    const dueDate = new Date(assignment.dueDate);
+    
+    if (assignment.submitted) return 'bg-green-100 text-green-800 border-green-200';
+    if (dueDate <= now) return 'bg-red-100 text-red-800 border-red-200';
+    if (dueDate - now < 24 * 60 * 60 * 1000) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    return 'bg-blue-100 text-blue-800 border-blue-200';
+  };
+
+  if (assignments.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <CheckSquare className="mx-auto h-12 w-12 text-gray-400" />
+        <h3 className="mt-4 text-sm font-medium text-gray-900 dark:text-white">No assignments</h3>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          You're all caught up! No assignments in this category.
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-2">
-      {objectives.map((q, i) => (
-        <div key={i} className="border rounded-md p-2">
-          <div className="text-sm font-medium">Q{i+1}. {q.question}</div>
-          <Input
-            className="mt-2"
-            value={val(q.question)}
-            onChange={e => setVal(q.question, e.target.value)}
-            placeholder="Your answer"
-          />
-        </div>
+    <div className="space-y-4">
+      {assignments.map((assignment) => (
+        <Card 
+          key={assignment.id} 
+          className="hover:shadow-md transition-shadow cursor-pointer"
+          onClick={() => onSelect(assignment)}
+        >
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 mb-2">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                    {assignment.title}
+                  </h3>
+                  <Badge variant="outline" className="text-xs">
+                    {assignment.subject?.name}
+                  </Badge>
+                  <Badge className={`text-xs ${getStatusColor(assignment)}`}>
+                    {assignment.type}
+                  </Badge>
+                </div>
+                
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+                  {assignment.description || 'No description provided'}
+                </p>
+                
+                <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                  <div className="flex items-center gap-1">
+                    <Calendar className="h-4 w-4" />
+                    <span>{formatDate(assignment.dueDate)}</span>
+                  </div>
+                  
+                  {assignment.maxMarks && (
+                    <div className="flex items-center gap-1">
+                      <Target className="h-4 w-4" />
+                      <span>{assignment.maxMarks} marks</span>
+                    </div>
+                  )}
+                  
+                  {assignment.attachments?.length > 0 && (
+                    <div className="flex items-center gap-1">
+                      <Paperclip className="h-4 w-4" />
+                      <span>{assignment.attachments.length} files</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="flex flex-col items-end gap-2">
+                <div className={`w-3 h-3 rounded-full ${assignment.submitted ? 'bg-green-500' : 
+                  new Date(assignment.dueDate) <= new Date() ? 'bg-red-500' : 'bg-yellow-500'}`}></div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       ))}
     </div>
   );
 }
 
+function AssignmentDetailModal({ assignment, isOpen, onClose }) {
+  // Assignment detail modal implementation
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>{assignment.title}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <p>{assignment.description}</p>
+          {/* Add submission interface here */}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------------- MODERN ASSIGNMENT FORM ----------------
 const initialAssignmentFormData = {
   id: null,
   title: '',
@@ -264,175 +316,444 @@ const initialAssignmentFormData = {
   classId: '',
   teacherId: '',
   maxMarks: '',
-  attachments: [], // Array of URLs or file identifiers
+  attachments: [],
   type: 'SUBJECT',
   objectives: [],
 };
 
-// Reusable FormFields Component for Assignment
-// Added `onFileChange` and `onRemoveAttachment` props
-const AssignmentFormFields = ({ formData, onFormChange, onSelectChange, onFileChange, onRemoveAttachment, sectionsList, subjectsList, teachersList, isLoadingDeps, isEdit = false }) => {
-  const labelTextClasses = "text-black dark:text-white block text-sm font-medium mb-1 text-left";
-  const inputTextClasses = "bg-white/50 dark:bg-zinc-800/50 text-black dark:text-white border-zinc-300 dark:border-zinc-700 focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-500 dark:focus:border-sky-500";
-  const descriptionTextClasses = "text-zinc-600 dark:text-zinc-400";
-
-  const classesList = Array.from(new Set(sectionsList.map(s => JSON.stringify({ id: s.class.id, name: s.class.name }))))
-                          .map(str => JSON.parse(str));
-
-  // Objective builder state
+function ModernAssignmentForm({ 
+  formData, onFormChange, onSelectChange, onFileChange, onRemoveAttachment,
+  subjects, sections, teachers, isLoadingDeps 
+}) {
   const [objectives, setObjectives] = useState(formData.objectives || []);
+  const [currentStep, setCurrentStep] = useState(1);
 
-  useEffect(() => { if (formData.type === 'OBJECTIVE') onSelectChange('objectives', objectives); }, [objectives, formData.type]);
+  useEffect(() => {
+    if (formData.type === 'OBJECTIVE') {
+      onSelectChange('objectives', objectives);
+    }
+  }, [objectives, formData.type]);
 
-  const handleObjectiveChange = (idx, field, value) => {
-    setObjectives(prev => prev.map((obj, i) => i === idx ? { ...obj, [field]: value } : obj));
+  const addObjective = () => {
+    setObjectives(prev => [...prev, { 
+      question: '', 
+      correctAnswer: '', 
+      marks: 1,
+      options: [] 
+    }]);
   };
-  const handleAddObjective = () => setObjectives(prev => [...prev, { question: '', options: [], correctAnswer: '', marks: '' }]);
-  const handleRemoveObjective = (idx) => setObjectives(prev => prev.filter((_, i) => i !== idx));
+
+  const updateObjective = (index, field, value) => {
+    setObjectives(prev => prev.map((obj, i) => 
+      i === index ? { ...obj, [field]: value } : obj
+    ));
+  };
+
+  const removeObjective = (index) => {
+    setObjectives(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const steps = [
+    { id: 1, name: 'Basic Info', icon: FileText },
+    { id: 2, name: 'Details', icon: Book },
+    { id: 3, name: 'Questions', icon: Target, condition: formData.type === 'OBJECTIVE' }
+  ].filter(step => !step.condition || step.condition);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 max-h-[70vh] overflow-y-auto p-1 custom-scrollbar">
-      {/* Title */}
-      <div className="sm:col-span-2">
-        <Label htmlFor="title" className={labelTextClasses}>Title <span className="text-red-500">*</span></Label>
-        <Input id="title" name="title" value={formData.title || ''} onChange={onFormChange} placeholder="e.g., Algebra Homework 1" required className={`${inputTextClasses} mt-1`} />
+    <div className="space-y-6">
+      {/* Step Indicator */}
+      <div className="flex items-center justify-between">
+        {steps.map((step, index) => (
+          <div key={step.id} className="flex items-center">
+            <div 
+              className={`flex items-center justify-center w-10 h-10 rounded-full border-2 cursor-pointer transition-colors ${
+                currentStep >= step.id 
+                  ? 'bg-blue-600 border-blue-600 text-white' 
+                  : 'border-gray-300 text-gray-400 hover:border-gray-400'
+              }`}
+              onClick={() => setCurrentStep(step.id)}
+            >
+              <step.icon className="w-5 h-5" />
+            </div>
+            {index < steps.length - 1 && (
+              <div className={`w-20 h-0.5 mx-4 ${
+                currentStep > step.id ? 'bg-blue-600' : 'bg-gray-300'
+              }`} />
+            )}
+          </div>
+        ))}
       </div>
-      <div className="sm:col-span-2">
-        <Label htmlFor="type" className={labelTextClasses}>Assignment Type <span className="text-red-500">*</span></Label>
-        <Select name="type" value={formData.type || 'SUBJECT'} onValueChange={v => onSelectChange('type', v)}>
-          <SelectTrigger className={`${inputTextClasses} mt-1`}><SelectValue placeholder="Select type" /></SelectTrigger>
-          <SelectContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700">
-            <SelectItem value="SUBJECT">Subject Assignment (manual marking)</SelectItem>
-            <SelectItem value="OBJECTIVE">Objectives Assignment (auto-marked)</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      {formData.type === 'OBJECTIVE' && (
-        <div className="sm:col-span-2">
-          <div className="space-y-4 mt-2">
-            <Label className={labelTextClasses}>Objectives / Questions</Label>
-            {objectives.map((obj, idx) => (
-              <div key={idx} className="border rounded-md p-3 mb-2 bg-zinc-50 dark:bg-zinc-800/20">
-                <Input
-                  placeholder="Question text"
-                  value={obj.question}
-                  onChange={e => handleObjectiveChange(idx, 'question', e.target.value)}
-                  className="mb-2"
-                />
-                <Input
-                  placeholder="Correct answer"
-                  value={obj.correctAnswer}
-                  onChange={e => handleObjectiveChange(idx, 'correctAnswer', e.target.value)}
-                  className="mb-2"
-                />
-                <Input
-                  placeholder="Marks for this question"
-                  type="number"
-                  min="0"
-                  value={obj.marks}
-                  onChange={e => handleObjectiveChange(idx, 'marks', e.target.value)}
-                  className="mb-2"
-                />
-                <Button type="button" variant="outline" size="sm" onClick={() => handleRemoveObjective(idx)} className="text-red-500">Remove</Button>
-              </div>
-            ))}
-            <Button type="button" variant="secondary" onClick={handleAddObjective}>Add Objective / Question</Button>
+
+      {/* Step 1: Basic Info */}
+      {currentStep === 1 && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="lg:col-span-2">
+              <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Assignment Title <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                name="title"
+                value={formData.title || ''}
+                onChange={onFormChange}
+                placeholder="Enter assignment title"
+                className="mt-1"
+              />
+            </div>
+            
+            <div>
+              <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Assignment Type <span className="text-red-500">*</span>
+              </Label>
+              <Select 
+                name="type" 
+                value={formData.type || 'SUBJECT'} 
+                onValueChange={v => onSelectChange('type', v)}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SUBJECT">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      <div>
+                        <div className="font-medium">Subject Assignment</div>
+                        <div className="text-xs text-gray-500">Manual grading required</div>
+                      </div>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="OBJECTIVE">
+                    <div className="flex items-center gap-2">
+                      <Target className="w-4 h-4" />
+                      <div>
+                        <div className="font-medium">Objective Assignment</div>
+                        <div className="text-xs text-gray-500">Auto-graded questions</div>
+                      </div>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Subject <span className="text-red-500">*</span>
+              </Label>
+              <Select 
+                name="subjectId" 
+                value={formData.subjectId || ''} 
+                onValueChange={v => onSelectChange('subjectId', v)}
+                disabled={isLoadingDeps}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select subject" />
+                </SelectTrigger>
+                <SelectContent>
+                  {subjects?.map(subject => (
+                    <SelectItem key={subject.id} value={subject.id}>
+                      {subject.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Button onClick={() => setCurrentStep(2)}>
+              Next Step <ChevronRight className="w-4 h-4 ml-1" />
+            </Button>
           </div>
         </div>
       )}
-      <div>
-        <Label htmlFor="subjectId" className={labelTextClasses}>Subject <span className="text-red-500">*</span></Label>
-        <Select name="subjectId" value={formData.subjectId || ''} onValueChange={(value) => onSelectChange('subjectId', value)} disabled={isLoadingDeps}>
-          <SelectTrigger className={`${inputTextClasses} mt-1`}> <SelectValue placeholder="Select subject" /> </SelectTrigger>
-          <SelectContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700">
-            {!isLoadingDeps && subjectsList?.length === 0 && <SelectItem value="no-subjects" disabled>No subjects available</SelectItem>}
-            {subjectsList?.map(subject => <SelectItem key={subject.id} value={subject.id}>{subject.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
-      <div>
-        <Label htmlFor="dueDate" className={labelTextClasses}>Due Date <span className="text-red-500">*</span></Label>
-        <Input id="dueDate" name="dueDate" type="date" value={formData.dueDate || ''} onChange={onFormChange} required className={`${inputTextClasses} mt-1`} />
-      </div>
-      <div>
-        <Label htmlFor="classId" className={labelTextClasses}>Target Class (Optional)</Label>
-        <Select name="classId" value={formData.classId || ''} onValueChange={(value) => onSelectChange('classId', value === 'none' ? '' : value)} disabled={isLoadingDeps}>
-          <SelectTrigger className={`${inputTextClasses} mt-1`}> <SelectValue placeholder="Select class" /> </SelectTrigger>
-          <SelectContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700">
-            <SelectItem value="none">All Classes</SelectItem>
-            {!isLoadingDeps && classesList?.length === 0 && <SelectItem value="no-classes" disabled>No classes available</SelectItem>}
-            {classesList?.map(cls => <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
-      <div>
-        <Label htmlFor="sectionId" className={labelTextClasses}>Target Section (Optional)</Label>
-        <Select name="sectionId" value={formData.sectionId || ''} onValueChange={(value) => onSelectChange('sectionId', value === 'none' ? '' : value)} disabled={isLoadingDeps}>
-          <SelectTrigger className={`${inputTextClasses} mt-1`}> <SelectValue placeholder="Select section" /> </SelectTrigger>
-          <SelectContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700">
-            <SelectItem value="none">All Sections</SelectItem>
-            {!isLoadingDeps && sectionsList?.length === 0 && <SelectItem value="no-sections" disabled>No sections available</SelectItem>}
-            {sectionsList
-              .filter(s => !formData.classId || s.classId === formData.classId)
-              .map(section => <SelectItem key={section.id} value={section.id}>{`${section.class.name} - ${section.name}`}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
-      <div>
-        <Label htmlFor="maxMarks" className={labelTextClasses}>Maximum Marks (Optional)</Label>
-        <Input id="maxMarks" name="maxMarks" type="number" step="0.1" min="0" value={formData.maxMarks || ''} onChange={onFormChange} className={`${inputTextClasses} mt-1`} placeholder="e.g., 100" />
-      </div>
-      {teachersList && formData.teacherId && (
-        <div>
-          <Label htmlFor="teacherName" className={labelTextClasses}>Assigned Teacher</Label>
-          <Input
-            id="teacherName"
-            value={teachersList.find(t => t.id === formData.teacherId)?.user?.firstName + ' ' + teachersList.find(t => t.id === formData.teacherId)?.user?.lastName || 'Loading...'}
-            disabled
-            className={`${inputTextClasses} mt-1`}
-          />
+
+      {/* Step 2: Details */}
+      {currentStep === 2 && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+              <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Due Date <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                name="dueDate"
+                type="date"
+                value={formData.dueDate || ''}
+                onChange={onFormChange}
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Maximum Marks
+              </Label>
+              <Input
+                name="maxMarks"
+                type="number"
+                min="0"
+                step="0.1"
+                value={formData.maxMarks || ''}
+                onChange={onFormChange}
+                placeholder="e.g., 100"
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Target Class (Optional)
+              </Label>
+              <Select 
+                name="classId" 
+                value={formData.classId || ''} 
+                onValueChange={v => onSelectChange('classId', v === 'none' ? '' : v)}
+                disabled={isLoadingDeps}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select class" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">All Classes</SelectItem>
+                  {/* Add classes here */}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Target Section (Optional)
+              </Label>
+              <Select 
+                name="sectionId" 
+                value={formData.sectionId || ''} 
+                onValueChange={v => onSelectChange('sectionId', v === 'none' ? '' : v)}
+                disabled={isLoadingDeps}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select section" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">All Sections</SelectItem>
+                  {sections?.map(section => (
+                    <SelectItem key={section.id} value={section.id}>
+                      {section.class?.name} - {section.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div>
+            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Description
+            </Label>
+            <Textarea
+              name="description"
+              value={formData.description || ''}
+              onChange={onFormChange}
+              rows={4}
+              placeholder="Provide detailed instructions for the assignment..."
+              className="mt-1"
+            />
+          </div>
+
+          <div>
+            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Attachments
+            </Label>
+            <div className="mt-1 border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+              <Upload className="mx-auto h-12 w-12 text-gray-400" />
+              <div className="mt-4">
+                <Label htmlFor="file-upload" className="cursor-pointer">
+                  <span className="mt-2 block text-sm font-medium text-gray-900 dark:text-white">
+                    Upload files
+                  </span>
+                  <Input
+                    id="file-upload"
+                    type="file"
+                    multiple
+                    onChange={onFileChange}
+                    className="sr-only"
+                  />
+                </Label>
+                <p className="mt-1 text-xs text-gray-500">
+                  PDF, DOC, DOCX, PNG, JPG up to 10MB each
+                </p>
+              </div>
+            </div>
+
+            {/* Show existing attachments */}
+            {formData.attachments?.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Current Attachments:
+                </Label>
+                {formData.attachments.map((fileUrl, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <File className="w-5 h-5 text-blue-500" />
+                      <a 
+                        href={fileUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-600 hover:text-blue-800 truncate max-w-xs"
+                      >
+                        {fileUrl.substring(fileUrl.lastIndexOf('/') + 1)}
+                      </a>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onRemoveAttachment(index)}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-between">
+            <Button variant="outline" onClick={() => setCurrentStep(1)}>
+              <ChevronRight className="w-4 h-4 mr-1 rotate-180" /> Previous
+            </Button>
+            {formData.type === 'OBJECTIVE' ? (
+              <Button onClick={() => setCurrentStep(3)}>
+                Next Step <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            ) : (
+              <div></div>
+            )}
+          </div>
         </div>
       )}
-      <div className="sm:col-span-2">
-        <Label htmlFor="description" className={labelTextClasses}>Description (Optional)</Label>
-        <Textarea id="description" name="description" value={formData.description || ''} onChange={onFormChange} rows={3} className={`${inputTextClasses} mt-1`} />
-      </div>
 
-      <div className="sm:col-span-2">
-        <Label htmlFor="file-attachments" className={labelTextClasses}>Attachments (Optional)</Label>
-        <Input id="file-attachments" type="file" multiple onChange={onFileChange} className={`${inputTextClasses} mt-1`} />
-        {formData.attachments && formData.attachments.length > 0 && (
-          <div className="mt-2 space-y-2">
-            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Current Attachments:</p>
-            {formData.attachments.map((fileUrl, index) => (
-              <div key={index} className="flex items-center justify-between p-2 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
-                <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-sky-600 hover:underline dark:text-sky-400 flex items-center text-sm truncate">
-                  <Paperclip className="h-4 w-4 mr-2 shrink-0" />
-                  {fileUrl.substring(fileUrl.lastIndexOf('/') + 1)} {/* Display just the file name */}
-                </a>
-                <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/50" onClick={() => onRemoveAttachment(index)} title="Remove attachment">
-                  <XCircle className="h-4 w-4" />
+      {/* Step 3: Objectives (only for OBJECTIVE type) */}
+      {currentStep === 3 && formData.type === 'OBJECTIVE' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                Create Questions
+              </h3>
+              <p className="text-sm text-gray-500">
+                Add questions that will be automatically graded
+              </p>
+            </div>
+            <Button onClick={addObjective} className="flex items-center gap-2">
+              <Plus className="w-4 h-4" />
+              Add Question
+            </Button>
+          </div>
+
+          <div className="space-y-4">
+            {objectives.map((objective, index) => (
+              <Card key={index} className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Question {index + 1}
+                  </Label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeObjective(index)}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Question Text
+                    </Label>
+                    <Textarea
+                      value={objective.question}
+                      onChange={e => updateObjective(index, 'question', e.target.value)}
+                      placeholder="Enter your question here..."
+                      className="mt-1"
+                      rows={2}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Correct Answer
+                      </Label>
+                      <Input
+                        value={objective.correctAnswer}
+                        onChange={e => updateObjective(index, 'correctAnswer', e.target.value)}
+                        placeholder="Enter correct answer"
+                        className="mt-1"
+                      />
+                    </div>
+
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Marks
+                      </Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        value={objective.marks}
+                        onChange={e => updateObjective(index, 'marks', e.target.value)}
+                        placeholder="1"
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            ))}
+
+            {objectives.length === 0 && (
+              <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
+                <Target className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-4 text-sm font-medium text-gray-900 dark:text-white">
+                  No questions yet
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Add questions to create an objective assignment
+                </p>
+                <Button onClick={addObjective} className="mt-4">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Your First Question
                 </Button>
               </div>
-            ))}
+            )}
           </div>
-        )}
-        <p className={`text-xs mt-1 ${descriptionTextClasses}`}>Upload files. Each file will be stored and linked here.</p>
-      </div>
+
+          <div className="flex justify-between">
+            <Button variant="outline" onClick={() => setCurrentStep(2)}>
+              <ChevronRight className="w-4 h-4 mr-1 rotate-180" /> Previous
+            </Button>
+            <div></div>
+          </div>
+        </div>
+      )}
     </div>
   );
-};
+}
 
 
-export default function ManageAssignmentsPage() {
+// ---------------- MAIN ASSIGNMENTS PAGE ----------------
+export default function ModernAssignmentsPage() {
   const schoolData = useSchool();
   const { data: session } = useSession();
 
-  // Student role gets lightweight view only
+  // Student role gets modern view
   if (session?.user?.role === 'STUDENT') {
     return (
       <RequireRole role="STUDENT" fallback={null}>
-        <StudentAssignmentsLite />
+        <StudentAssignmentsView />
       </RequireRole>
     );
   }
@@ -441,9 +762,6 @@ export default function ManageAssignmentsPage() {
   const [subjects, setSubjects] = useState([]);
   const [sections, setSections] = useState([]);
   const [teachers, setTeachers] = useState([]);
-  const [taughtSubjects, setTaughtSubjects] = useState([]); // Teacher-specific subjects
-  const [classTeacherSections, setClassTeacherSections] = useState([]); // Sections where teacher is class teacher
-  const [activeSubjectFilter, setActiveSubjectFilter] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingDeps, setIsLoadingDeps] = useState(true);
   const [error, setError] = useState('');
@@ -453,138 +771,117 @@ export default function ManageAssignmentsPage() {
   const [editingAssignment, setEditingAssignment] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
-  const [selectedFiles, setSelectedFiles] = useState([]); // New state for files to upload
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  
+  // Filters
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all'); // all | upcoming | past
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [subjectFilter, setSubjectFilter] = useState('');
+  const [viewMode, setViewMode] = useState('cards'); // cards | list
 
-  const titleTextClasses = "text-black dark:text-white";
-  const descriptionTextClasses = "text-zinc-600 dark:text-zinc-400";
-  const primaryButtonClasses = "bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200";
-  const outlineButtonClasses = "border-zinc-300 text-black hover:bg-zinc-100 dark:border-zinc-700 dark:text-white dark:hover:bg-zinc-800";
-  const glassCardClasses = `p-6 md:p-8 rounded-xl backdrop-blur-xl backdrop-saturate-150 shadow-xl dark:shadow-2xl bg-white/60 border border-zinc-200/50 dark:bg-zinc-900/60 dark:border-zinc-700/50`;
-
+  // Fetch assignments
   const fetchAssignments = useCallback(async () => {
     if (!schoolData?.id) return;
-    setIsLoading(true); setError('');
+    setIsLoading(true);
+    setError('');
+    
     try {
-      // If the logged-in user is a teacher, we fetch only their assignments by default
       const mine = session?.user?.role === 'TEACHER' ? '1' : '0';
-      const subjectParam = activeSubjectFilter ? `&subjectId=${encodeURIComponent(activeSubjectFilter)}` : '';
-      const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
-      const statusParam = statusFilter !== 'all' ? `&status=${encodeURIComponent(statusFilter)}` : '';
-      const response = await fetch(`/api/schools/${schoolData.id}/academics/assignments?mine=${mine}${subjectParam}${searchParam}${statusParam}`);
-      if (!response.ok) { const errData = await response.json().catch(() => ({})); throw new Error(errData.error || 'Failed to fetch assignments.'); }
+      const params = new URLSearchParams({
+        mine,
+        ...(subjectFilter && { subjectId: subjectFilter }),
+        ...(search && { search }),
+        ...(statusFilter !== 'all' && { status: statusFilter })
+      });
+      
+      const response = await fetch(`/api/schools/${schoolData.id}/academics/assignments?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch assignments');
+      
       const data = await response.json();
       setAssignments(data.assignments || []);
-    } catch (err) { toast.error("Error fetching assignments", { description: err.message }); setError(err.message);
-    } finally { setIsLoading(false); }
-  }, [schoolData?.id, session?.user?.role, activeSubjectFilter, search, statusFilter]);
+    } catch (err) {
+      setError(err.message);
+      toast.error('Error fetching assignments', { description: err.message });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [schoolData?.id, session?.user?.role, subjectFilter, search, statusFilter]);
 
-  const fetchDropdownDependencies = useCallback(async () => {
+  // Fetch dependencies
+  const fetchDependencies = useCallback(async () => {
     if (!schoolData?.id) return;
     setIsLoadingDeps(true);
+    
     try {
       const mine = session?.user?.role === 'TEACHER' ? '1' : '0';
-      // Always fetch subjects/sections; fetch teachers differently based on role to avoid 401s for teachers
       const [subjectsRes, sectionsRes] = await Promise.all([
         fetch(`/api/schools/${schoolData.id}/academics/subjects?mine=${mine}`),
         fetch(`/api/schools/${schoolData.id}/academics/sections`),
       ]);
 
-      if (!subjectsRes.ok) throw new Error('Failed to fetch subjects.');
-      const subjectsData = await subjectsRes.json();
-      setSubjects(subjectsData.subjects || []);
-
-      if (!sectionsRes.ok) {
-        const errData = await sectionsRes.json().catch(() => ({}));
-        console.error("Sections fetch error:", errData);
-        throw new Error(errData.error || 'Failed to fetch sections.');
+      if (subjectsRes.ok) {
+        const subjectsData = await subjectsRes.json();
+        setSubjects(subjectsData.subjects || []);
       }
-      const sectionsData = await sectionsRes.json();
-      setSections(sectionsData.sections || []);
 
-      // Populate teachers list based on role:
-      // - For SCHOOL_ADMIN: fetch full teachers list
-      // - For TEACHER: use current staff profile for display and form prefill
+      if (sectionsRes.ok) {
+        const sectionsData = await sectionsRes.json();
+        setSections(sectionsData.sections || []);
+      }
+
+      // Fetch teachers for admin
       if (session?.user?.role === 'SCHOOL_ADMIN') {
         const teachersRes = await fetch(`/api/schools/${schoolData.id}/staff/teachers`);
-        if (!teachersRes.ok) throw new Error('Failed to fetch teachers.');
-        const teachersData = await teachersRes.json();
-        setTeachers(teachersData.teachers?.filter(t => t.user) || []);
-      } else if (session?.user?.role === 'TEACHER') {
-        try {
-          const meRes = await fetch(`/api/schools/${schoolData.id}/staff/me`);
-          if (meRes.ok) {
-            const meData = await meRes.json();
-            // Shape matches Staff include user from teachers endpoint
-            setTeachers(meData.staff ? [meData.staff] : []);
-          } else {
-            setTeachers([]);
-          }
-        } catch {
-          setTeachers([]);
+        if (teachersRes.ok) {
+          const teachersData = await teachersRes.json();
+          setTeachers(teachersData.teachers?.filter(t => t.user) || []);
         }
-      } else {
-        setTeachers([]);
+      } else if (session?.user?.role === 'TEACHER') {
+        const meRes = await fetch(`/api/schools/${schoolData.id}/staff/me`);
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          setTeachers(meData.staff ? [meData.staff] : []);
+        }
       }
-
     } catch (err) {
-      toast.error("Error fetching form dependencies", { description: err.message });
-      console.error("Dependency fetch error:", err);
+      console.error('Failed to fetch dependencies:', err);
     } finally {
       setIsLoadingDeps(false);
     }
   }, [schoolData?.id, session?.user?.role]);
 
-  // Fetch teacher profile context (taught subjects and class teacher sections)
-  const fetchTeacherContext = useCallback(async () => {
-    if (!schoolData?.id || session?.user?.role !== 'TEACHER') return;
-    try {
-      const res = await fetch(`/api/schools/${schoolData.id}/staff/me`);
-      if (!res.ok) return; // Non-fatal
-      const data = await res.json();
-      setTaughtSubjects(data.taughtSubjects || []);
-      setClassTeacherSections(data.classTeacherSections || []);
-    } catch (e) {
-      console.warn('Failed to load teacher context', e);
-    }
-  }, [schoolData?.id, session?.user?.role]);
-
   useEffect(() => {
-    if (schoolData?.id && session) {
-      fetchAssignments();
-      fetchDropdownDependencies();
-      fetchTeacherContext();
-    }
-  }, [schoolData, session, fetchAssignments, fetchDropdownDependencies, fetchTeacherContext]);
+    fetchAssignments();
+    fetchDependencies();
+  }, [fetchAssignments, fetchDependencies]);
 
-  const onClickSubjectChip = (subjectId) => {
-    setActiveSubjectFilter(prev => (prev === subjectId ? '' : subjectId));
+  // Form handlers
+  const handleFormChange = (e) => {
+    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleFormChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
-  const handleSelectChange = (name, value) => setFormData(prev => ({ ...prev, [name]: value === 'none' ? '' : value }));
+  const handleSelectChange = (name, value) => {
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
 
-  // New handler for file input change
   const handleFileChange = (e) => {
-    setSelectedFiles(Array.from(e.target.files));
+    setSelectedFiles(Array.from(e.target.files || []));
   };
 
-  // New handler to remove an already attached file (by URL)
-  const handleRemoveAttachment = (indexToRemove) => {
+  const handleRemoveAttachment = (index) => {
     setFormData(prev => ({
       ...prev,
-      attachments: prev.attachments.filter((_, index) => index !== indexToRemove)
+      attachments: prev.attachments.filter((_, i) => i !== index)
     }));
   };
 
-  const openAddDialog = () => {
+  const openCreateDialog = () => {
     setEditingAssignment(null);
     setFormData({
       ...initialAssignmentFormData,
-      teacherId: session?.user?.staffProfileId || '', // Pre-fill teacher if available from session
+      teacherId: session?.user?.staffProfileId || '',
     });
-    setSelectedFiles([]); // Clear selected files
+    setSelectedFiles([]);
     setFormError('');
     setIsDialogOpen(true);
   };
@@ -601,67 +898,36 @@ export default function ManageAssignmentsPage() {
       classId: assignment.classId || '',
       teacherId: assignment.teacherId || '',
       maxMarks: assignment.maxMarks?.toString() || '',
-      attachments: assignment.attachments || [], // Existing attachments
+      attachments: assignment.attachments || [],
       type: assignment.type || 'SUBJECT',
       objectives: assignment.objectives || [],
     });
-    setSelectedFiles([]); // Clear selected files for edit; new uploads are handled separately
+    setSelectedFiles([]);
     setFormError('');
     setIsDialogOpen(true);
   };
 
-  // New function to handle file uploads to a separate API endpoint
-  const uploadFiles = async () => {
-    if (selectedFiles.length === 0) {
-      return []; // No files to upload
-    }
-
-    const uploadToastId = toast.loading("Uploading files...", { description: "Please wait, this may take a moment." });
-    const formData = new FormData();
-    selectedFiles.forEach(file => {
-      formData.append('files', file);
-    });
-
-    try {
-      const response = await fetch(`/api/upload-files`, { // Dedicated upload endpoint
-        method: 'POST',
-        body: formData,
-      });
-
-      const result = await response.json();
-      if (!response.ok) {
-        toast.error("File Upload Failed", { description: result.error || "An error occurred during file upload.", id: uploadToastId });
-        throw new Error(result.error || "File upload failed.");
-      }
-      toast.success("Files uploaded successfully!", { id: uploadToastId });
-      return result.fileUrls || []; // Expecting an array of URLs
-    } catch (uploadError) {
-      console.error('Upload Error:', uploadError);
-      // The toast is already shown by the catch block, no need to show again
-      throw uploadError; // Re-throw to stop the assignment submission
-    }
-  };
-
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!schoolData?.id) return;
-    setIsSubmitting(true); setFormError('');
+    setIsSubmitting(true);
+    setFormError('');
 
     try {
-      // 1. Upload new files if any are selected
+      // Upload files if any
       let uploadedFileUrls = [];
       if (selectedFiles.length > 0) {
-        uploadedFileUrls = await uploadFiles();
+        const formDataUpload = new FormData();
+        selectedFiles.forEach(file => formDataUpload.append('files', file));
+        
+        const uploadResponse = await fetch('/api/upload-files', {
+          method: 'POST',
+          body: formDataUpload,
+        });
+        
+        const uploadResult = await uploadResponse.json();
+        if (!uploadResponse.ok) throw new Error(uploadResult.error || 'File upload failed');
+        uploadedFileUrls = uploadResult.fileUrls || [];
       }
-
-      const isEditing = !!editingAssignment;
-
-      // Combine existing attachments with newly uploaded ones
-      const finalAttachments = [
-        ...(formData.attachments || []), // Existing attachments
-        ...uploadedFileUrls // Newly uploaded attachments
-      ];
 
       const payload = {
         title: formData.title,
@@ -672,24 +938,20 @@ export default function ManageAssignmentsPage() {
         classId: formData.classId || null,
         teacherId: formData.teacherId,
         maxMarks: formData.maxMarks ? parseFloat(formData.maxMarks) : null,
-        attachments: finalAttachments.length > 0 ? finalAttachments : null, // Send null if no attachments
+        attachments: [...(formData.attachments || []), ...uploadedFileUrls],
         type: formData.type || 'SUBJECT',
         objectives: (formData.type === 'OBJECTIVE'
           ? (formData.objectives || [])
               .map(o => {
                 const obj = {};
                 const q = (o.question || '').trim();
-                if (!q) return null; // skip empty questions
+                if (!q) return null;
                 obj.question = q;
                 const ca = (o.correctAnswer || '').trim();
                 if (ca) obj.correctAnswer = ca;
                 if (o.marks !== undefined && o.marks !== null && String(o.marks).trim() !== '') {
                   const num = Number(o.marks);
                   if (!Number.isNaN(num)) obj.marks = num;
-                }
-                if (Array.isArray(o.options) && o.options.length > 0) {
-                  const opts = o.options.map(x => String(x)).filter(Boolean);
-                  if (opts.length) obj.options = opts;
                 }
                 return obj;
               })
@@ -698,268 +960,931 @@ export default function ManageAssignmentsPage() {
         schoolId: schoolData.id,
       };
 
+      const isEditing = !!editingAssignment;
       const url = isEditing
         ? `/api/schools/${schoolData.id}/academics/assignments/${editingAssignment.id}`
         : `/api/schools/${schoolData.id}/academics/assignments`;
-      const method = isEditing ? 'PUT' : 'POST';
-      const actionText = isEditing ? 'update' : 'create';
-
+      
       const response = await fetch(url, {
-        method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+        method: isEditing ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
+
       const result = await response.json();
       if (!response.ok) {
-        let err = result.error || `Failed to ${actionText} assignment.`;
-        if (result.issues) err = result.issues.map(i => `${i.path.join('.') || 'Field'}: ${i.message}`).join('; ');
-        toast.error(`${actionText.charAt(0).toUpperCase() + actionText.slice(1)} Failed`, { description: err }); setFormError(err);
-      } else {
-        toast.success(`Assignment "${result.assignment?.title}" ${actionText}d successfully!`);
-        setIsDialogOpen(false);
-        setSelectedFiles([]); // Clear selected files after successful submission
-        fetchAssignments();
+        let err = result.error || `Failed to ${isEditing ? 'update' : 'create'} assignment.`;
+        if (result.issues) {
+          err = result.issues.map(i => `${i.path.join('.') || 'Field'}: ${i.message}`).join('; ');
+        }
+        throw new Error(err);
       }
-    } catch (submissionError) {
-      // This catch block handles errors from uploadFiles or the assignment submission itself
-      console.error('Submission Error:', submissionError);
-      if (!formError) { // Only set generic error if a specific error wasn't already set by uploadFiles
-          setFormError('An unexpected error occurred during submission.');
-          toast.error('Submission Failed', { description: 'An unexpected error occurred.' });
-      }
+
+      toast.success(`Assignment "${result.assignment?.title}" ${isEditing ? 'updated' : 'created'} successfully!`);
+      setIsDialogOpen(false);
+      fetchAssignments();
+    } catch (err) {
+      setFormError(err.message);
+      toast.error('Operation failed', { description: err.message });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDelete = async (assignmentId, assignmentTitle) => {
-    if (!schoolData?.id) return;
-    if (!window.confirm(`Are you sure you want to DELETE assignment "${assignmentTitle}"? This action cannot be undone.`)) return;
-    const toastId = `delete-assignment-${assignmentId}`;
-    toast.loading("Deleting assignment...", { id: toastId });
+  const handleDelete = async (assignment) => {
+    if (!confirm(`Delete "${assignment.title}"? This cannot be undone.`)) return;
+    
     try {
-      const response = await fetch(`/api/schools/${schoolData.id}/academics/assignments/${assignmentId}`, { method: 'DELETE' });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Deletion failed.");
-      toast.success(result.message || `Assignment "${assignmentTitle}" deleted.`, { id: toastId });
+      const response = await fetch(`/api/schools/${schoolData.id}/academics/assignments/${assignment.id}`, {
+        method: 'DELETE'
+      });
+      
+      if (!response.ok) throw new Error('Failed to delete assignment');
+      
+      toast.success('Assignment deleted successfully');
       fetchAssignments();
-    } catch (err) { toast.error(`Deletion Failed: ${err.message}`, { id: toastId }); }
+    } catch (err) {
+      toast.error('Failed to delete assignment', { description: err.message });
+    }
   };
 
-  // Helper functions for displaying names
-  const getSubjectName = useCallback((id) => {
-    const subject = subjects.find(s => s.id === id);
-    return subject ? subject.name : 'N/A';
-  }, [subjects]);
+  // Categorize assignments
+  const categorizedAssignments = useMemo(() => {
+    const now = new Date();
+    const active = assignments.filter(a => new Date(a.dueDate) > now);
+    const overdue = assignments.filter(a => new Date(a.dueDate) <= now);
+    const draft = []; // Placeholder for draft assignments
+    
+    return { active, overdue, draft };
+  }, [assignments]);
 
-  const getSectionClassDisplayName = useCallback((sectionId, classId) => {
-    if (sectionId) {
-      const section = sections.find(s => s.id === sectionId);
-      return section ? `${section.class?.name || 'N/A'} - ${section.name}` : 'N/A';
-    }
-    if (classId) {
-      const classObj = sections.find(s => s.classId === classId)?.class;
-      return classObj ? classObj.name : 'N/A (All Sections)';
-    }
-    return 'All Classes & Sections';
-  }, [sections]);
-
-  const getTeacherName = useCallback((id) => {
-    const teacher = teachers.find(t => t.id === id);
-    return teacher ? `${teacher.user?.firstName || ''} ${teacher.user?.lastName || ''}`.trim() : 'N/A';
-  }, [teachers]);
-
-  const formatDueDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString(undefined, {
-      year: 'numeric', month: 'short', day: 'numeric'
-    });
-  };
+  if (isLoading) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <div className="h-8 w-48 bg-gray-200 rounded animate-pulse"></div>
+            <div className="h-4 w-64 bg-gray-100 rounded animate-pulse mt-2"></div>
+          </div>
+          <div className="h-10 w-32 bg-gray-200 rounded animate-pulse"></div>
+        </div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="h-48 bg-gray-100 rounded-lg animate-pulse"></div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="space-y-6 p-6">
+      {/* Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
-          <h1 className={`text-2xl md:text-3xl font-bold ${titleTextClasses} flex items-center`}>
-            <CheckSquare className="mr-3 h-8 w-8 opacity-80"/>Manage Assignments
-          </h1>
-          <p className={descriptionTextClasses}>Create, view, and manage academic assignments for students.</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Assignments</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
+            Manage and track student assignments
+          </p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setFormError(''); }}>
-          <DialogTrigger asChild>
-            <Button className={primaryButtonClasses} onClick={openAddDialog}> <FilePlus2 className="mr-2 h-4 w-4" /> Add New Assignment </Button>
-          </DialogTrigger>
-          <DialogContent className="w-[95vw] sm:w-auto sm:max-w-2xl md:max-w-3xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 max-h-[85vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className={titleTextClasses}>{editingAssignment ? 'Edit Assignment' : 'Create New Assignment'}</DialogTitle>
-              <DialogDescription className={descriptionTextClasses}>
-                {editingAssignment ? 'Update the details for this assignment.' : 'Fill in the details for a new assignment.'}
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-6 py-1">
-              <AssignmentFormFields
-                formData={formData}
-                onFormChange={handleFormChange}
-                onSelectChange={handleSelectChange}
-                onFileChange={handleFileChange} 
-                onRemoveAttachment={handleRemoveAttachment} 
-                sectionsList={sections}
-                subjectsList={subjects}
-                teachersList={teachers}
-                isLoadingDeps={isLoadingDeps}
-                isEdit={!!editingAssignment}
-              />
-              {formError && ( <p className="text-sm text-red-600 dark:text-red-400 md:col-span-full">{formError}</p> )}
-              <DialogFooter className="pt-6">
-                <DialogClose asChild><Button type="button" variant="outline" className={outlineButtonClasses}>Cancel</Button></DialogClose>
-                <Button type="submit" className={primaryButtonClasses} disabled={isSubmitting || isLoadingDeps || !formData.title || !formData.subjectId || !formData.dueDate}>
-                  {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>{editingAssignment ? 'Saving...' : 'Creating...'}</> : editingAssignment ? 'Save Changes' : 'Create Assignment'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setViewMode(viewMode === 'cards' ? 'list' : 'cards')}
+          >
+            {viewMode === 'cards' ? 'List View' : 'Card View'}
+          </Button>
+          
+          <Button onClick={openCreateDialog} className="flex items-center gap-2">
+            <Plus className="w-4 h-4" />
+            Create Assignment
+          </Button>
+        </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-3 md:items-center">
-        <Input placeholder="Search assignments..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-40"><SelectValue placeholder="Status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All</SelectItem>
-            <SelectItem value="upcoming">Upcoming</SelectItem>
-            <SelectItem value="past">Past</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* Stats Cards */}
+      <div className="grid gap-6 md:grid-cols-3">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Clock className="w-6 h-6 text-blue-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {categorizedAssignments.active.length}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="p-2 bg-red-100 rounded-lg">
+                <AlertCircle className="w-6 h-6 text-red-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Overdue</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {categorizedAssignments.overdue.length}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <CheckSquare className="w-6 h-6 text-green-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {assignments.length}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {session?.user?.role === 'TEACHER' && (
-        <div className={`${glassCardClasses} space-y-4`}>
-          <div>
-            <p className={`text-sm font-semibold ${titleTextClasses} mb-2 flex items-center`}>
-              <BookOpen className="h-4 w-4 mr-2"/> My Subjects
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {(subjects?.length ? subjects : taughtSubjects)?.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => onClickSubjectChip(s.id)}
-                  className={`px-3 py-1 rounded-full border text-sm transition-colors ${activeSubjectFilter === s.id ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-white/60 dark:bg-zinc-800/60 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 hover:bg-white/80 dark:hover:bg-zinc-700/60'}`}
-                  title="Filter assignments by this subject"
-                >
-                  {s.name}
-                </button>
-              ))}
-              {((subjects || []).length === 0 && (taughtSubjects || []).length === 0) && (
-                <span className={`text-sm ${descriptionTextClasses}`}>No subjects assigned.</span>
-              )}
-            </div>
-          </div>
-          <div>
-            <p className={`text-sm font-semibold ${titleTextClasses} mb-2 flex items-center`}>
-              <Users className="h-4 w-4 mr-2"/> Class Teacher Sections
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {classTeacherSections?.map(sec => (
-                <span key={sec.id} className="px-3 py-1 rounded-full bg-white/60 dark:bg-zinc-800/60 border border-zinc-300 dark:border-zinc-700 text-sm text-zinc-800 dark:text-zinc-200">
-                  {sec.class?.name || 'Class'} - {sec.name}
-                </span>
-              ))}
-              {(classTeacherSections || []).length === 0 && (
-                <span className={`text-sm ${descriptionTextClasses}`}>Not a class teacher for any section.</span>
-              )}
-            </div>
-          </div>
+      {/* Filters */}
+      <div className="flex flex-col lg:flex-row gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input
+            placeholder="Search assignments..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10"
+          />
         </div>
+        
+        <div className="flex gap-2">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-32">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="upcoming">Upcoming</SelectItem>
+              <SelectItem value="past">Past Due</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={subjectFilter} onValueChange={setSubjectFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="All Subjects" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Subjects</SelectItem>
+              {subjects.map(subject => (
+                <SelectItem key={subject.id} value={subject.id}>
+                  {subject.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Assignments Grid */}
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
-      {error && ( <Alert variant="destructive" className="bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300 dark:border-red-700/50"> <AlertTriangle className="h-4 w-4" /> <AlertTitle>Error</AlertTitle> <AlertDescription>{error}</AlertDescription> </Alert> )}
+      <AssignmentsGrid 
+        assignments={assignments}
+        viewMode={viewMode}
+        onEdit={openEditDialog}
+        onDelete={handleDelete}
+        schoolData={schoolData}
+      />
 
-      <div className={`${glassCardClasses} overflow-x-auto`}>
-        <Table>
-          <TableHeader>
-            <TableRow className="border-zinc-200/80 dark:border-zinc-700/80">
-              <TableHead className={`${titleTextClasses} font-semibold`}>Title</TableHead>
-              <TableHead className={`${titleTextClasses} font-semibold`}>Subject</TableHead>
-              <TableHead className={`${titleTextClasses} font-semibold hidden sm:table-cell`}>Due Date</TableHead>
-              <TableHead className={`${titleTextClasses} font-semibold hidden lg:table-cell`}>Submissions</TableHead>
-              <TableHead className={`${titleTextClasses} font-semibold hidden md:table-cell`}>Target</TableHead>
-              <TableHead className={`${titleTextClasses} font-semibold hidden lg:table-cell`}>Teacher</TableHead>
-              <TableHead className={`${titleTextClasses} font-semibold text-right`}>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              Array.from({ length: 5 }).map((_, index) => (
-                <TableRow key={`skeleton-${index}`} className="border-zinc-200/50 dark:border-zinc-800/50">
-                  <TableCell><Skeleton className="h-5 w-32 rounded" /></TableCell>
-                  <TableCell><Skeleton className="h-5 w-20 rounded" /></TableCell>
-                  <TableCell className="hidden sm:table-cell"><Skeleton className="h-5 w-24 rounded" /></TableCell>
-                  <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-28 rounded" /></TableCell>
-                  <TableCell className="hidden lg:table-cell"><Skeleton className="h-5 w-24 rounded" /></TableCell>
-                  <TableCell className="text-right"><div className="flex justify-end gap-2"><Skeleton className="h-8 w-8 rounded" /><Skeleton className="h-8 w-8 rounded" /></div></TableCell>
-                </TableRow>
-              ))
-            ) : assignments.length > 0 ? assignments.map((assignment) => (
-              <TableRow key={assignment.id} className="border-zinc-200/50 dark:border-zinc-800/50 hover:bg-zinc-500/5 dark:hover:bg-white/5">
-                <TableCell className={`${descriptionTextClasses} font-medium flex items-center gap-2`}>
-                  <span>{assignment.title}</span>
-                  {Array.isArray(assignment.attachments) && assignment.attachments.length > 0 && (
-                    <span title={`${assignment.attachments.length} attachment(s)`} className="inline-flex items-center text-zinc-500 dark:text-zinc-400">
-                      <Paperclip className="h-3.5 w-3.5" />
-                    </span>
-                  )}
-                </TableCell>
-                <TableCell className={`${descriptionTextClasses}`}>
-                  <button onClick={() => onClickSubjectChip(assignment.subjectId)} className="underline-offset-2 hover:underline">
-                    {getSubjectName(assignment.subjectId)}
-                  </button>
-                </TableCell>
-                <TableCell className={`${descriptionTextClasses} hidden sm:table-cell`}>{formatDueDate(assignment.dueDate)}</TableCell>
-                <TableCell className={`${descriptionTextClasses} hidden lg:table-cell`}>{assignment._count?.submittedAssignments ?? 0}</TableCell>
-                <TableCell className={`${descriptionTextClasses} hidden md:table-cell`}>{getSectionClassDisplayName(assignment.sectionId, assignment.classId)}</TableCell>
-                <TableCell className={`${descriptionTextClasses} hidden lg:table-cell`}>{getTeacherName(assignment.teacherId)}</TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-1 md:gap-2">
-                    {session?.user?.role === 'TEACHER' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className={`${outlineButtonClasses}`}
-                        onClick={() => window.location.assign(`/${schoolData?.subdomain || ''}/teacher/academics/assignments/${assignment.id}/submissions`) }
-                        title="Review submissions"
-                      >
-                        Review
-                      </Button>
-                    )}
-                    <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} onClick={() => openEditDialog(assignment)} title="Edit Assignment"> <Edit3 className="h-4 w-4" /> </Button>
-                    <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} onClick={async () => {
-                      const res = await fetch(`/api/schools/${schoolData.id}/academics/assignments/${assignment.id}/duplicate`, { method: 'POST' });
-                      const j = await res.json();
-                      if (!res.ok) return toast.error(j.error || 'Duplicate failed');
-                      toast.success('Assignment duplicated');
-                      fetchAssignments();
-                    }} title="Duplicate Assignment"> <Copy className="h-4 w-4" /> </Button>
-                    <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} onClick={async () => {
-                      const days = 3; // quick extend by 3 days; could add a mini-dialog later
-                      const res = await fetch(`/api/schools/${schoolData.id}/academics/assignments/${assignment.id}/extend-due-date`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ days }) });
-                      const j = await res.json();
-                      if (!res.ok) return toast.error(j.error || 'Extend failed');
-                      toast.success('Due date extended');
-                      fetchAssignments();
-                    }} title="Extend due date by 3 days"> <Clock className="h-4 w-4" /> </Button>
-                    <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8 border-red-300 text-red-600 hover:bg-red-100 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/50`} onClick={() => handleDelete(assignment.id, assignment.title)} title="Delete Assignment"> <Trash2 className="h-4 w-4" /> </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            )) : (
-              <TableRow className="border-zinc-200/50 dark:border-zinc-800/50">
-                <TableCell colSpan="6" className={`text-center py-10 ${descriptionTextClasses}`}>
-                  No assignments created yet. Click "Add New Assignment" to get started.
-                </TableCell>
-              </TableRow>
+      {/* Create/Edit Assignment Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingAssignment ? 'Edit Assignment' : 'Create New Assignment'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingAssignment 
+                ? 'Update assignment details and settings' 
+                : 'Create a new assignment for your students'
+              }
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmit}>
+            <ModernAssignmentForm
+              formData={formData}
+              onFormChange={handleFormChange}
+              onSelectChange={handleSelectChange}
+              onFileChange={handleFileChange}
+              onRemoveAttachment={handleRemoveAttachment}
+              subjects={subjects}
+              sections={sections}
+              teachers={teachers}
+              isLoadingDeps={isLoadingDeps}
+            />
+
+            {formError && (
+              <Alert variant="destructive" className="mt-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{formError}</AlertDescription>
+              </Alert>
             )}
-          </TableBody>
-        </Table>
-      </div>
+
+            <DialogFooter className="mt-6">
+              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                disabled={isSubmitting || !formData.title || !formData.subjectId || !formData.dueDate}
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    {editingAssignment ? 'Updating...' : 'Creating...'}
+                  </>
+                ) : (
+                  editingAssignment ? 'Update Assignment' : 'Create Assignment'
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+// ---------------- ASSIGNMENTS GRID COMPONENT ----------------
+function AssignmentsGrid({ assignments, viewMode, onEdit, onDelete, schoolData }) {
+  const { data: session } = useSession();
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInHours = (date - now) / (1000 * 60 * 60);
+    
+    if (diffInHours < 24 && diffInHours > 0) {
+      return { text: `Due in ${Math.ceil(diffInHours)} hours`, urgent: true };
+    } else if (diffInHours < 0) {
+      return { text: `Overdue by ${Math.ceil(-diffInHours)} hours`, overdue: true };
+    }
+    
+    return { 
+      text: date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric',
+        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined 
+      }),
+      upcoming: true
+    };
+  };
+
+  const getStatusColor = (assignment) => {
+    const now = new Date();
+    const dueDate = new Date(assignment.dueDate);
+    
+    if (dueDate <= now) return { bg: 'bg-red-100', text: 'text-red-800', dot: 'bg-red-500' };
+    if (dueDate - now < 24 * 60 * 60 * 1000) return { bg: 'bg-yellow-100', text: 'text-yellow-800', dot: 'bg-yellow-500' };
+    return { bg: 'bg-green-100', text: 'text-green-800', dot: 'bg-green-500' };
+  };
+
+  if (assignments.length === 0) {
+    return (
+      <div className="text-center py-16">
+        <div className="mx-auto h-24 w-24 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+          <BookOpen className="h-12 w-12 text-gray-400" />
+        </div>
+        <h3 className="mt-6 text-lg font-medium text-gray-900 dark:text-white">No assignments found</h3>
+        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+          Get started by creating your first assignment to engage your students with meaningful learning activities.
+        </p>
+      </div>
+    );
+  }
+
+  if (viewMode === 'list') {
+    return (
+      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+          <div className="grid grid-cols-12 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            <div className="col-span-4">Assignment</div>
+            <div className="col-span-2">Subject</div>
+            <div className="col-span-2">Due Date</div>
+            <div className="col-span-2">Submissions</div>
+            <div className="col-span-2">Actions</div>
+          </div>
+        </div>
+        
+        <div className="divide-y divide-gray-200 dark:divide-gray-800">
+          {assignments.map((assignment) => {
+            const dateInfo = formatDate(assignment.dueDate);
+            const statusColors = getStatusColor(assignment);
+            
+            return (
+              <div key={assignment.id} className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                <div className="grid grid-cols-12 gap-4 items-center">
+                  <div className="col-span-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-2 h-2 rounded-full ${statusColors.dot}`}></div>
+                      <div>
+                        <h3 className="font-medium text-gray-900 dark:text-white truncate">
+                          {assignment.title}
+                        </h3>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant={assignment.type === 'OBJECTIVE' ? 'default' : 'secondary'} className="text-xs">
+                            {assignment.type}
+                          </Badge>
+                          {assignment.attachments?.length > 0 && (
+                            <div className="flex items-center gap-1 text-xs text-gray-500">
+                              <Paperclip className="w-3 h-3" />
+                              {assignment.attachments.length}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="col-span-2">
+                    <Badge variant="outline" className="text-xs">
+                      {assignment.subject?.name || 'N/A'}
+                    </Badge>
+                  </div>
+                  
+                  <div className="col-span-2">
+                    <span className={`text-sm ${
+                      dateInfo.overdue ? 'text-red-600 font-medium' : 
+                      dateInfo.urgent ? 'text-yellow-600 font-medium' : 
+                      'text-gray-600 dark:text-gray-400'
+                    }`}>
+                      {dateInfo.text}
+                    </span>
+                  </div>
+                  
+                  <div className="col-span-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        {assignment._count?.submittedAssignments || 0}
+                      </span>
+                      <Progress 
+                        value={(assignment._count?.submittedAssignments || 0) / Math.max(assignment.enrollmentCount || 1, 1) * 100} 
+                        className="w-16 h-2"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="col-span-2">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => onEdit(assignment)}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                        {session?.user?.role === 'TEACHER' && (
+                          <DropdownMenuItem 
+                            onClick={() => window.location.assign(`/${schoolData?.subdomain || ''}/teacher/academics/assignments/${assignment.id}/submissions`)}
+                          >
+                            <Eye className="mr-2 h-4 w-4" />
+                            Review Submissions
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          onClick={() => onDelete(assignment)}
+                          className="text-red-600 focus:text-red-600"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // Card view
+  return (
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      {assignments.map((assignment) => {
+        const dateInfo = formatDate(assignment.dueDate);
+        const statusColors = getStatusColor(assignment);
+        
+        return (
+          <Card key={assignment.id} className="group hover:shadow-lg transition-all duration-200 border-0 shadow-md">
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${statusColors.dot}`}></div>
+                  <Badge 
+                    variant={assignment.type === 'OBJECTIVE' ? 'default' : 'secondary'} 
+                    className="text-xs"
+                  >
+                    {assignment.type === 'OBJECTIVE' ? (
+                      <><Zap className="w-3 h-3 mr-1" />Auto-graded</>
+                    ) : (
+                      <><FileText className="w-3 h-3 mr-1" />Manual</>
+                    )}
+                  </Badge>
+                </div>
+                
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => onEdit(assignment)}>
+                      <Edit className="mr-2 h-4 w-4" />
+                      Edit
+                    </DropdownMenuItem>
+                    {session?.user?.role === 'TEACHER' && (
+                      <DropdownMenuItem 
+                        onClick={() => window.location.assign(`/${schoolData?.subdomain || ''}/teacher/academics/assignments/${assignment.id}/submissions`)}
+                      >
+                        <Eye className="mr-2 h-4 w-4" />
+                        Review Submissions
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem 
+                      onClick={() => onDelete(assignment)}
+                      className="text-red-600 focus:text-red-600"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              
+              <div>
+                <h3 className="font-semibold text-lg text-gray-900 dark:text-white line-clamp-2 leading-tight">
+                  {assignment.title}
+                </h3>
+                
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge variant="outline" className="text-xs">
+                    {assignment.subject?.name || 'N/A'}
+                  </Badge>
+                  {assignment.maxMarks && (
+                    <div className="flex items-center gap-1 text-xs text-gray-500">
+                      <Target className="w-3 h-3" />
+                      {assignment.maxMarks} pts
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            
+            <CardContent className="pt-0">
+              <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-3 mb-4">
+                {assignment.description || 'No description provided'}
+              </p>
+              
+              <div className="space-y-3">
+                {/* Due date */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Calendar className="w-4 h-4 text-gray-400" />
+                    <span className={`${
+                      dateInfo.overdue ? 'text-red-600 font-medium' : 
+                      dateInfo.urgent ? 'text-yellow-600 font-medium' : 
+                      'text-gray-600 dark:text-gray-400'
+                    }`}>
+                      {dateInfo.text}
+                    </span>
+                  </div>
+                  
+                  {assignment.attachments?.length > 0 && (
+                    <div className="flex items-center gap-1 text-xs text-gray-500">
+                      <Paperclip className="w-4 h-4" />
+                      <span>{assignment.attachments.length} files</span>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Submissions progress */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600 dark:text-gray-400">Submissions</span>
+                    <span className="font-medium">
+                      {assignment._count?.submittedAssignments || 0} / {assignment.enrollmentCount || 0}
+                    </span>
+                  </div>
+                  <Progress 
+                    value={(assignment._count?.submittedAssignments || 0) / Math.max(assignment.enrollmentCount || 1, 1) * 100} 
+                    className="h-2"
+                  />
+                </div>
+                
+                {/* Action buttons */}
+                <div className="flex gap-2 pt-2">
+                  {session?.user?.role === 'TEACHER' && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1 text-xs"
+                      onClick={() => window.location.assign(`/${schoolData?.subdomain || ''}/teacher/academics/assignments/${assignment.id}/submissions`)}
+                    >
+                      <Eye className="w-4 h-4 mr-1" />
+                      Review
+                    </Button>
+                  )}
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1 text-xs"
+                    onClick={() => onEdit(assignment)}
+                  >
+                    <Edit className="w-4 h-4 mr-1" />
+                    Edit
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------------- MAIN ASSIGNMENTS PAGE COMPONENT ----------------
+export default function ModernAssignmentsPage() {
+  const { data: session } = useSession();
+  const school = useSchool();
+  
+  // Return appropriate view based on user role
+  if (session?.user?.role === 'STUDENT') {
+    return <StudentAssignmentsView />;
+  }
+
+  // Teacher/Admin view (includes all management features)
+  const [assignments, setAssignments] = useState([]);
+  const [filteredAssignments, setFilteredAssignments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState('all');
+  const [selectedType, setSelectedType] = useState('all');
+  const [viewMode, setViewMode] = useState('cards');
+  const [subjects, setSubjects] = useState([]);
+  
+  // Dialog states
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingAssignment, setEditingAssignment] = useState(null);
+
+  // Fetch assignments and subjects
+  const fetchData = useCallback(async () => {
+    if (!school?.id || !session) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
+
+      const [assignmentsRes, subjectsRes] = await Promise.all([
+        fetch(`/api/schools/${school.id}/academics/assignments`),
+        fetch(`/api/schools/${school.id}/academics/subjects`)
+      ]);
+
+      if (!assignmentsRes.ok) throw new Error('Failed to fetch assignments');
+      if (!subjectsRes.ok) throw new Error('Failed to fetch subjects');
+
+      const assignmentsData = await assignmentsRes.json();
+      const subjectsData = await subjectsRes.json();
+
+      setAssignments(assignmentsData.assignments || []);
+      setSubjects(subjectsData.subjects || []);
+    } catch (err) {
+      console.error('Error fetching data:', err);
+      setError(err.message);
+      toast.error('Failed to load assignments');
+    } finally {
+      setLoading(false);
+    }
+  }, [school?.id, session]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Filter assignments based on search and filters
+  useEffect(() => {
+    let filtered = assignments;
+
+    if (searchTerm) {
+      filtered = filtered.filter(assignment =>
+        assignment.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        assignment.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        assignment.subject?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    if (selectedSubject !== 'all') {
+      filtered = filtered.filter(assignment => assignment.subjectId === selectedSubject);
+    }
+
+    if (selectedType !== 'all') {
+      filtered = filtered.filter(assignment => assignment.type === selectedType);
+    }
+
+    setFilteredAssignments(filtered);
+  }, [assignments, searchTerm, selectedSubject, selectedType]);
+
+  // Calculate stats
+  const stats = useMemo(() => {
+    const now = new Date();
+    const total = assignments.length;
+    const overdue = assignments.filter(a => new Date(a.dueDate) < now).length;
+    const dueToday = assignments.filter(a => {
+      const due = new Date(a.dueDate);
+      return due.toDateString() === now.toDateString();
+    }).length;
+    const totalSubmissions = assignments.reduce((sum, a) => sum + (a._count?.submittedAssignments || 0), 0);
+
+    return { total, overdue, dueToday, totalSubmissions };
+  }, [assignments]);
+
+  // Handle assignment operations
+  const handleEdit = (assignment) => {
+    setEditingAssignment(assignment);
+    setIsDialogOpen(true);
+  };
+
+  const handleDelete = async (assignment) => {
+    if (!confirm(`Are you sure you want to delete "${assignment.title}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/schools/${school.id}/academics/assignments/${assignment.id}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete assignment');
+      }
+
+      toast.success('Assignment deleted successfully');
+      fetchData();
+    } catch (err) {
+      console.error('Error deleting assignment:', err);
+      toast.error('Failed to delete assignment', { description: err.message });
+    }
+  };
+
+  const handleDialogClose = () => {
+    setIsDialogOpen(false);
+    setEditingAssignment(null);
+  };
+
+  const handleAssignmentSaved = () => {
+    handleDialogClose();
+    fetchData();
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="mb-8">
+          <Skeleton className="h-8 w-64 mb-2" />
+          <Skeleton className="h-4 w-96" />
+        </div>
+        
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full" />
+          ))}
+        </div>
+        
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {[...Array(6)].map((_, i) => (
+            <Skeleton key={i} className="h-64 w-full" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto p-6">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  return (
+    <RequireRole allowedRoles={['TEACHER', 'SCHOOL_ADMIN']}>
+      <div className="max-w-7xl mx-auto p-6 space-y-8">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Assignments</h1>
+            <p className="mt-2 text-gray-600 dark:text-gray-400">
+              Create, manage, and track student assignments with auto-grading capabilities
+            </p>
+          </div>
+          
+          <Button 
+            onClick={() => setIsDialogOpen(true)}
+            size="lg"
+            className="mt-4 sm:mt-0"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            New Assignment
+          </Button>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <Card className="border-0 shadow-md">
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                  <BookOpen className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.total}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Assignments</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-md">
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <div className="p-2 bg-red-100 dark:bg-red-900 rounded-lg">
+                  <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.overdue}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Overdue</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-md">
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <div className="p-2 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
+                  <Clock className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.dueToday}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Due Today</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-md">
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                  <Users className="h-6 w-6 text-green-600 dark:text-green-400" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.totalSubmissions}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Submissions</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filters and Search */}
+        <Card className="border-0 shadow-md">
+          <CardContent className="p-6">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    placeholder="Search assignments..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              
+              <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <SelectValue placeholder="Filter by subject" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Subjects</SelectItem>
+                  {subjects.map((subject) => (
+                    <SelectItem key={subject.id} value={subject.id}>
+                      {subject.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={selectedType} onValueChange={setSelectedType}>
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <SelectValue placeholder="Filter by type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="OBJECTIVE">
+                    <div className="flex items-center">
+                      <Zap className="w-4 h-4 mr-2" />
+                      Auto-graded
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="SUBJECTIVE">
+                    <div className="flex items-center">
+                      <FileText className="w-4 h-4 mr-2" />
+                      Manual
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+
+              <div className="flex border rounded-lg">
+                <Button
+                  variant={viewMode === 'cards' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('cards')}
+                  className="rounded-r-none"
+                >
+                  Cards
+                </Button>
+                <Button
+                  variant={viewMode === 'list' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('list')}
+                  className="rounded-l-none"
+                >
+                  List
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Assignments Grid/List */}
+        <AssignmentsGrid
+          assignments={filteredAssignments}
+          viewMode={viewMode}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          schoolData={school}
+        />
+
+        {/* Assignment Creation/Edit Dialog */}
+        <ModernAssignmentForm
+          isOpen={isDialogOpen}
+          onClose={handleDialogClose}
+          onSave={handleAssignmentSaved}
+          editingAssignment={editingAssignment}
+          schoolId={school?.id}
+          subjects={subjects}
+        />
+      </div>
+    </RequireRole>
   );
 }
