@@ -819,8 +819,7 @@ class _HomePageState extends State<HomePage> {
                               MaterialPageRoute(
                                 builder: (_) => AttendancePage(
                                   studentId: _selectedChild!['id'].toString(),
-                                  studentName:
-                                      name.isEmpty ? 'Student' : name,
+                                  studentName: name.isEmpty ? 'Student' : name,
                                 ),
                               ),
                             );

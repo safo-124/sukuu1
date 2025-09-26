@@ -47,8 +47,8 @@ class _MainTabsPageState extends State<MainTabsPage> {
     super.initState();
     _pages = [
       HomePage(
-          goToTab: (i) => setState(
-              () => _currentIndex = i.clamp(0, _pages.length - 1))),
+          goToTab: (i) =>
+              setState(() => _currentIndex = i.clamp(0, _pages.length - 1))),
       MessagesPage(onAnyRead: _loadUnreadCount),
       const _FeesTab(),
       const _MoreTab(),
