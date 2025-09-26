@@ -175,6 +175,53 @@ export async function POST(request, { params }) {
     // Audience is targeted to parents, and further limited by section/class when available
     (async () => {
       try {
+        // Best-effort: create placeholder CA grade rows (null marks) so the CA Grades page reflects the assignment immediately.
+        try {
+          // Resolve current year & term
+          let year = await prisma.academicYear.findFirst({ where: { schoolId: parsedSchoolId, isCurrent: true }, include: { terms: true } });
+          if (!year) {
+            year = await prisma.academicYear.findFirst({ where: { schoolId: parsedSchoolId }, orderBy: { startDate: 'desc' }, include: { terms: true } });
+          }
+          const now = new Date();
+          const term = year?.terms?.find(t => new Date(t.startDate) <= now && now <= new Date(t.endDate)) || year?.terms?.[0] || null;
+
+          if (year && term) {
+            let enrollmentWhere = { schoolId: parsedSchoolId, academicYearId: year.id };
+            if (parsedData.sectionId) {
+              enrollmentWhere.sectionId = parsedData.sectionId;
+            } else if (parsedData.classId) {
+              const sectionsInClass = await prisma.section.findMany({ where: { schoolId: parsedSchoolId, classId: parsedData.classId } });
+              const sectionIds = sectionsInClass.map(s => s.id);
+              enrollmentWhere.sectionId = { in: sectionIds };
+            }
+
+            const enrollments = await prisma.studentEnrollment.findMany({ where: enrollmentWhere, select: { studentId: true, sectionId: true } });
+            if (enrollments.length) {
+              await prisma.$transaction(async (tx) => {
+                for (const e of enrollments) {
+                  const exists = await tx.grade.findFirst({ where: { studentId: e.studentId, assignmentId: newAssignment.id, subjectId: parsedData.subjectId, termId: term.id, academicYearId: year.id } });
+                  if (!exists) {
+                    await tx.grade.create({
+                      data: {
+                        studentId: e.studentId,
+                        subjectId: parsedData.subjectId,
+                        termId: term.id,
+                        academicYearId: year.id,
+                        schoolId: parsedSchoolId,
+                        sectionId: e.sectionId,
+                        assignmentId: newAssignment.id,
+                        marksObtained: null,
+                      },
+                    });
+                  }
+                }
+              });
+            }
+          }
+        } catch (seedErr) {
+          console.warn('Placeholder CA grades not created:', seedErr?.message || seedErr);
+        }
+
         const dueStr = new Date(parsedData.dueDate).toLocaleDateString();
         const scopeText = section
           ? `Section ${section.name}`
@@ -227,7 +274,7 @@ export async function POST(request, { params }) {
             if (parentIds.length > 0) {
               const parents = await prisma.parent.findMany({
                 where: { id: { in: parentIds }, schoolId: parsedSchoolId },
-                select: { id: true, user: { select: { email: true, firstName: true, lastName: true } } }
+                select: { id: true, user: { select: { id: true, email: true, firstName: true, lastName: true } } }
               });
               await notifyParentsNewAssignment({
                 schoolId: parsedSchoolId,

@@ -168,16 +168,119 @@ class _MessagesPageState extends State<MessagesPage> {
   }
 }
 
-class _MessageDetailPage extends StatelessWidget {
+class _MessageDetailPage extends StatefulWidget {
   final Map<String, dynamic> message;
   const _MessageDetailPage({required this.message});
 
   @override
+  State<_MessageDetailPage> createState() => _MessageDetailPageState();
+}
+
+class _MessageDetailPageState extends State<_MessageDetailPage> {
+  bool _openedAutomatically = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-open assignment modal if deep link exists
+    final content = widget.message['content']?.toString() ?? '';
+    final deepLinkMatch =
+        RegExp(r'assignment:\/\/([a-zA-Z0-9_-]+)').firstMatch(content);
+    final assignmentId = deepLinkMatch != null ? deepLinkMatch.group(1) : null;
+    if (assignmentId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_openedAutomatically) {
+          _openedAutomatically = true;
+          _openAssignment(assignmentId);
+        }
+      });
+    }
+  }
+
+  Future<void> _openAssignment(String assignmentId) async {
+    final storage = const FlutterSecureStorage();
+    final baseUrl = await storage.read(key: 'baseUrl');
+    final token = await storage.read(key: 'token');
+    final schoolId = await storage.read(key: 'schoolId');
+    if (baseUrl == null || token == null || schoolId == null) return;
+    final url = Uri.parse(
+        '$baseUrl/api/schools/$schoolId/parents/me/assignments/$assignmentId');
+    try {
+      final res = await http.get(url,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json'
+          });
+      if (res.statusCode != 200) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Failed to load assignment')));
+        }
+        return;
+      }
+      final jsonMap = jsonDecode(res.body) as Map<String, dynamic>;
+      final a = jsonMap['assignment'] as Map<String, dynamic>;
+      if (!mounted) return;
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        builder: (_) {
+          final subj = a['subject']?['name']?.toString() ?? '';
+          final sec = a['section']?['name']?.toString();
+          final cls = a['class']?['name']?.toString();
+          final due = a['dueDate']?.toString();
+          final dueDt = due != null ? DateTime.tryParse(due) : null;
+          final teacherName = [
+            a['teacher']?['user']?['firstName'],
+            a['teacher']?['user']?['lastName']
+          ].whereType<String>().join(' ');
+          return Padding(
+            padding: MediaQuery.of(context)
+                .viewInsets
+                .add(const EdgeInsets.all(16)),
+            child: SafeArea(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(a['title']?.toString() ?? 'Assignment',
+                        style: const TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Text(
+                        'Subject: $subj${sec != null ? ' • Section: ' + sec : ''}${cls != null ? ' • Class: ' + cls : ''}'),
+                    if (dueDt != null)
+                      Text(
+                          'Due: ${DateFormat('MMM d, yyyy h:mm a').format(dueDt)}'),
+                    if (teacherName.isNotEmpty)
+                      Text('Teacher: $teacherName'),
+                    const Divider(height: 24),
+                    if (a['description'] != null)
+                      Text(a['description'].toString()),
+                    const SizedBox(height: 16),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to load assignment')));
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final df = DateFormat('EEEE, MMM d, yyyy h:mm a');
-    final dtStr = (message['publishedAt'] ?? message['createdAt'])?.toString();
+    final dtStr =
+        (widget.message['publishedAt'] ?? widget.message['createdAt'])
+            ?.toString();
     final dt = dtStr != null ? DateTime.tryParse(dtStr) : null;
-    final content = message['content']?.toString() ?? '';
+    final content = widget.message['content']?.toString() ?? '';
     final deepLinkMatch =
         RegExp(r'assignment:\/\/([a-zA-Z0-9_-]+)').firstMatch(content);
     final assignmentId = deepLinkMatch != null ? deepLinkMatch.group(1) : null;
@@ -188,9 +291,9 @@ class _MessageDetailPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(message['title']?.toString() ?? 'Message',
-                style:
-                    const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text(widget.message['title']?.toString() ?? 'Message',
+                style: const TextStyle(
+                    fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             if (dt != null)
               Text(df.format(dt),
@@ -202,83 +305,7 @@ class _MessageDetailPage extends StatelessWidget {
               FilledButton.icon(
                 icon: const Icon(Icons.assignment_outlined),
                 label: const Text('View assignment details'),
-                onPressed: () async {
-                  final storage = const FlutterSecureStorage();
-                  final baseUrl = await storage.read(key: 'baseUrl');
-                  final token = await storage.read(key: 'token');
-                  final schoolId = await storage.read(key: 'schoolId');
-                  if (baseUrl == null || token == null || schoolId == null)
-                    return;
-                  final url = Uri.parse(
-                      '$baseUrl/api/schools/$schoolId/parents/me/assignments/$assignmentId');
-                  try {
-                    final res = await http.get(url, headers: {
-                      'Authorization': 'Bearer $token',
-                      'Accept': 'application/json'
-                    });
-                    if (res.statusCode != 200) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text('Failed to load assignment')));
-                      }
-                      return;
-                    }
-                    final json = jsonDecode(res.body) as Map<String, dynamic>;
-                    final a = json['assignment'] as Map<String, dynamic>;
-                    if (!context.mounted) return;
-                    showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        builder: (_) {
-                          final subj = a['subject']?['name']?.toString() ?? '';
-                          final sec = a['section']?['name']?.toString();
-                          final cls = a['class']?['name']?.toString();
-                          final due = a['dueDate']?.toString();
-                          final dueDt =
-                              due != null ? DateTime.tryParse(due) : null;
-                          final teacherName = [
-                            a['teacher']?['user']?['firstName'],
-                            a['teacher']?['user']?['lastName']
-                          ].whereType<String>().join(' ');
-                          return Padding(
-                            padding: MediaQuery.of(context)
-                                .viewInsets
-                                .add(const EdgeInsets.all(16)),
-                            child: SafeArea(
-                              child: SingleChildScrollView(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(a['title']?.toString() ?? 'Assignment',
-                                        style: const TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold)),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                        'Subject: $subj${sec != null ? ' • Section: ' + sec : ''}${cls != null ? ' • Class: ' + cls : ''}'),
-                                    if (dueDt != null)
-                                      Text(
-                                          'Due: ${DateFormat('MMM d, yyyy h:mm a').format(dueDt)}'),
-                                    if (teacherName.isNotEmpty)
-                                      Text('Teacher: $teacherName'),
-                                    const Divider(height: 24),
-                                    if (a['description'] != null)
-                                      Text(a['description'].toString()),
-                                    const SizedBox(height: 16),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        });
-                  } catch (_) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                          content: Text('Failed to load assignment')));
-                    }
-                  }
-                },
+                onPressed: () => _openAssignment(assignmentId),
               ),
             ]
           ],
@@ -290,27 +317,30 @@ class _MessageDetailPage extends StatelessWidget {
 
 class _ErrorView extends StatelessWidget {
   final String message;
-  final VoidCallback onRetry;
+  final Future<void> Function() onRetry;
   const _ErrorView({required this.message, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(24.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 32),
-            const SizedBox(height: 8),
-            Text(message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.red)),
+            const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
             const SizedBox(height: 12),
+            Text(
+              message,
+              style: const TextStyle(fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
             FilledButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retry')),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+              onPressed: onRetry,
+            )
           ],
         ),
       ),
