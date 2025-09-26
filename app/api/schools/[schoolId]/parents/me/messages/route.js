@@ -50,14 +50,47 @@ export async function GET(request, { params }) {
     });
     const readSet = new Set(readStates.map((r) => r.announcementId));
 
-    // Optional: filter by audience roles if audience is set
+    // Fetch the parent's children current enrollments to filter targeted announcements
+    const parent = await prisma.parent.findFirst({ where: { userId: session.user.id, schoolId }, select: { id: true } });
+    let childSectionIds = new Set();
+    let childClassIds = new Set();
+    if (parent) {
+      const links = await prisma.parentStudent.findMany({
+        where: { parentId: parent.id },
+        select: { studentId: true },
+      });
+      const studentIds = links.map((l) => l.studentId);
+      if (studentIds.length > 0) {
+        const enrollments = await prisma.studentEnrollment.findMany({
+          where: { schoolId, studentId: { in: studentIds }, isCurrent: true },
+          select: { sectionId: true, section: { select: { classId: true } } },
+        });
+        enrollments.forEach((en) => {
+          if (en.sectionId) childSectionIds.add(en.sectionId);
+          if (en.section?.classId) childClassIds.add(en.section.classId);
+        });
+      }
+    }
+
+    // Filter by audience roles and targeted section/class if present
     const role = session.user.role;
     const filtered = rows.filter((a) => {
       try {
-        if (!a.audience) return true;
-        const audience = a.audience; // JSON
-        if (audience && Array.isArray(audience.roles) && audience.roles.length > 0) {
-          return audience.roles.includes(role);
+        const audience = a.audience || {};
+        const roles = Array.isArray(audience.roles) ? audience.roles : [];
+        const sectionIds = Array.isArray(audience.sectionIds) ? audience.sectionIds : [];
+        const classIds = Array.isArray(audience.classIds) ? audience.classIds : [];
+
+        // if roles set, must include PARENT
+        if (roles.length > 0 && !roles.includes(role)) return false;
+        // if targeted sections/classes set, at least one must match a child's current context
+        if (sectionIds.length > 0) {
+          const anySection = sectionIds.some((id) => childSectionIds.has(id));
+          if (!anySection) return false;
+        }
+        if (classIds.length > 0) {
+          const anyClass = classIds.some((id) => childClassIds.has(id));
+          if (!anyClass) return false;
         }
         return true;
       } catch {

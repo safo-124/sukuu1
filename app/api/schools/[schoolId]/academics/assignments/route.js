@@ -170,6 +170,39 @@ export async function POST(request, { params }) {
       },
     });
 
+    // Fire-and-forget: create a parent-facing Announcement so parents get a notification in the parent app
+    // Audience is targeted to parents, and further limited by section/class when available
+    (async () => {
+      try {
+        const dueStr = new Date(parsedData.dueDate).toLocaleDateString();
+        const scopeText = section
+          ? `Section ${section.name}`
+          : _class
+            ? `Class ${_class.name}`
+            : subject.name;
+
+        const audience = {
+          roles: ["PARENT"],
+          ...(parsedData.sectionId ? { sectionIds: [parsedData.sectionId] } : {}),
+          ...(!parsedData.sectionId && parsedData.classId ? { classIds: [parsedData.classId] } : {}),
+        };
+
+        await prisma.announcement.create({
+          data: {
+            title: `New assignment: ${subject.name} - ${parsedData.title}`,
+            content: `A new assignment has been posted for ${scopeText}. Due on ${dueStr}.`,
+            publishedAt: new Date(),
+            isGlobal: false,
+            audience,
+            schoolId: parsedSchoolId,
+            authorId: session.user.id,
+          },
+        });
+      } catch (e) {
+        console.error('Failed to create parent announcement for assignment', e);
+      }
+    })();
+
     return NextResponse.json({ assignment: newAssignment, message: 'Assignment created successfully.' }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {

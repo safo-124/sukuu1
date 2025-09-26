@@ -605,6 +605,7 @@ function ModernAssignmentForm({
                       </a>
                     </div>
                     <Button
+                      type="button"
                       variant="ghost"
                       size="sm"
                       onClick={() => onRemoveAttachment(index)}
@@ -619,11 +620,11 @@ function ModernAssignmentForm({
           </div>
 
           <div className="flex justify-between">
-            <Button variant="outline" onClick={() => setCurrentStep(1)}>
+            <Button type="button" variant="outline" onClick={() => setCurrentStep(1)}>
               <ChevronRight className="w-4 h-4 mr-1 rotate-180" /> Previous
             </Button>
             {formData.type === 'OBJECTIVE' ? (
-              <Button onClick={() => setCurrentStep(3)}>
+              <Button type="button" onClick={() => setCurrentStep(3)}>
                 Next Step <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
             ) : (
@@ -645,7 +646,7 @@ function ModernAssignmentForm({
                 Add questions that will be automatically graded
               </p>
             </div>
-            <Button onClick={addObjective} className="flex items-center gap-2">
+            <Button type="button" onClick={addObjective} className="flex items-center gap-2">
               <Plus className="w-4 h-4" />
               Add Question
             </Button>
@@ -659,6 +660,7 @@ function ModernAssignmentForm({
                     Question {index + 1}
                   </Label>
                   <Button
+                    type="button"
                     variant="ghost"
                     size="sm"
                     onClick={() => removeObjective(index)}
@@ -723,7 +725,7 @@ function ModernAssignmentForm({
                 <p className="mt-1 text-sm text-gray-500">
                   Add questions to create an objective assignment
                 </p>
-                <Button onClick={addObjective} className="mt-4">
+                <Button type="button" onClick={addObjective} className="mt-4">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Your First Question
                 </Button>
@@ -732,7 +734,7 @@ function ModernAssignmentForm({
           </div>
 
           <div className="flex justify-between">
-            <Button variant="outline" onClick={() => setCurrentStep(2)}>
+            <Button type="button" variant="outline" onClick={() => setCurrentStep(2)}>
               <ChevronRight className="w-4 h-4 mr-1 rotate-180" /> Previous
             </Button>
             <div></div>
@@ -762,6 +764,13 @@ export default function ModernAssignmentsPage() {
   const [subjects, setSubjects] = useState([]);
   const [sections, setSections] = useState([]);
   const [teachers, setTeachers] = useState([]);
+  const uniqueClasses = useMemo(() => {
+    const map = new Map();
+    for (const s of sections || []) {
+      if (s.class) map.set(s.class.id, s.class);
+    }
+    return Array.from(map.values()).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }, [sections]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingDeps, setIsLoadingDeps] = useState(true);
   const [error, setError] = useState('');
@@ -815,9 +824,14 @@ export default function ModernAssignmentsPage() {
     
     try {
       const mine = session?.user?.role === 'TEACHER' ? '1' : '0';
+      let sectionsUrl = `/api/schools/${schoolData.id}/academics/sections?mine=${mine}`;
+      if (mine === '1' && formData.subjectId) {
+        sectionsUrl += `&subjectId=${encodeURIComponent(formData.subjectId)}`;
+      }
+
       const [subjectsRes, sectionsRes] = await Promise.all([
         fetch(`/api/schools/${schoolData.id}/academics/subjects?mine=${mine}`),
-        fetch(`/api/schools/${schoolData.id}/academics/sections`),
+        fetch(sectionsUrl),
       ]);
 
       if (subjectsRes.ok) {
@@ -855,6 +869,18 @@ export default function ModernAssignmentsPage() {
     fetchAssignments();
     fetchDependencies();
   }, [fetchAssignments, fetchDependencies]);
+
+  // When a teacher selects a subject, refresh sections to only those taught for that subject
+  useEffect(() => {
+    if (!schoolData?.id) return;
+    const mine = session?.user?.role === 'TEACHER' ? '1' : '0';
+    const params = new URLSearchParams({ mine });
+    if (mine === '1' && formData.subjectId) params.set('subjectId', formData.subjectId);
+    fetch(`/api/schools/${schoolData.id}/academics/sections?${params.toString()}`)
+      .then(res => res.ok ? res.json() : Promise.reject(new Error('Failed to fetch sections')))
+      .then(data => setSections(data.sections || []))
+      .catch(err => console.error('Failed to refresh sections:', err));
+  }, [formData.subjectId, schoolData?.id, session?.user?.role]);
 
   // Form handlers
   const handleFormChange = (e) => {
@@ -1183,8 +1209,7 @@ export default function ModernAssignmentsPage() {
             <DialogDescription>
               {editingAssignment 
                 ? 'Update assignment details and settings' 
-                : 'Create a new assignment for your students'
-              }
+                : 'Create a new assignment for your students'}
             </DialogDescription>
           </DialogHeader>
 
@@ -1232,8 +1257,6 @@ export default function ModernAssignmentsPage() {
     </div>
   );
 }
-
-// ---------------- ASSIGNMENTS GRID COMPONENT ----------------
 function AssignmentsGrid({ assignments, viewMode, onEdit, onDelete, schoolData }) {
   const { data: session } = useSession();
 

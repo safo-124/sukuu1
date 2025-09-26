@@ -4,7 +4,10 @@ export const audienceSchema = z.object({
   roles: z.array(z.enum([
     'SUPER_ADMIN','SCHOOL_ADMIN','SECRETARY','PROCUREMENT_OFFICER','TEACHER','STUDENT','HR_MANAGER','ACCOUNTANT','LIBRARIAN','TRANSPORT_MANAGER','HOSTEL_WARDEN','PARENT'
   ])).optional().default([]),
-}).optional().default({ roles: [] });
+  // Optional targeting keys for more granular audiences
+  sectionIds: z.array(z.string()).optional().default([]),
+  classIds: z.array(z.string()).optional().default([]),
+}).optional().default({ roles: [], sectionIds: [], classIds: [] });
 
 export const createAnnouncementSchema = z.object({
   title: z.string().min(1, 'Title is required').max(200),
