@@ -254,15 +254,24 @@ class _HomePageState extends State<HomePage> {
       final token = await _storage.read(key: 'token');
       final baseUrl = await _storage.read(key: 'baseUrl');
       final schoolId = await _storage.read(key: 'schoolId');
-      if (token == null || baseUrl == null || schoolId == null) throw Exception('Missing auth or config');
+      if (token == null || baseUrl == null || schoolId == null)
+        throw Exception('Missing auth or config');
       final res = await http.get(
-        Uri.parse('$baseUrl/api/schools/$schoolId/parents/me/children/promotions'),
-        headers: { 'Authorization': 'Bearer $token', 'Accept': 'application/json' },
+        Uri.parse(
+            '$baseUrl/api/schools/$schoolId/parents/me/children/promotions'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json'
+        },
       );
-      if (res.statusCode != 200) throw Exception('Failed: ${res.statusCode} ${res.body}');
+      if (res.statusCode != 200)
+        throw Exception('Failed: ${res.statusCode} ${res.body}');
       final json = jsonDecode(res.body) as Map<String, dynamic>;
       final children = (json['children'] as List?) ?? [];
-      final match = children.where((c) => c['studentId'].toString() == _selectedChild!['id'].toString()).toList();
+      final match = children
+          .where((c) =>
+              c['studentId'].toString() == _selectedChild!['id'].toString())
+          .toList();
       if (match.isNotEmpty && (match.first['promotions'] as List).isNotEmpty) {
         final promos = (match.first['promotions'] as List);
         _latestPromotion = promos.last as Map<String, dynamic>?;
@@ -432,9 +441,14 @@ class _HomePageState extends State<HomePage> {
                             child: _latestPromotion == null
                                 ? Row(
                                     children: const [
-                                      Icon(Icons.trending_up, color: Colors.grey),
+                                      Icon(Icons.trending_up,
+                                          color: Colors.grey),
                                       SizedBox(width: 12),
-                                      Expanded(child: Text('No promotion or transfer history for this child.', style: TextStyle(color: Colors.grey))),
+                                      Expanded(
+                                          child: Text(
+                                              'No promotion or transfer history for this child.',
+                                              style: TextStyle(
+                                                  color: Colors.grey))),
                                     ],
                                   )
                                 : Row(
@@ -448,23 +462,30 @@ class _HomePageState extends State<HomePage> {
                                       const SizedBox(width: 12),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              _latestPromotion!['type'] == 'PROMOTED'
+                                              _latestPromotion!['type'] ==
+                                                      'PROMOTED'
                                                   ? 'Last promoted'
                                                   : 'Last transferred',
-                                              style: const TextStyle(fontWeight: FontWeight.bold),
+                                              style: const TextStyle(
+                                                  fontWeight: FontWeight.bold),
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
                                               '${_latestPromotion!['from']?['academicYear'] ?? ''} • ${_latestPromotion!['from']?['className'] ?? ''} → ${_latestPromotion!['to']?['academicYear'] ?? ''} • ${_latestPromotion!['to']?['className'] ?? ''}',
-                                              style: const TextStyle(color: Colors.black87),
+                                              style: const TextStyle(
+                                                  color: Colors.black87),
                                             ),
-                                            if (_latestPromotion!['date'] != null)
+                                            if (_latestPromotion!['date'] !=
+                                                null)
                                               Text(
                                                 'On ${_latestPromotion!['date'].toString().substring(0, 10)}',
-                                                style: const TextStyle(color: Colors.black54, fontSize: 12),
+                                                style: const TextStyle(
+                                                    color: Colors.black54,
+                                                    fontSize: 12),
                                               ),
                                           ],
                                         ),
