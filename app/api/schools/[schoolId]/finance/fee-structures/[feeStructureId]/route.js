@@ -13,9 +13,8 @@ export async function GET(request, { params }) {
   const { schoolId, feeStructureId } = params;
   const session = await getServerSession(authOptions);
   const role = session?.user?.role;
-  const isSuperAdmin = role === 'SUPER_ADMIN';
   const allowedRoles = ['SCHOOL_ADMIN','ACCOUNTANT','SECRETARY'];
-  if (!session || (!isSuperAdmin && (session.user?.schoolId !== schoolId || !allowedRoles.includes(role)))) {
+  if (!session || session.user?.schoolId !== schoolId || !allowedRoles.includes(role)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -60,9 +59,8 @@ export async function PUT(request, { params }) {
   const { schoolId, feeStructureId } = params;
   const session = await getServerSession(authOptions);
   const role = session?.user?.role;
-  const isSuperAdmin = role === 'SUPER_ADMIN';
   const allowedRoles = ['SCHOOL_ADMIN','ACCOUNTANT'];
-  if (!session || (!isSuperAdmin && (session.user?.schoolId !== schoolId || !allowedRoles.includes(role)))) {
+  if (!session || session.user?.schoolId !== schoolId || !allowedRoles.includes(role)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -221,9 +219,8 @@ export async function DELETE(request, { params }) {
   const { schoolId, feeStructureId } = params;
   const session = await getServerSession(authOptions);
   const role = session?.user?.role;
-  const isSuperAdmin = role === 'SUPER_ADMIN';
   const allowedRoles = ['SCHOOL_ADMIN','ACCOUNTANT'];
-  if (!session || (!isSuperAdmin && (session.user?.schoolId !== schoolId || !allowedRoles.includes(role)))) {
+  if (!session || session.user?.schoolId !== schoolId || !allowedRoles.includes(role)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

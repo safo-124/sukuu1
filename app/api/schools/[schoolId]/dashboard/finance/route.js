@@ -24,7 +24,7 @@ export async function GET(req, ctx) {
     return NextResponse.json({ error: 'Invalid school id' }, { status: 400 });
   }
 
-  if (!session || session.user?.schoolId !== schoolId || !['SCHOOL_ADMIN','ACCOUNTANT','SUPER_ADMIN','SECRETARY'].includes(session.user?.role)) {
+  if (!session || session.user?.schoolId !== schoolId || !['SCHOOL_ADMIN','ACCOUNTANT','SECRETARY'].includes(session.user?.role)) {
     return unauthorized();
   }
 

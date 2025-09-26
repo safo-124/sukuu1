@@ -7,7 +7,7 @@ import { schoolIdSchema, createLeaveTypeSchema } from '@/validators/academics.va
 async function authorize(schoolId) {
   const session = await getServerSession(authOptions);
   if (!session || !session.user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
-  if (session.user.role === 'SUPER_ADMIN') return { session };
+  // SUPER_ADMIN must not access in-school HR endpoints
   if (!schoolId || typeof schoolId !== 'string') return { error: NextResponse.json({ error: 'Invalid or missing school ID' }, { status: 400 }) };
   if (session.user.schoolId === schoolId) return { session };
   return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };

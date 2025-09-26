@@ -37,8 +37,8 @@ export async function PUT(request, { params }) {
   if (!session || session.user?.schoolId !== schoolId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  // Only admins can modify existing grades; teachers are blocked from updates once created
-  if (!['SCHOOL_ADMIN', 'SUPER_ADMIN'].includes(session.user?.role)) {
+  // Only school admins can modify existing grades; teachers are blocked from updates once created
+  if (!['SCHOOL_ADMIN'].includes(session.user?.role)) {
     return NextResponse.json({ error: 'Only admins can modify grades.' }, { status: 403 });
   }
 
@@ -87,8 +87,8 @@ export async function DELETE(request, { params }) {
   if (!session || session.user?.schoolId !== schoolId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  // Only admins can delete grades
-  if (!['SCHOOL_ADMIN', 'SUPER_ADMIN'].includes(session.user?.role)) {
+  // Only school admins can delete grades
+  if (!['SCHOOL_ADMIN'].includes(session.user?.role)) {
     return NextResponse.json({ error: 'Only admins can delete grades.' }, { status: 403 });
   }
 

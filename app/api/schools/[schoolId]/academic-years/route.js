@@ -13,8 +13,7 @@ export async function GET(request, { params }) {
   const session = await getServerSession(authOptions);
 
   const role = session?.user?.role;
-  const isSuperAdmin = role === 'SUPER_ADMIN';
-  if (!session || (!isSuperAdmin && (session.user?.schoolId !== schoolId || (role !== 'SCHOOL_ADMIN' && role !== 'TEACHER' && role !== 'PARENT')))) {
+  if (!session || session.user?.schoolId !== schoolId || (role !== 'SCHOOL_ADMIN' && role !== 'TEACHER' && role !== 'PARENT')) {
     console.warn(`Unauthorized access attempt to /api/schools/${schoolId}/academic-years by user: ${session?.user?.id}, role: ${session?.user?.role}, schoolId: ${session?.user?.schoolId}`);
     return NextResponse.json({ error: 'Unauthorized access.' }, { status: 401 });
   }
@@ -59,8 +58,7 @@ export async function POST(request, { params }) {
   const session = await getServerSession(authOptions);
 
   const role = session?.user?.role;
-  const isSuperAdmin = role === 'SUPER_ADMIN';
-  if (!session || (!isSuperAdmin && (session.user?.schoolId !== schoolId || role !== 'SCHOOL_ADMIN'))) { // SUPER_ADMIN bypass for creation
+  if (!session || session.user?.schoolId !== schoolId || role !== 'SCHOOL_ADMIN') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

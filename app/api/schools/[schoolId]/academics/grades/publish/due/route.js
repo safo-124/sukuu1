@@ -13,7 +13,7 @@ export async function POST(request, { params }) {
   const cronSecret = request.headers.get('x-cron-secret');
   const allowCron = cronSecret && process.env.CRON_SECRET && cronSecret === process.env.CRON_SECRET;
   if (!allowCron) {
-    if (!session || session.user?.schoolId !== schoolId || !['SCHOOL_ADMIN','SUPER_ADMIN'].includes(session.user?.role)) {
+    if (!session || session.user?.schoolId !== schoolId || session.user?.role !== 'SCHOOL_ADMIN') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
   }

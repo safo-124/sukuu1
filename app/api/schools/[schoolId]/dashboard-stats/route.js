@@ -9,7 +9,6 @@ export async function GET(request, { params }) {
   const { schoolId } = await params;
 
   // Allow a broader set of roles to view school dashboard stats, but enforce same-school access.
-  // SUPER_ADMIN is allowed regardless of school (cross-tenant overview), but still needs to be authenticated.
   const allowedRoles = new Set([
     'SCHOOL_ADMIN',
     'ACCOUNTANT',
@@ -19,15 +18,14 @@ export async function GET(request, { params }) {
     'PROCUREMENT_OFFICER',
     'TRANSPORT_MANAGER',
     'HOSTEL_WARDEN',
-    'SUPER_ADMIN',
   ]);
 
   if (!session || !allowedRoles.has(session.user?.role)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Enforce same-school for non-super admins
-  if (session.user.role !== 'SUPER_ADMIN' && session.user.schoolId !== schoolId) {
+  // Enforce same-school access for all roles
+  if (session.user.schoolId !== schoolId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

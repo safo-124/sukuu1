@@ -23,10 +23,8 @@ export async function GET(request, ctx) {
   const { schoolId } = params;
   const session = await getServerSession(authOptions);
   const role = session?.user?.role;
-  const isSuperAdmin = role === 'SUPER_ADMIN';
   const allowedRoles = ['SCHOOL_ADMIN','ACCOUNTANT','SECRETARY'];
-  // Authorization: SUPER_ADMIN can access any school's fee structures. Other roles must belong to the school & be in allowedRoles.
-  if (!session || (!isSuperAdmin && (session.user?.schoolId !== schoolId || !allowedRoles.includes(role)))) {
+  if (!session || session.user?.schoolId !== schoolId || !allowedRoles.includes(role)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -114,9 +112,8 @@ export async function POST(request, ctx) {
   const { schoolId } = params;
   const session = await getServerSession(authOptions);
   const role = session?.user?.role;
-  const isSuperAdmin = role === 'SUPER_ADMIN';
   const allowedRoles = ['SCHOOL_ADMIN','ACCOUNTANT'];
-  if (!session || (!isSuperAdmin && (session.user?.schoolId !== schoolId || !allowedRoles.includes(role)))) {
+  if (!session || session.user?.schoolId !== schoolId || !allowedRoles.includes(role)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

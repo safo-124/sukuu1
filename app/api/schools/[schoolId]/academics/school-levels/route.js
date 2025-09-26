@@ -12,8 +12,7 @@ export async function GET(request, { params }) {
   const session = await getServerSession(authOptions);
 
   const role = session?.user?.role;
-  const isSuperAdmin = role === 'SUPER_ADMIN';
-  if (!session || (!isSuperAdmin && (session.user?.schoolId !== schoolId || (role !== 'SCHOOL_ADMIN' && role !== 'TEACHER')))) {
+  if (!session || (session.user?.schoolId !== schoolId || (role !== 'SCHOOL_ADMIN' && role !== 'TEACHER'))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -41,8 +40,7 @@ export async function POST(request, { params }) {
   const session = await getServerSession(authOptions);
 
   const role = session?.user?.role;
-  const isSuperAdmin = role === 'SUPER_ADMIN';
-  if (!session || (!isSuperAdmin && (session.user?.schoolId !== schoolId || role !== 'SCHOOL_ADMIN'))) {
+  if (!session || (session.user?.schoolId !== schoolId || role !== 'SCHOOL_ADMIN')) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
