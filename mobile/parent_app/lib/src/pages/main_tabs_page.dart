@@ -461,10 +461,10 @@ class _MoreItem extends StatelessWidget {
               );
               break;
             case _MoreTarget.promotions:
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const PromotionsPage()),
-                );
-                break;
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PromotionsPage()),
+              );
+              break;
             case _MoreTarget.profile:
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const ProfilePage()),

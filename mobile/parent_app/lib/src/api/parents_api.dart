@@ -102,8 +102,8 @@ class ParentsApiClient {
   }
 
   Future<Map<String, dynamic>> getChildrenPromotions() async {
-    final uri =
-        Uri.parse('$baseUrl/api/schools/$schoolId/parents/me/children/promotions');
+    final uri = Uri.parse(
+        '$baseUrl/api/schools/$schoolId/parents/me/children/promotions');
     final res = await http.get(uri, headers: _headers);
     if (res.statusCode != 200) {
       throw Exception('Promotions fetch failed: ${res.statusCode} ${res.body}');

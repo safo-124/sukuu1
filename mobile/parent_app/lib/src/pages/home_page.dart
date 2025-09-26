@@ -43,6 +43,10 @@ class _HomePageState extends State<HomePage> {
   int _pendingExplanations =
       0; // number of attendance items requesting explanation
 
+  // Promotion summary state
+  Map<String, dynamic>? _latestPromotion;
+  bool _loadingPromotion = false;
+
   @override
   void initState() {
     super.initState();
@@ -81,6 +85,7 @@ class _HomePageState extends State<HomePage> {
       _schoolLogoUrl = (meJson['schoolLogoUrl'] as String?)?.trim();
       if (_children.isNotEmpty) _selectedChild = _children.first;
 
+      await _loadLatestPromotion();
       await _loadGrades();
       await _loadAttendance();
       await _loadRemarks();
@@ -239,6 +244,38 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _refresh() async => _bootstrap();
 
+  Future<void> _loadLatestPromotion() async {
+    if (_selectedChild == null) {
+      setState(() => _latestPromotion = null);
+      return;
+    }
+    setState(() => _loadingPromotion = true);
+    try {
+      final token = await _storage.read(key: 'token');
+      final baseUrl = await _storage.read(key: 'baseUrl');
+      final schoolId = await _storage.read(key: 'schoolId');
+      if (token == null || baseUrl == null || schoolId == null) throw Exception('Missing auth or config');
+      final res = await http.get(
+        Uri.parse('$baseUrl/api/schools/$schoolId/parents/me/children/promotions'),
+        headers: { 'Authorization': 'Bearer $token', 'Accept': 'application/json' },
+      );
+      if (res.statusCode != 200) throw Exception('Failed: ${res.statusCode} ${res.body}');
+      final json = jsonDecode(res.body) as Map<String, dynamic>;
+      final children = (json['children'] as List?) ?? [];
+      final match = children.where((c) => c['studentId'].toString() == _selectedChild!['id'].toString()).toList();
+      if (match.isNotEmpty && (match.first['promotions'] as List).isNotEmpty) {
+        final promos = (match.first['promotions'] as List);
+        _latestPromotion = promos.last as Map<String, dynamic>?;
+      } else {
+        _latestPromotion = null;
+      }
+    } catch (e) {
+      _latestPromotion = null;
+    } finally {
+      setState(() => _loadingPromotion = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final df = DateFormat('EEE, MMM d');
@@ -378,6 +415,64 @@ class _HomePageState extends State<HomePage> {
 
                       const SizedBox(height: 12),
 
+                      // Promotion summary card
+                      if (_loadingPromotion)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          child: GlassContainer(
+                            padding: EdgeInsets.all(16),
+                            child: Center(child: CircularProgressIndicator()),
+                          ),
+                        )
+                      else if (_selectedChild != null)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: GlassContainer(
+                            padding: const EdgeInsets.all(16),
+                            child: _latestPromotion == null
+                                ? Row(
+                                    children: const [
+                                      Icon(Icons.trending_up, color: Colors.grey),
+                                      SizedBox(width: 12),
+                                      Expanded(child: Text('No promotion or transfer history for this child.', style: TextStyle(color: Colors.grey))),
+                                    ],
+                                  )
+                                : Row(
+                                    children: [
+                                      Icon(
+                                        _latestPromotion!['type'] == 'PROMOTED'
+                                            ? Icons.trending_up
+                                            : Icons.swap_horiz,
+                                        color: Colors.blueAccent,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              _latestPromotion!['type'] == 'PROMOTED'
+                                                  ? 'Last promoted'
+                                                  : 'Last transferred',
+                                              style: const TextStyle(fontWeight: FontWeight.bold),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              '${_latestPromotion!['from']?['academicYear'] ?? ''} • ${_latestPromotion!['from']?['className'] ?? ''} → ${_latestPromotion!['to']?['academicYear'] ?? ''} • ${_latestPromotion!['to']?['className'] ?? ''}',
+                                              style: const TextStyle(color: Colors.black87),
+                                            ),
+                                            if (_latestPromotion!['date'] != null)
+                                              Text(
+                                                'On ${_latestPromotion!['date'].toString().substring(0, 10)}',
+                                                style: const TextStyle(color: Colors.black54, fontSize: 12),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                        ),
                       // Child selector in glass card
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -393,6 +488,7 @@ class _HomePageState extends State<HomePage> {
                               );
                               setState(() => _selectedChild =
                                   found.isEmpty ? null : found);
+                              _loadLatestPromotion();
                               _loadGrades();
                               _loadAttendance();
                               _loadRemarks();
