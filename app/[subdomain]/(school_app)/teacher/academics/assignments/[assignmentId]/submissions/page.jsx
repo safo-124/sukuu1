@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSchool } from '../../../../layout';
+import { useSchool } from '../../../../../layout';
 import { useSession } from 'next-auth/react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
