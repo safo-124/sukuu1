@@ -119,6 +119,8 @@ const initialAssignmentFormData = {
   teacherId: '',
   maxMarks: '',
   attachments: [], // Array of URLs or file identifiers
+  type: 'SUBJECT',
+  objectives: [],
 };
 
 // Reusable FormFields Component for Assignment
@@ -131,12 +133,62 @@ const AssignmentFormFields = ({ formData, onFormChange, onSelectChange, onFileCh
   const classesList = Array.from(new Set(sectionsList.map(s => JSON.stringify({ id: s.class.id, name: s.class.name }))))
                           .map(str => JSON.parse(str));
 
+  // Objective builder state
+  const [objectives, setObjectives] = useState(formData.objectives || []);
+
+  useEffect(() => { if (formData.type === 'OBJECTIVE') onSelectChange('objectives', objectives); }, [objectives, formData.type]);
+
+  const handleObjectiveChange = (idx, field, value) => {
+    setObjectives(prev => prev.map((obj, i) => i === idx ? { ...obj, [field]: value } : obj));
+  };
+  const handleAddObjective = () => setObjectives(prev => [...prev, { question: '', options: [], correctAnswer: '', marks: '' }]);
+  const handleRemoveObjective = (idx) => setObjectives(prev => prev.filter((_, i) => i !== idx));
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 max-h-[70vh] overflow-y-auto p-1 custom-scrollbar">
       <div className="sm:col-span-2">
-        <Label htmlFor="title" className={labelTextClasses}>Assignment Title <span className="text-red-500">*</span></Label>
-        <Input id="title" name="title" value={formData.title || ''} onChange={onFormChange} required className={`${inputTextClasses} mt-1`} />
+        <Label htmlFor="type" className={labelTextClasses}>Assignment Type <span className="text-red-500">*</span></Label>
+        <Select name="type" value={formData.type || 'SUBJECT'} onValueChange={v => onSelectChange('type', v)}>
+          <SelectTrigger className={`${inputTextClasses} mt-1`}><SelectValue placeholder="Select type" /></SelectTrigger>
+          <SelectContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700">
+            <SelectItem value="SUBJECT">Subject Assignment (manual marking)</SelectItem>
+            <SelectItem value="OBJECTIVE">Objectives Assignment (auto-marked)</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
+      {formData.type === 'OBJECTIVE' && (
+        <div className="sm:col-span-2">
+          <div className="space-y-4 mt-2">
+            <Label className={labelTextClasses}>Objectives / Questions</Label>
+            {objectives.map((obj, idx) => (
+              <div key={idx} className="border rounded-md p-3 mb-2 bg-zinc-50 dark:bg-zinc-800/20">
+                <Input
+                  placeholder="Question text"
+                  value={obj.question}
+                  onChange={e => handleObjectiveChange(idx, 'question', e.target.value)}
+                  className="mb-2"
+                />
+                <Input
+                  placeholder="Correct answer"
+                  value={obj.correctAnswer}
+                  onChange={e => handleObjectiveChange(idx, 'correctAnswer', e.target.value)}
+                  className="mb-2"
+                />
+                <Input
+                  placeholder="Marks for this question"
+                  type="number"
+                  min="0"
+                  value={obj.marks}
+                  onChange={e => handleObjectiveChange(idx, 'marks', e.target.value)}
+                  className="mb-2"
+                />
+                <Button type="button" variant="outline" size="sm" onClick={() => handleRemoveObjective(idx)} className="text-red-500">Remove</Button>
+              </div>
+            ))}
+            <Button type="button" variant="secondary" onClick={handleAddObjective}>Add Objective / Question</Button>
+          </div>
+        </div>
+      )}
       <div>
         <Label htmlFor="subjectId" className={labelTextClasses}>Subject <span className="text-red-500">*</span></Label>
         <Select name="subjectId" value={formData.subjectId || ''} onValueChange={(value) => onSelectChange('subjectId', value)} disabled={isLoadingDeps}>

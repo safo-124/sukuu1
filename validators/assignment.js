@@ -12,6 +12,13 @@ export const createAssignmentSchema = z.object({
   teacherId: z.string().min(1, "Teacher is required."), // Staff ID of the teacher
   maxMarks: z.coerce.number().min(0, "Max marks cannot be negative.").nullable().optional(),
   attachments: z.array(z.string().url("Attachment must be a valid URL.")).nullable().optional(), // Array of URLs
+  type: z.enum(["OBJECTIVE", "SUBJECT"]).optional().default("SUBJECT"),
+  objectives: z.array(z.object({
+    question: z.string().min(1, "Question required"),
+    options: z.array(z.string().min(1)).min(2, "At least two options required").optional(),
+    correctAnswer: z.string().min(1, "Correct answer required").optional(),
+    marks: z.coerce.number().min(0).optional(),
+  })).nullable().optional(), // Only for OBJECTIVE type
   // schoolId is usually added by the API based on the route, not from payload
 });
 

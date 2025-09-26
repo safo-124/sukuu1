@@ -12,6 +12,10 @@ datasource db {
 
 // --------------------
 // ENUMS
+enum AssignmentType {
+  OBJECTIVE   // System can auto-mark and grade
+  SUBJECT     // Teacher must mark manually
+}
 // --------------------
 
 enum UserRole {
@@ -846,6 +850,8 @@ model Assignment {
   teacher              Staff                 @relation(fields: [teacherId], references: [id])
   maxMarks             Float?
   attachments          Json?
+  type                 AssignmentType        @default(SUBJECT)
+  objectives           Json?                 // For OBJECTIVE type: array of questions, options, correct answers
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   schoolId             String

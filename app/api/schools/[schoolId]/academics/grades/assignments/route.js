@@ -73,14 +73,26 @@ export async function POST(request, { params }) {
     await prisma.$transaction(async (tx) => {
       for (const g of grades) {
         if (!validStudentIds.has(g.studentId)) continue;
+        let marksObtained = g.marksObtained;
+        // Auto-marking for OBJECTIVE assignments
+        if (assignment.type === 'OBJECTIVE' && Array.isArray(assignment.objectives) && Array.isArray(g.answers)) {
+          // g.answers: [{ question, answer }]
+          let total = 0;
+          for (const obj of assignment.objectives) {
+            const studentAnswer = (g.answers || []).find(a => a.question === obj.question)?.answer;
+            if (studentAnswer && obj.correctAnswer && studentAnswer.trim().toLowerCase() === obj.correctAnswer.trim().toLowerCase()) {
+              total += Number(obj.marks) || 1;
+            }
+          }
+          marksObtained = total;
+        }
         const existing = await tx.grade.findFirst({
           where: { studentId: g.studentId, assignmentId, subjectId, termId, academicYearId },
         });
         if (existing) {
           if (isAdmin) {
-            await tx.grade.update({ where: { id: existing.id }, data: { marksObtained: g.marksObtained } });
+            await tx.grade.update({ where: { id: existing.id }, data: { marksObtained } });
           } else {
-            // Teachers cannot modify existing assignment grade entry
             continue;
           }
         } else {
@@ -93,7 +105,7 @@ export async function POST(request, { params }) {
               schoolId,
               sectionId: effectiveSectionId ?? (assignment.sectionId || (assignment.class ? undefined : undefined)),
               assignmentId,
-              marksObtained: g.marksObtained,
+              marksObtained,
             },
           });
         }

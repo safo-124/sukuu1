@@ -164,6 +164,8 @@ export async function POST(request, { params }) {
         teacherId: teacherIdToUse,
         maxMarks: parsedData.maxMarks,
         attachments: parsedData.attachments,
+        type: parsedData.type || "SUBJECT",
+        objectives: parsedData.type === "OBJECTIVE" ? parsedData.objectives : null,
         schoolId: parsedSchoolId,
       },
     });
