@@ -342,7 +342,7 @@ export default function SchoolAppLayout({ children }) {
     const schoolAdminLoginPath = subdomain ? `/${subdomain}/login` : '/login';
     const teacherLoginPath = subdomain ? `/${subdomain}/teacher-login` : '/teacher-login';
 
-    if (sessionStatus === 'unauthenticated') {
+  if (sessionStatus === 'unauthenticated') {
       // If unauthenticated, redirect to admin login by default,
       // unless the current path is explicitly the teacher login page.
       if (!window.location.pathname.includes('/teacher-login')) {
@@ -373,7 +373,9 @@ export default function SchoolAppLayout({ children }) {
         }
         // Teacher allowlist to avoid hitting admin pages that may error
         const teacherAllowedPrefixes = [
+          // Teacher dashboard
           `/${subdomain}/dashboard/teacher`,
+          // Teacher (non-prefixed) legacy routes
           `/${subdomain}/academics/assignments`,
           `/${subdomain}/academics/grades`,
           `/${subdomain}/academics/timetable`,
@@ -385,6 +387,12 @@ export default function SchoolAppLayout({ children }) {
           `/${subdomain}/attendance/staff`,
           `/${subdomain}/communication/announcements`,
           `/${subdomain}/hr/payroll`,
+          // Teacher-prefixed canonical routes
+          `/${subdomain}/teacher/academics`,
+          `/${subdomain}/teacher/students`,
+          `/${subdomain}/teacher/people`,
+          `/${subdomain}/teacher/people/teachers`,
+          `/${subdomain}/teacher-login`,
         ];
         const isAllowed = teacherAllowedPrefixes.some(p => currentPath === p || currentPath.startsWith(p + '/'));
         if (!isAllowed) {

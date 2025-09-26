@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { z } from 'zod';
 import { schoolIdSchema, createAssignmentSchema } from '@/validators/assignment';
+import { notifyParentsNewAssignment } from '@/lib/notify';
 
 // GET /api/schools/[schoolId]/academics/assignments
 // Fetches all assignments for a specific school
@@ -187,10 +188,10 @@ export async function POST(request, { params }) {
           ...(!parsedData.sectionId && parsedData.classId ? { classIds: [parsedData.classId] } : {}),
         };
 
-        await prisma.announcement.create({
+        const announcement = await prisma.announcement.create({
           data: {
             title: `New assignment: ${subject.name} - ${parsedData.title}`,
-            content: `A new assignment has been posted for ${scopeText}. Due on ${dueStr}.`,
+            content: `A new assignment has been posted for ${scopeText}. Due on ${dueStr}.\n\nOpen assignment: assignment://${newAssignment.id}`,
             publishedAt: new Date(),
             isGlobal: false,
             audience,
@@ -198,6 +199,50 @@ export async function POST(request, { params }) {
             authorId: session.user.id,
           },
         });
+
+        // Also email/push notify relevant parents if provider configured
+        try {
+          // Collect relevant students by section/class
+          let studentIds = [];
+          if (parsedData.sectionId) {
+            const enrolls = await prisma.studentEnrollment.findMany({
+              where: { schoolId: parsedSchoolId, sectionId: parsedData.sectionId, isCurrent: true },
+              select: { studentId: true }
+            });
+            studentIds = enrolls.map(e => e.studentId);
+          } else if (parsedData.classId) {
+            const enrolls = await prisma.studentEnrollment.findMany({
+              where: { schoolId: parsedSchoolId, isCurrent: true, section: { classId: parsedData.classId } },
+              select: { studentId: true }
+            });
+            studentIds = enrolls.map(e => e.studentId);
+          }
+          if (studentIds.length > 0) {
+            const parentLinks = await prisma.parentStudent.findMany({
+              where: { studentId: { in: studentIds } },
+              select: { parentId: true },
+              distinct: ['parentId']
+            });
+            const parentIds = parentLinks.map(l => l.parentId);
+            if (parentIds.length > 0) {
+              const parents = await prisma.parent.findMany({
+                where: { id: { in: parentIds }, schoolId: parsedSchoolId },
+                select: { id: true, user: { select: { email: true, firstName: true, lastName: true } } }
+              });
+              await notifyParentsNewAssignment({
+                schoolId: parsedSchoolId,
+                assignment: newAssignment,
+                subject,
+                section,
+                _class,
+                parents,
+                announcement,
+              });
+            }
+          }
+        } catch (e) {
+          console.error('notifyParentsNewAssignment failed', e);
+        }
       } catch (e) {
         console.error('Failed to create parent announcement for assignment', e);
       }
