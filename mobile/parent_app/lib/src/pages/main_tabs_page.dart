@@ -83,9 +83,8 @@ class _MainTabsPageState extends State<MainTabsPage> {
   @override
   Widget build(BuildContext context) {
     // Ensure current index is within bounds and an int
-    final int currentIdx = _currentIndex
-        .clamp(0, (_pages.length - 1).clamp(0, 9999))
-        .toInt();
+    final int currentIdx =
+        _currentIndex.clamp(0, (_pages.length - 1).clamp(0, 9999)).toInt();
     return Scaffold(
       body: IndexedStack(index: currentIdx, children: _pages),
       bottomNavigationBar: GlassBottomBar(
@@ -98,8 +97,8 @@ class _MainTabsPageState extends State<MainTabsPage> {
           ),
           child: NavigationBar(
             selectedIndex: currentIdx,
-            onDestinationSelected: (i) =>
-                setState(() => _currentIndex = i.clamp(0, _pages.length - 1).toInt()),
+            onDestinationSelected: (i) => setState(
+                () => _currentIndex = i.clamp(0, _pages.length - 1).toInt()),
             labelBehavior: (Theme.of(context).platform == TargetPlatform.iOS)
                 ? NavigationDestinationLabelBehavior.alwaysHide
                 : NavigationDestinationLabelBehavior.onlyShowSelected,
