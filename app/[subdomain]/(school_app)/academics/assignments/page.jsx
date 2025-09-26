@@ -34,6 +34,15 @@ function StudentAssignmentsLite() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [items, setItems] = useState([]);
+  const [active, setActive] = useState(null); // assignment currently opened
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [answers, setAnswers] = useState([]); // for OBJECTIVE
+  const [content, setContent] = useState(''); // for SUBJECT
+  const [files, setFiles] = useState([]);
+  const [mySubmission, setMySubmission] = useState(null);
+  const [result, setResult] = useState(null);
+  const [activeAssignmentDetail, setActiveAssignmentDetail] = useState(null); // from GET submission
 
   useEffect(() => {
     let ignore = false;
@@ -100,10 +109,147 @@ function StudentAssignmentsLite() {
                   <Badge variant="secondary" className="text-[10px]">Due</Badge>
                 )}
               </div>
+              <div className="flex gap-2 mt-2">
+                <Button size="sm" variant="secondary" onClick={async () => {
+                  setActive(a);
+                  setSubmitError(''); setResult(null); setMySubmission(null);
+                  setAnswers([]); setContent(''); setFiles([]);
+                  try {
+                    const res = await fetch(`/api/schools/${school.id}/students/me/assignments/${a.id}/submission`);
+                    if (res.ok) {
+                      const d = await res.json();
+                      setMySubmission(d.submission || null);
+                      setActiveAssignmentDetail(d.assignment || null);
+                      // Hydrate previous answers/content if present
+                      if (d.submission?.content) {
+                        try {
+                          const cj = JSON.parse(d.submission.content);
+                          if (cj.answers) setAnswers(cj.answers);
+                          if (typeof cj === 'string') setContent(cj);
+                        } catch {
+                          setContent(d.submission.content);
+                        }
+                      }
+                    }
+                  } catch {}
+                }}>Open</Button>
+              </div>
             </Card>
           ))}
         </div>
       )}
+
+      {/* Simple modal-like panel for active assignment */}
+      {active && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="max-w-2xl w-full rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 space-y-3">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="text-base font-semibold">{active.title}</div>
+                <div className="text-xs text-muted-foreground">Due: {formatDate(active.dueDate)}</div>
+                <div className="text-xs text-muted-foreground">Type: {active.type || 'SUBJECT'}</div>
+              </div>
+              <Button size="icon" variant="ghost" onClick={() => { setActive(null); }}><XCircle className="h-5 w-5"/></Button>
+            </div>
+            <div className="text-sm whitespace-pre-wrap">{active.description || '—'}</div>
+
+            {active.type === 'OBJECTIVE' ? (
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Answer the questions</div>
+                <ObjectiveQuestionsInline objectives={activeAssignmentDetail?.objectives || []} answers={answers} setAnswers={setAnswers} />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Your answer</div>
+                <Textarea rows={6} value={content} onChange={e => setContent(e.target.value)} placeholder="Write your response here..."/>
+                <div>
+                  <Input type="file" multiple onChange={e => setFiles(Array.from(e.target.files || []))}/>
+                </div>
+              </div>
+            )}
+
+            {submitError && <Alert variant="destructive"><AlertDescription>{submitError}</AlertDescription></Alert>}
+            {result && result.detail && (
+              <div className="rounded-md border p-2 text-sm">
+                <div className="font-semibold mb-1">Auto-marking Result</div>
+                <div>Total: {result.total}</div>
+                <div className="mt-1 space-y-1">
+                  {result.detail.map((d, i) => (
+                    <div key={i} className="text-xs">
+                      Q{i+1}: {d.question}
+                      <div className="ml-2">Your answer: {String(d.given ?? '—')} | Correct: {String(d.correct ?? '—')} | Marks: {d.awarded}/{d.max}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => { setActive(null); setActiveAssignmentDetail(null); }}>Close</Button>
+              <Button disabled={submitting} onClick={async () => {
+                setSubmitting(true); setSubmitError(''); setResult(null);
+                try {
+                  let attachments = [];
+                  if (files.length) {
+                    const fd = new FormData();
+                    files.forEach(f => fd.append('files', f));
+                    const up = await fetch('/api/upload-files', { method: 'POST', body: fd });
+                    const d = await up.json().catch(()=>({}));
+                    if (!up.ok) throw new Error(d.error || 'File upload failed');
+                    attachments = d.fileUrls || [];
+                  }
+                  const res = await fetch(`/api/schools/${school.id}/students/me/assignments/${active.id}/submission`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      content: active.type === 'SUBJECT' ? content : undefined,
+                      attachments,
+                      answers: active.type === 'OBJECTIVE' ? answers : undefined,
+                    })
+                  });
+                  const out = await res.json().catch(()=>({}));
+                  if (!res.ok) throw new Error(out.error || 'Failed to submit');
+                  setMySubmission(out.submission || null);
+                  if (out.result) setResult(out.result);
+                  toast.success('Submission saved');
+                } catch (e) {
+                  setSubmitError(e.message || 'Failed to submit');
+                } finally {
+                  setSubmitting(false);
+                }
+              }}>{submitting ? 'Submitting…' : 'Submit'}</Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Inline renderer for objective questions
+function ObjectiveQuestionsInline({ objectives, answers, setAnswers }) {
+  const val = (q) => answers.find(a => a.question === q)?.answer || '';
+  const setVal = (q, v) => {
+    setAnswers(prev => {
+      const i = prev.findIndex(a => a.question === q);
+      if (i === -1) return [...prev, { question: q, answer: v }];
+      const copy = prev.slice(); copy[i] = { question: q, answer: v }; return copy;
+    });
+  };
+  if (!objectives?.length) return <div className="text-sm text-muted-foreground">No questions.</div>;
+  return (
+    <div className="space-y-2">
+      {objectives.map((q, i) => (
+        <div key={i} className="border rounded-md p-2">
+          <div className="text-sm font-medium">Q{i+1}. {q.question}</div>
+          <Input
+            className="mt-2"
+            value={val(q.question)}
+            onChange={e => setVal(q.question, e.target.value)}
+            placeholder="Your answer"
+          />
+        </div>
+      ))}
     </div>
   );
 }
@@ -744,6 +890,17 @@ export default function ManageAssignmentsPage() {
                 <TableCell className={`${descriptionTextClasses} hidden lg:table-cell`}>{getTeacherName(assignment.teacherId)}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1 md:gap-2">
+                    {session?.user?.role === 'TEACHER' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={`${outlineButtonClasses}`}
+                        onClick={() => window.location.assign(`/${schoolData?.subdomain || ''}/teacher/academics/assignments/${assignment.id}/submissions`) }
+                        title="Review submissions"
+                      >
+                        Review
+                      </Button>
+                    )}
                     <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} onClick={() => openEditDialog(assignment)} title="Edit Assignment"> <Edit3 className="h-4 w-4" /> </Button>
                     <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} onClick={async () => {
                       const res = await fetch(`/api/schools/${schoolData.id}/academics/assignments/${assignment.id}/duplicate`, { method: 'POST' });
