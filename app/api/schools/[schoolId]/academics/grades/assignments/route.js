@@ -69,7 +69,7 @@ export async function POST(request, { params }) {
     const validEnrollments = await prisma.studentEnrollment.findMany({ where: enrollmentWhere, select: { studentId: true } });
     const validStudentIds = new Set(validEnrollments.map(e => e.studentId));
 
-  const isAdmin = ['SCHOOL_ADMIN'].includes(session.user?.role);
+    const isAdmin = ['SCHOOL_ADMIN','SUPER_ADMIN'].includes(session.user?.role);
     await prisma.$transaction(async (tx) => {
       for (const g of grades) {
         if (!validStudentIds.has(g.studentId)) continue;

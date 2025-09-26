@@ -153,6 +153,7 @@ function getNavigationSections(schoolSubdomain, role) {
     ];
 
     switch (role) {
+      case 'SUPER_ADMIN':
       case 'SCHOOL_ADMIN':
         return [
           { items: commonItems },
@@ -164,14 +165,6 @@ function getNavigationSections(schoolSubdomain, role) {
           { title: 'Resources', items: resourceItems },
           { title: 'Communication', items: communicationItems },
           { title: 'School Setup', items: schoolSetupItems },
-        ];
-      case 'SUPER_ADMIN':
-        // Platform admins should not operate inside a school's portal. Provide minimal nav.
-        return [
-          { items: [
-            { href: `/${schoolSubdomain}/dashboard`, label: 'Dashboard', icon: LayoutDashboard },
-            { href: `/superadmin/dashboard`, label: 'Go to Super Admin Console', icon: Settings },
-          ]}
         ];
       case 'HR_MANAGER':
         return [

@@ -67,7 +67,7 @@ export async function POST(request, { params }) {
       if (debug) console.log('EXAM_GRADES_DEBUG authorized', { staffId, sectionId, subjectId, reasons });
     }
 
-  const isAdmin = ['SCHOOL_ADMIN'].includes(session.user?.role);
+    const isAdmin = ['SCHOOL_ADMIN','SUPER_ADMIN'].includes(session.user?.role);
     // Create or update based on role policy
     await prisma.$transaction(async (tx) => {
       for (const g of grades) {

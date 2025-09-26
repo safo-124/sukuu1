@@ -45,7 +45,7 @@ export async function POST(request, { params }) {
     }
 
     // Save or update by matching (studentId, subjectId, termId, academicYearId, sectionId, label) via manual find/update
-  const isAdmin = ['SCHOOL_ADMIN'].includes(session.user?.role);
+    const isAdmin = ['SCHOOL_ADMIN','SUPER_ADMIN'].includes(session.user?.role);
     await prisma.$transaction(async (tx) => {
       for (const g of grades) {
         // Only current enrolled students in the section/year

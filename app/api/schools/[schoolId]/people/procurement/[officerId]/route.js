@@ -7,7 +7,7 @@ import { updateProcurementOfficerSchema } from "@/validators/academics.validator
 async function authorize(schoolId) {
   const session = await getServerSession(authOptions);
   if (!session || !session.user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
-  // SUPER_ADMIN must not access in-school people management
+  if (session.user.role === 'SUPER_ADMIN') return { session };
   if (!schoolId) return { error: NextResponse.json({ error: 'School ID missing' }, { status: 400 }) };
   if (session.user.schoolId === schoolId && session.user.role === 'SCHOOL_ADMIN') return { session };
   return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };

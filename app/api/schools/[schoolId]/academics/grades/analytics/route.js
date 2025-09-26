@@ -10,7 +10,7 @@ export async function GET(request, { params }) {
     const { searchParams } = new URL(request.url);
     const { schoolId } = await params;
     const session = await getServerSession(authOptions);
-    if (!session || session.user?.schoolId !== schoolId || !['SCHOOL_ADMIN','TEACHER','SECRETARY','ACCOUNTANT'].includes(session.user?.role)) {
+    if (!session || session.user?.schoolId !== schoolId || !['SCHOOL_ADMIN','TEACHER','SUPER_ADMIN','SECRETARY','ACCOUNTANT'].includes(session.user?.role)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

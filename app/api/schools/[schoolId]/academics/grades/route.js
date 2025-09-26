@@ -135,7 +135,7 @@ export async function POST(request, { params }) {
     }
 
     // Process creates/updates with teacher immutability: teachers cannot modify existing grades
-  const isAdmin = ['SCHOOL_ADMIN'].includes(session.user?.role);
+    const isAdmin = ['SCHOOL_ADMIN', 'SUPER_ADMIN'].includes(session.user?.role);
     let created = 0;
     let updated = 0;
     let skippedExisting = 0;

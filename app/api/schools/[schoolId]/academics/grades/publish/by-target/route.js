@@ -10,7 +10,7 @@ import { upsertSectionRankings } from '@/lib/analytics/grades';
 export async function POST(request, { params }) {
   const { schoolId } = await params;
   const session = await getServerSession(authOptions);
-  if (!session || session.user?.schoolId !== schoolId || session.user?.role !== 'SCHOOL_ADMIN') {
+  if (!session || session.user?.schoolId !== schoolId || !['SCHOOL_ADMIN','SUPER_ADMIN'].includes(session.user?.role)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {

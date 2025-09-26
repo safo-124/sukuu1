@@ -6,17 +6,13 @@ import { createAnnouncementSchema } from '@/validators/communications.validators
 
 const canManage = (role) => ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'SECRETARY', 'HR_MANAGER'].includes(role);
 const canView = (role) => [
-	'SCHOOL_ADMIN','SECRETARY','HR_MANAGER','TEACHER','ACCOUNTANT','PROCUREMENT_OFFICER','HOSTEL_WARDEN','LIBRARIAN','TRANSPORT_MANAGER','PARENT','STUDENT','SUPER_ADMIN'
+	'SUPER_ADMIN','SCHOOL_ADMIN','SECRETARY','HR_MANAGER','TEACHER','ACCOUNTANT','PROCUREMENT_OFFICER','HOSTEL_WARDEN','LIBRARIAN','TRANSPORT_MANAGER','PARENT','STUDENT'
 ].includes(role);
 
 export async function GET(request, { params }) {
 	const { schoolId } = params;
 	const session = await getServerSession(authOptions);
-	if (!session || !canView(session.user?.role)) {
-		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-	}
-	// SUPER_ADMIN may view only global announcements; in-school users view their own school's + global
-	if (session.user?.role !== 'SUPER_ADMIN' && session.user?.schoolId !== schoolId) {
+	if (!session || !canView(session.user?.role) || (session.user?.role !== 'SUPER_ADMIN' && session.user?.schoolId !== schoolId)) {
 		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
@@ -31,10 +27,6 @@ export async function GET(request, { params }) {
 			OR: [ { isGlobal: true }, { schoolId } ],
 			...(publishedOnly ? { publishedAt: { lte: now } } : {}),
 		};
-		// Restrict SUPER_ADMIN to only global announcements
-		if (session.user?.role === 'SUPER_ADMIN') {
-			where.OR = [{ isGlobal: true }];
-		}
 		const skip = (page - 1) * limit;
 		const [rows, total] = await prisma.$transaction([
 			prisma.announcement.findMany({ where, orderBy: { publishedAt: 'desc' }, skip, take: limit }),

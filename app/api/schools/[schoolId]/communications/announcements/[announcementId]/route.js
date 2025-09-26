@@ -12,19 +12,12 @@ const canView = (role) => [
 export async function GET(request, { params }) {
 	const { schoolId, announcementId } = params;
 	const session = await getServerSession(authOptions);
-	if (!session || !canView(session.user?.role)) {
-		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-	}
-	if (session.user?.role !== 'SUPER_ADMIN' && session.user?.schoolId !== schoolId) {
+	if (!session || !canView(session.user?.role) || (session.user?.role !== 'SUPER_ADMIN' && session.user?.schoolId !== schoolId)) {
 		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 	}
 	try {
 		const ann = await prisma.announcement.findUnique({ where: { id: announcementId } });
 		if (!ann || (!ann.isGlobal && ann.schoolId !== schoolId)) {
-			return NextResponse.json({ error: 'Not found' }, { status: 404 });
-		}
-		// SUPER_ADMIN can only read global announcements via any school route
-		if (session.user?.role === 'SUPER_ADMIN' && !ann.isGlobal) {
 			return NextResponse.json({ error: 'Not found' }, { status: 404 });
 		}
 		return NextResponse.json({ announcement: ann });
@@ -46,9 +39,6 @@ export async function PUT(request, { params }) {
 	try {
 		const existing = await prisma.announcement.findUnique({ where: { id: announcementId } });
 		if (!existing || (!existing.isGlobal && existing.schoolId !== schoolId)) {
-			return NextResponse.json({ error: 'Not found' }, { status: 404 });
-		}
-		if (session.user?.role === 'SUPER_ADMIN' && !existing.isGlobal) {
 			return NextResponse.json({ error: 'Not found' }, { status: 404 });
 		}
 
@@ -95,9 +85,6 @@ export async function DELETE(request, { params }) {
 	try {
 		const existing = await prisma.announcement.findUnique({ where: { id: announcementId } });
 		if (!existing || (!existing.isGlobal && existing.schoolId !== schoolId)) {
-			return NextResponse.json({ error: 'Not found' }, { status: 404 });
-		}
-		if (session.user?.role === 'SUPER_ADMIN' && existing && !existing.isGlobal) {
 			return NextResponse.json({ error: 'Not found' }, { status: 404 });
 		}
 		// Non-super admins cannot delete a global announcement

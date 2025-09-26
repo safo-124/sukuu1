@@ -24,7 +24,7 @@ export async function GET(request, { params }) {
       if (!parent) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       const link = await prisma.parentStudent.findFirst({ where: { parentId: parent.id, studentId } });
       if (!link) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    } else if (!['TEACHER', 'SCHOOL_ADMIN', 'SECRETARY', 'ACCOUNTANT'].includes(role)) {
+    } else if (!['TEACHER', 'SCHOOL_ADMIN', 'SUPER_ADMIN', 'SECRETARY', 'ACCOUNTANT'].includes(role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

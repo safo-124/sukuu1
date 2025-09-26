@@ -12,7 +12,7 @@ export async function GET(request, { params }) {
   const { schoolId } = params;
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user?.schoolId !== schoolId || !['SCHOOL_ADMIN','LIBRARIAN','SECRETARY','ACCOUNTANT'].includes(session.user?.role)) {
+  if (!session || session.user?.schoolId !== schoolId || !['SCHOOL_ADMIN','LIBRARIAN','SECRETARY','ACCOUNTANT','SUPER_ADMIN'].includes(session.user?.role)) {
     // Allow key school roles to view stats; super admin bypasses schoolId check above only for same-school here
     // but we still require same-school to avoid cross-tenant leakage unless explicitly allowed elsewhere
     // Adjust as needed.

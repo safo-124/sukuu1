@@ -254,7 +254,7 @@ export default function GradeManagerPage() {
   }, [school?.id, filters.subjectId, filters.sectionId]);
 
   return (
-  <RequireRole role={["SCHOOL_ADMIN"]} fallback={<div className="p-6 text-sm text-muted-foreground">Only school admins can manage grades.</div>}>
+    <RequireRole role="SCHOOL_ADMIN" fallback={<div className="p-6 text-sm text-muted-foreground">Only school admins can manage grades.</div>}>
       <div className="space-y-6">
         <h1 className="text-2xl font-semibold">Grade Manager</h1>
         <div className="grid grid-cols-1 md:grid-cols-7 gap-4">

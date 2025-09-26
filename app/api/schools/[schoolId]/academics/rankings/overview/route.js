@@ -8,7 +8,7 @@ import prisma from '@/lib/prisma';
 export async function GET(request, { params }) {
   const { schoolId } = await params;
   const session = await getServerSession(authOptions);
-  if (!session || session.user?.schoolId !== schoolId || !['SCHOOL_ADMIN','SECRETARY'].includes(session.user?.role)) {
+  if (!session || session.user?.schoolId !== schoolId || !['SCHOOL_ADMIN','SUPER_ADMIN','SECRETARY'].includes(session.user?.role)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {
