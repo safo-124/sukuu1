@@ -98,9 +98,9 @@ export default function TeacherContinuousGradesPage() {
 
   const loadAssignments = useCallback(async () => {
     if (!school?.id || !selected.subjectId) return setAssignments([]);
-    const mine = isTeacher ? '1' : '0';
+    // Fetch all assignments for the subject/section (not only "mine") so titles show up
     const secParam = selected.sectionId ? `&sectionId=${selected.sectionId}` : '';
-    const res = await fetch(`/api/schools/${school.id}/academics/assignments?mine=${mine}&subjectId=${selected.subjectId}${secParam}`);
+    const res = await fetch(`/api/schools/${school.id}/academics/assignments?subjectId=${selected.subjectId}${secParam}`);
     if (!res.ok) return setAssignments([]);
     const d = await res.json(); setAssignments(d.assignments || []);
   }, [school?.id, selected.subjectId, selected.sectionId, isTeacher]);
@@ -202,7 +202,16 @@ export default function TeacherContinuousGradesPage() {
             <SelectTrigger><SelectValue placeholder="Pick assignment (or leave empty for Test)" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="__none__">— Use Test Label —</SelectItem>
-              {assignments.map(a => (<SelectItem value={a.id} key={a.id}>{a.title}</SelectItem>))}
+              {assignments.map(a => {
+                const cls = a.section?.class?.name || a.class?.name;
+                const sec = a.section?.name;
+                const suffix = cls && sec ? ` (${cls} - ${sec})` : cls ? ` (${cls})` : '';
+                return (
+                  <SelectItem value={a.id} key={a.id}>
+                    {a.title}{suffix}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
         </div>

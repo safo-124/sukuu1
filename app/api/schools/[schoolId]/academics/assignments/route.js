@@ -53,7 +53,8 @@ export async function GET(request, { params }) {
       }
     }
     const isTeacher = session.user?.role === 'TEACHER';
-    if (isTeacher || mine === '1' || mine === 'true') {
+    // Only filter to "my assignments" when explicitly requested via mine=1
+    if (mine === '1' || mine === 'true') {
       where.teacherId = session.user?.staffProfileId || '__none__';
     }
 
