@@ -20,7 +20,7 @@ import {
   Plus, Search, Filter, Calendar, Clock, Users, BookOpen, CheckSquare, 
   FileText, MoreVertical, Edit, Trash2, Eye, Copy, Share, Download,
   AlertCircle, Target, Zap, Book, ChevronDown, ChevronRight, X,
-  Paperclip, Upload, Image, Video, File
+  Paperclip, Upload, Image, Video, File, Link2
 } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -1395,6 +1395,21 @@ function AssignmentsGrid({ assignments, viewMode, onEdit, onDelete, schoolData }
                             Review Submissions
                           </DropdownMenuItem>
                         )}
+                        {session?.user?.role === 'TEACHER' && (
+                          <DropdownMenuItem
+                            onClick={() => {
+                              const sub = schoolData?.subdomain || '';
+                              const qs = new URLSearchParams();
+                              if (assignment.subjectId) qs.set('subjectId', assignment.subjectId);
+                              if (assignment.sectionId) qs.set('sectionId', assignment.sectionId);
+                              if (assignment.id) qs.set('assignmentId', assignment.id);
+                              window.location.assign(`/${sub}/teacher/academics/grades/continuous?${qs.toString()}`);
+                            }}
+                          >
+                            <Link2 className="mr-2 h-4 w-4" />
+                            CA Grades
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 
                           onClick={() => onDelete(assignment)}
@@ -1545,6 +1560,24 @@ function AssignmentsGrid({ assignments, viewMode, onEdit, onDelete, schoolData }
                     >
                       <Eye className="w-4 h-4 mr-1" />
                       Review
+                    </Button>
+                  )}
+                  {session?.user?.role === 'TEACHER' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 text-xs"
+                      onClick={() => {
+                        const sub = schoolData?.subdomain || '';
+                        const qs = new URLSearchParams();
+                        if (assignment.subjectId) qs.set('subjectId', assignment.subjectId);
+                        if (assignment.sectionId) qs.set('sectionId', assignment.sectionId);
+                        if (assignment.id) qs.set('assignmentId', assignment.id);
+                        window.location.assign(`/${sub}/teacher/academics/grades/continuous?${qs.toString()}`);
+                      }}
+                    >
+                      <Link2 className="w-4 h-4 mr-1" />
+                      CA Grades
                     </Button>
                   )}
                   <Button 

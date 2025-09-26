@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { z } from 'zod';
 import { schoolIdSchema, createAssignmentSchema } from '@/validators/assignment';
 import { notifyParentsNewAssignment } from '@/lib/notify';
+import { getSchoolSetting } from '@/lib/schoolSettings';
 
 // GET /api/schools/[schoolId]/academics/assignments
 // Fetches all assignments for a specific school
@@ -171,12 +172,16 @@ export async function POST(request, { params }) {
       },
     });
 
-    // Fire-and-forget: create a parent-facing Announcement so parents get a notification in the parent app
+  // Fire-and-forget: create a parent-facing Announcement so parents get a notification in the parent app
     // Audience is targeted to parents, and further limited by section/class when available
     (async () => {
       try {
         // Best-effort: create placeholder CA grade rows (null marks) so the CA Grades page reflects the assignment immediately.
         try {
+          const seedEnabled = await getSchoolSetting(parsedSchoolId, 'seedPlaceholderCAGrades', true);
+          if (!seedEnabled) {
+            // Skip placeholder seeding if disabled in settings
+          } else {
           // Resolve current year & term
           let year = await prisma.academicYear.findFirst({ where: { schoolId: parsedSchoolId, isCurrent: true }, include: { terms: true } });
           if (!year) {
@@ -217,6 +222,7 @@ export async function POST(request, { params }) {
                 }
               });
             }
+          }
           }
         } catch (seedErr) {
           console.warn('Placeholder CA grades not created:', seedErr?.message || seedErr);

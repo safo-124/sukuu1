@@ -41,6 +41,7 @@ export default function SchoolProfilePage() {
   const [isLoading, setIsLoading] = useState(false); // For form submission
   const [isFetchingProfile, setIsFetchingProfile] = useState(true); // For initial profile load
   const [formError, setFormError] = useState('');
+  const [seedPlaceholderCAGrades, setSeedPlaceholderCAGrades] = useState(true);
 
   // Tailwind class constants
   const titleTextClasses = "text-black dark:text-white";
@@ -66,6 +67,19 @@ export default function SchoolProfilePage() {
       setIsFetchingProfile(false);
     }
   }, [schoolData]);
+
+  // Load school settings
+  useEffect(() => {
+    const loadSettings = async () => {
+      if (!schoolData?.id) return;
+      try {
+        const res = await fetch(`/api/schools/${schoolData.id}/settings`);
+        const d = await res.json();
+        if (res.ok) setSeedPlaceholderCAGrades(!!d.settings?.seedPlaceholderCAGrades);
+      } catch {}
+    };
+    loadSettings();
+  }, [schoolData?.id]);
 
   const handleFormChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
@@ -95,6 +109,10 @@ export default function SchoolProfilePage() {
         if (result.issues) err = result.issues.map(i => `${i.path.join('.') || 'Field'}: ${i.message}`).join('; ');
         toast.error("Update Failed", { description: err }); setFormError(err);
       } else {
+        // Persist settings toggle in parallel
+        try {
+          await fetch(`/api/schools/${schoolData.id}/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ seedPlaceholderCAGrades }) });
+        } catch {}
         toast.success("School profile updated successfully!");
         // Optionally, refetch school data in layout if useSchool doesn't auto-update
         // Or update it locally via setSchoolData from layout context if available and designed for it.
@@ -160,6 +178,14 @@ export default function SchoolProfilePage() {
           </div>
 
           <hr className="my-6 border-zinc-200 dark:border-zinc-700" />
+
+          <h2 className={`text-xl font-bold ${titleTextClasses} mb-4`}>Academics Settings</h2>
+          <div className="flex items-center gap-3">
+            <Checkbox id="seedPlaceholderCAGrades" checked={seedPlaceholderCAGrades} onCheckedChange={(v) => setSeedPlaceholderCAGrades(!!v)} />
+            <Label htmlFor="seedPlaceholderCAGrades" className={labelTextClasses}>
+              Seed placeholder CA grades when creating assignments
+            </Label>
+          </div>
 
           <h2 className={`text-xl font-bold ${titleTextClasses} mb-4 flex items-center`}>
             <Clock className="mr-2 h-6 w-6 opacity-80"/>Timetable Settings

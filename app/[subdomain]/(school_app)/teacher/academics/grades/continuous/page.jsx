@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useSchool } from '../../../../layout';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
@@ -23,6 +24,7 @@ export default function TeacherContinuousGradesPage() {
   const [allowedSubjectsForSection, setAllowedSubjectsForSection] = useState(null);
   const [marks, setMarks] = useState({});
   const [testLabel, setTestLabel] = useState('');
+  const searchParams = useSearchParams();
 
   const inputRefs = useRef({});
   const dirtyIdsRef = useRef(new Set());
@@ -49,6 +51,16 @@ export default function TeacherContinuousGradesPage() {
   }, [school?.id, session, isTeacher]);
 
   useEffect(() => { loadContext(); }, [loadContext]);
+
+  // Prefill from query params (subjectId, sectionId, assignmentId)
+  useEffect(() => {
+    const sid = searchParams?.get('subjectId');
+    const sec = searchParams?.get('sectionId');
+    const aid = searchParams?.get('assignmentId');
+    if (sid || sec || aid) {
+      setSelected(s => ({ ...s, subjectId: sid || s.subjectId, sectionId: sec || s.sectionId, assignmentId: aid || s.assignmentId }));
+    }
+  }, [searchParams]);
 
   const availableSubjects = useMemo(() => Array.isArray(allowedSubjectsForSection) ? allowedSubjectsForSection : subjects, [allowedSubjectsForSection, subjects]);
 

@@ -78,11 +78,57 @@ export async function GET(request, { params }) {
     ].filter(Boolean)));
     const subjectsCount = subjectIds.length;
 
+    // Compute CA Grades aggregates for current term/year across sections/subjects this teacher handles
+    let caSummary = { assignmentAvg: null, testAvg: null, publishedCount: 0 };
+    try {
+      // Resolve current year & active term
+      const now2 = new Date();
+      let year = await prisma.academicYear.findFirst({ where: { schoolId, isCurrent: true }, include: { terms: true } });
+      if (!year) {
+        year = await prisma.academicYear.findFirst({ where: { schoolId }, orderBy: { startDate: 'desc' }, include: { terms: true } });
+      }
+      const term = year?.terms?.find(t => new Date(t.startDate) <= now2 && now2 <= new Date(t.endDate)) || year?.terms?.[0] || null;
+      if (year && term) {
+        const subjectIdsForTeacher = subjectIds;
+        // Sections taught via TT
+        const ttSections = await prisma.timetableEntry.findMany({
+          where: { schoolId, staffId: staff.id, dayOfWeek: { gte: 0 } },
+          select: { sectionId: true },
+          distinct: ['sectionId'],
+        });
+        const sectionIds = Array.from(new Set(ttSections.map(t => t.sectionId).filter(Boolean)));
+        if (subjectIdsForTeacher.length && sectionIds.length) {
+          const grades = await prisma.grade.findMany({
+            where: {
+              schoolId,
+              academicYearId: year.id,
+              termId: term.id,
+              subjectId: { in: subjectIdsForTeacher },
+              sectionId: { in: sectionIds },
+              examScheduleId: null,
+            },
+            select: { marksObtained: true, assignmentId: true, isPublished: true },
+          });
+          const tests = grades.filter(g => !g.assignmentId && g.marksObtained !== null).map(g => g.marksObtained);
+          const assignments = grades.filter(g => g.assignmentId && g.marksObtained !== null).map(g => g.marksObtained);
+          const avg = (arr) => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null;
+          caSummary = {
+            assignmentAvg: avg(assignments),
+            testAvg: avg(tests),
+            publishedCount: grades.filter(g => g.isPublished).length,
+          };
+        }
+      }
+    } catch (e) {
+      console.warn('Teacher dashboard CA summary failed', e?.message || e);
+    }
+
     return NextResponse.json({
       subjectsCount,
       assignmentsCount,
       todayLessons,
       nextLesson,
+      caSummary,
     }, { status: 200 });
   } catch (error) {
     console.error('Teacher dashboard API error:', error);

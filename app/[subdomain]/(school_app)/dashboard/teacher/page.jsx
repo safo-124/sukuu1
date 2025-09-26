@@ -14,7 +14,7 @@ export default function TeacherDashboardPage() {
   const subdomain = schoolData?.subdomain;
   const router = useRouter();
 
-  const [stats, setStats] = useState({ subjectsCount: 0, assignmentsCount: 0, todayLessons: [], nextLesson: null });
+  const [stats, setStats] = useState({ subjectsCount: 0, assignmentsCount: 0, todayLessons: [], nextLesson: null, caSummary: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [wardenHostel, setWardenHostel] = useState(null);
@@ -47,6 +47,7 @@ export default function TeacherDashboardPage() {
           assignmentsCount: data.assignmentsCount || 0,
           todayLessons: Array.isArray(data.todayLessons) ? data.todayLessons : [],
           nextLesson: data.nextLesson || null,
+          caSummary: data.caSummary || null,
         });
         // Also check if this teacher is assigned as a hostel warden (API limits for teacher already)
         const hRes = await fetch(`/api/schools/${schoolData.id}/resources/hostels`);
@@ -105,6 +106,21 @@ export default function TeacherDashboardPage() {
           </div>
           <div className={`mt-2 text-base ${titleTextClasses}`}>
             {loading ? '…' : stats.nextLesson ? `${stats.nextLesson.subject?.name || ''} • ${stats.nextLesson.section?.class?.name || ''}-${stats.nextLesson.section?.name || ''} • ${stats.nextLesson.startTime}-${stats.nextLesson.endTime}` : 'No upcoming'}
+          </div>
+        </div>
+        <div className={`rounded-xl border border-zinc-200/60 dark:border-zinc-700/60 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md p-4`}>
+          <div className="flex items-center justify-between">
+            <span className={`text-sm ${descriptionTextClasses}`}>CA Averages</span>
+            <BarChart4 className="h-4 w-4 opacity-70" />
+          </div>
+          <div className={`mt-2 text-sm ${descriptionTextClasses}`}>
+            {loading ? '…' : stats.caSummary ? (
+              <div className="flex flex-col gap-1">
+                <div><span className="text-zinc-500">Assignments:</span> <span className={`font-semibold ${titleTextClasses}`}>{stats.caSummary.assignmentAvg != null ? stats.caSummary.assignmentAvg.toFixed(1) : '—'}</span></div>
+                <div><span className="text-zinc-500">Tests:</span> <span className={`font-semibold ${titleTextClasses}`}>{stats.caSummary.testAvg != null ? stats.caSummary.testAvg.toFixed(1) : '—'}</span></div>
+                <div className="text-xs text-zinc-500">Published entries: {stats.caSummary.publishedCount}</div>
+              </div>
+            ) : '—'}
           </div>
         </div>
       </div>
