@@ -41,7 +41,6 @@ export async function PUT(request, { params }) {
         classId: parsed.data.classId ?? undefined,
         subjectId: parsed.data.subjectId ?? undefined,
         gradingScaleId: parsed.data.gradingScaleId ?? undefined,
-        overallRankingEnabled: parsed.data.overallRankingEnabled ?? undefined,
       }
     });
     return NextResponse.json({ config: updated, message: 'Grading weight config updated.' }, { status: 200 });

@@ -19,7 +19,7 @@ export default function GradingWeightsPage() {
   const [scales, setScales] = useState([]);
   const [configs, setConfigs] = useState([]);
 
-  const [form, setForm] = useState({ academicYearId: '', schoolLevelId: '', classId: '', subjectId: '', gradingScaleId: '', examWeight: '60', classworkWeight: '20', assignmentWeight: '20', isDefault: false, overallRankingEnabled: false });
+  const [form, setForm] = useState({ academicYearId: '', schoolLevelId: '', classId: '', subjectId: '', gradingScaleId: '', examWeight: '60', classworkWeight: '20', assignmentWeight: '20', isDefault: false });
 
   const isAdmin = session?.user?.role === 'SCHOOL_ADMIN';
 
@@ -64,7 +64,6 @@ export default function GradingWeightsPage() {
         classworkWeight: Number(form.classworkWeight || 0),
         assignmentWeight: Number(form.assignmentWeight || 0),
         isDefault: Boolean(form.isDefault),
-        overallRankingEnabled: Boolean(form.overallRankingEnabled),
       };
       const res = await fetch(`/api/schools/${school.id}/academics/grades/weights`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const d = await res.json();
@@ -168,19 +167,6 @@ export default function GradingWeightsPage() {
           <label className="block text-sm mb-1">Assignment %</label>
           <Input type="number" value={form.assignmentWeight} onChange={e => setForm(f => ({ ...f, assignmentWeight: e.target.value }))} />
         </div>
-        <div>
-          <label className="block text-sm mb-1">Overall Ranking</label>
-          <Select
-            value={form.overallRankingEnabled ? 'enabled' : 'disabled'}
-            onValueChange={(v) => setForm(f => ({ ...f, overallRankingEnabled: v === 'enabled' }))}
-          >
-            <SelectTrigger><SelectValue placeholder="Disabled" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="disabled">Disabled</SelectItem>
-              <SelectItem value="enabled">Enabled</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
       </div>
 
       <div className="flex gap-2">
@@ -195,7 +181,6 @@ export default function GradingWeightsPage() {
               <div>
                 <div className="font-medium">{displayScope(cfg)}</div>
                 <div className="text-sm text-muted-foreground">Exam {cfg.examWeight}% • Classwork {cfg.classworkWeight}% • Assignment {cfg.assignmentWeight}%</div>
-                <div className="text-xs mt-1">Ranking: {cfg.overallRankingEnabled ? 'Enabled' : 'Disabled'}</div>
               </div>
               <div className="text-xs text-muted-foreground">{scales.find(s => s.id === cfg.gradingScaleId)?.name || 'No scale'}</div>
             </div>

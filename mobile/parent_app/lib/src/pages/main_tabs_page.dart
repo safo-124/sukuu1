@@ -12,7 +12,6 @@ import 'fees_page.dart';
 import 'profile_page.dart'; // used for AppBar actions navigation
 import 'promotions_page.dart';
 import '../ui/glass.dart';
-import 'assessments_page.dart';
 
 class _PlaceholderPage extends StatelessWidget {
   final String title;
@@ -82,11 +81,8 @@ class _MainTabsPageState extends State<MainTabsPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Ensure current index is within bounds and an int
-    final int currentIdx =
-        _currentIndex.clamp(0, (_pages.length - 1).clamp(0, 9999)).toInt();
     return Scaffold(
-      body: IndexedStack(index: currentIdx, children: _pages),
+      body: IndexedStack(index: _currentIndex, children: _pages),
       bottomNavigationBar: GlassBottomBar(
         child: Theme(
           data: Theme.of(context).copyWith(
@@ -96,9 +92,8 @@ class _MainTabsPageState extends State<MainTabsPage> {
                 ),
           ),
           child: NavigationBar(
-            selectedIndex: currentIdx,
-            onDestinationSelected: (i) => setState(
-                () => _currentIndex = i.clamp(0, _pages.length - 1).toInt()),
+            selectedIndex: _currentIndex,
+            onDestinationSelected: (i) => setState(() => _currentIndex = i),
             labelBehavior: (Theme.of(context).platform == TargetPlatform.iOS)
                 ? NavigationDestinationLabelBehavior.alwaysHide
                 : NavigationDestinationLabelBehavior.onlyShowSelected,
@@ -386,9 +381,9 @@ class _MoreTab extends StatelessWidget {
           ),
           const _MoreItem(
             icon: Icons.school_outlined,
-            title: 'Assessments',
-            subtitle: 'Assignments, tests, exams and grades',
-            target: _MoreTarget.assessments,
+            title: 'Grades',
+            subtitle: 'View recent grades and report cards',
+            target: _MoreTarget.grades,
           ),
           const _MoreItem(
             icon: Icons.fact_check_outlined,
@@ -425,7 +420,7 @@ class _MoreTab extends StatelessWidget {
   }
 }
 
-enum _MoreTarget { assessments, attendance, timetable, promotions, profile }
+enum _MoreTarget { grades, attendance, timetable, promotions, profile }
 
 class _MoreItem extends StatelessWidget {
   final IconData icon;
@@ -452,9 +447,9 @@ class _MoreItem extends StatelessWidget {
         trailing: const Icon(Icons.chevron_right),
         onTap: () {
           switch (target) {
-            case _MoreTarget.assessments:
+            case _MoreTarget.grades:
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const AssessmentsPage()),
+                MaterialPageRoute(builder: (_) => const _GradesTab()),
               );
               break;
             case _MoreTarget.attendance:

@@ -852,7 +852,6 @@ model Assignment {
   attachments          Json?
   type                 AssignmentType        @default(SUBJECT)
   objectives           Json?                 // For OBJECTIVE type: array of questions, options, correct answers
-  publishAt            DateTime?             // Optional: schedule automatic publishing of grades
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   schoolId             String
@@ -1047,7 +1046,6 @@ model ExamSchedule {
   endTime     String
   maxMarks    Float
   room        String?
-  publishAt   DateTime?  // Optional: schedule automatic publishing of grades
   schoolId    String
   school      School    @relation(fields: [schoolId], references: [id], onDelete: Restrict)
   grades      Grade[]

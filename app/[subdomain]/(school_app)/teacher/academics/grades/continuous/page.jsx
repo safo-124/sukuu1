@@ -24,8 +24,6 @@ export default function TeacherContinuousGradesPage() {
   const [allowedSubjectsForSection, setAllowedSubjectsForSection] = useState(null);
   const [marks, setMarks] = useState({});
   const [testLabel, setTestLabel] = useState('');
-  const [remarks, setRemarks] = useState({});
-  const [locked, setLocked] = useState({}); // teacher lock when grade exists
   const searchParams = useSearchParams();
 
   const inputRefs = useRef({});
@@ -109,28 +107,6 @@ export default function TeacherContinuousGradesPage() {
 
   useEffect(() => { loadAssignments(); }, [loadAssignments]);
 
-  // Prefill marks/remarks for assignment and lock for teachers
-  useEffect(() => {
-    const run = async () => {
-      if (!school?.id || !selected.assignmentId || !selected.sectionId) return;
-      try {
-        const res = await fetch(`/api/schools/${school.id}/academics/assignments/${selected.assignmentId}/grade-entry-data?sectionId=${selected.sectionId}`);
-        if (!res.ok) return;
-        const d = await res.json();
-        const nextMarks = {}; const nextRemarks = {}; const nextLocked = {};
-        (d.students || []).forEach(st => {
-          if (st.marksObtained !== null && st.marksObtained !== undefined) {
-            nextMarks[st.id] = st.marksObtained;
-            nextLocked[st.id] = true; // existing grade locks for teachers
-          }
-          if (st.comments) nextRemarks[st.id] = st.comments;
-        });
-        setMarks(nextMarks); setRemarks(nextRemarks); setLocked(nextLocked);
-      } catch {}
-    };
-    run();
-  }, [school?.id, selected.assignmentId, selected.sectionId]);
-
   const onChangeMark = (studentId, value) => { setMarks(prev => ({ ...prev, [studentId]: value })); dirtyIdsRef.current.add(studentId); setSaving('idle'); };
 
   const handleKeyDown = (e, idx) => {
@@ -143,11 +119,7 @@ export default function TeacherContinuousGradesPage() {
   const buildAssignmentJob = () => {
     const dirtyIds = Array.from(dirtyIdsRef.current); if (!dirtyIds.length) return null;
     if (!selected.assignmentId || !selected.subjectId || !selected.sectionId) return null;
-    const grades = dirtyIds.map(id => ({
-      studentId: id,
-      marksObtained: toNum(marks[id]),
-      comments: (remarks[id] ?? '')?.toString().trim() || null,
-    }));
+    const grades = dirtyIds.map(id => ({ studentId: id, marksObtained: toNum(marks[id]) }));
     return {
       url: `/api/schools/${school.id}/academics/grades/assignments`,
       payload: { assignmentId: selected.assignmentId, termId: termYear.termId, academicYearId: termYear.academicYearId, subjectId: selected.subjectId, sectionId: selected.sectionId, grades }
@@ -181,26 +153,12 @@ export default function TeacherContinuousGradesPage() {
       } catch (err) { setSaving('error'); setSaveMessage('Failed to save'); }
     }, 800);
     return () => clearTimeout(autosaveTimer.current);
-  }, [marks, remarks, selected.assignmentId, testLabel, selected.subjectId, selected.sectionId, termYear.termId, termYear.academicYearId]);
+  }, [marks, selected.assignmentId, testLabel, selected.subjectId, selected.sectionId, termYear.termId, termYear.academicYearId]);
 
   const submitAssignment = async () => {
     const job = buildAssignmentJob(); if (!job) return;
   const res = await fetch(job.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(job.payload) });
   const data = await res.json().catch(()=>({})); if (!res.ok) return toast.error(data.error || 'Failed to save assignment grades');
-  // After save, refetch to sync and lock
-  try {
-    const ref = await fetch(`/api/schools/${school.id}/academics/assignments/${selected.assignmentId}/grade-entry-data?sectionId=${selected.sectionId}`);
-    if (ref.ok) {
-      const d = await ref.json();
-      const nextMarks = {}; const nextRemarks = {}; const nextLocked = {};
-      (d.students || []).forEach(st => {
-        if (st.marksObtained !== null && st.marksObtained !== undefined) { nextMarks[st.id] = st.marksObtained; nextLocked[st.id] = true; }
-        if (st.comments) nextRemarks[st.id] = st.comments;
-      });
-      setMarks(nextMarks); setRemarks(nextRemarks); setLocked(nextLocked);
-    }
-  } catch {}
-  dirtyIdsRef.current.clear();
   toast.success(data.message || 'Assignment grades saved');
   };
 
@@ -272,7 +230,6 @@ export default function TeacherContinuousGradesPage() {
             <tr className="text-left border-b">
               <th className="py-2 pr-4">Student</th>
               <th className="py-2">Marks</th>
-              {selected.assignmentId ? (<th className="py-2 pl-4">Remarks</th>) : null}
             </tr>
           </thead>
           <tbody>
@@ -287,49 +244,17 @@ export default function TeacherContinuousGradesPage() {
                     onChange={(e) => { setMarks(prev => ({ ...prev, [st.id]: e.target.value })); dirtyIdsRef.current.add(st.id); setSaving('idle'); }}
                     onKeyDown={(e) => { if (e.key === 'ArrowDown') { e.preventDefault(); const n = students[idx + 1]; if (n && inputRefs.current[n.id]) inputRefs.current[n.id].focus(); } else if (e.key === 'ArrowUp') { e.preventDefault(); const p = students[idx - 1]; if (p && inputRefs.current[p.id]) inputRefs.current[p.id].focus(); } }}
                     placeholder="e.g., 10"
-                    disabled={isTeacher && !!locked[st.id]}
-                    title={isTeacher && !!locked[st.id] ? 'Locked: contact school admin to modify.' : ''}
                   />
                 </td>
-                {selected.assignmentId ? (
-                  <td className="py-2 pl-4">
-                    <Input
-                      value={remarks[st.id] ?? ''}
-                      onChange={(e) => { setRemarks(prev => ({ ...prev, [st.id]: e.target.value })); dirtyIdsRef.current.add(st.id); setSaving('idle'); }}
-                      placeholder="Optional notes"
-                      disabled={isTeacher && !!locked[st.id]}
-                      title={isTeacher && !!locked[st.id] ? 'Locked: contact school admin to modify.' : ''}
-                    />
-                  </td>
-                ) : null}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      <div className="flex gap-2 items-center">
+      <div className="flex gap-2">
         <Button onClick={submitAssignment} disabled={!selected.assignmentId || !selected.subjectId || !selected.sectionId}>Save Assignment Grades</Button>
         <Button variant="secondary" onClick={submitTest} disabled={!testLabel || !!selected.assignmentId || !selected.subjectId || !selected.sectionId}>Save Test Grades</Button>
-        {/* Admin-only publish shortcut for assignment grades */}
-        {['SCHOOL_ADMIN','SUPER_ADMIN'].includes(session?.user?.role) && (
-          <Button
-            variant="outline"
-            onClick={async () => {
-              if (!school?.id || !selected.assignmentId || !selected.sectionId) return;
-              const res = await fetch(`/api/schools/${school.id}/academics/grades/publish/by-target`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ assignmentId: selected.assignmentId, sectionId: selected.sectionId })
-              });
-              const out = await res.json().catch(()=>({}));
-              if (!res.ok) return toast.error(out.error || 'Failed to publish');
-              toast.success(`Published ${out.count || 0} grades`);
-            }}
-            disabled={!selected.assignmentId || !selected.sectionId}
-          >
-            Publish Assignment Grades
-          </Button>
-        )}
       </div>
     </div>
   );

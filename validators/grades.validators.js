@@ -12,7 +12,6 @@ export const baseGradingWeightConfigSchema = z.object({
   examWeight: z.coerce.number().min(0).max(100, "Exam weight must be between 0 and 100."),
   classworkWeight: z.coerce.number().min(0).max(100, "Classwork weight must be between 0 and 100."),
   assignmentWeight: z.coerce.number().min(0).max(100, "Assignment weight must be between 0 and 100."),
-  overallRankingEnabled: z.boolean().optional().default(false),
   isDefault: z.boolean().optional().default(false),
 });
 
@@ -71,11 +70,5 @@ export const assignmentGradesSchema = z.object({
   academicYearId: z.string().cuid(),
   subjectId: z.string().cuid(),
   sectionId: z.string().cuid().nullable().optional(),
-  grades: z.array(z.object({
-    studentId: z.string().cuid(),
-    marksObtained: z.coerce.number().min(0).nullable(),
-    comments: z.string().trim().optional().nullable(),
-    // For OBJECTIVE assignments auto-marking, accept raw answers
-    answers: z.array(z.object({ question: z.string(), answer: z.string() })).optional(),
-  })),
+  grades: z.array(z.object({ studentId: z.string().cuid(), marksObtained: z.coerce.number().min(0).nullable() })),
 });
