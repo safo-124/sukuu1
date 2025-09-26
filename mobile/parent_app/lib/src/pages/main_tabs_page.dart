@@ -10,6 +10,7 @@ import 'grades_page.dart';
 import 'attendance_page.dart';
 import 'fees_page.dart';
 import 'profile_page.dart'; // used for AppBar actions navigation
+import 'promotions_page.dart';
 import '../ui/glass.dart';
 
 class _PlaceholderPage extends StatelessWidget {
@@ -394,6 +395,12 @@ class _MoreTab extends StatelessWidget {
             subtitle: 'Daily subjects and teachers',
             target: _MoreTarget.timetable,
           ),
+          const _MoreItem(
+            icon: Icons.trending_up,
+            title: 'Promotions / Transfers',
+            subtitle: 'Movements between years and sections',
+            target: _MoreTarget.promotions,
+          ),
           const Padding(
             padding: EdgeInsets.fromLTRB(4, 12, 4, 4),
             child: Text('Account',
@@ -411,7 +418,7 @@ class _MoreTab extends StatelessWidget {
   }
 }
 
-enum _MoreTarget { grades, attendance, timetable, profile }
+enum _MoreTarget { grades, attendance, timetable, promotions, profile }
 
 class _MoreItem extends StatelessWidget {
   final IconData icon;
@@ -453,6 +460,11 @@ class _MoreItem extends StatelessWidget {
                 MaterialPageRoute(builder: (_) => const _TimetableTab()),
               );
               break;
+            case _MoreTarget.promotions:
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const PromotionsPage()),
+                );
+                break;
             case _MoreTarget.profile:
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const ProfilePage()),
