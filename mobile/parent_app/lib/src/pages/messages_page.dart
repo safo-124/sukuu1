@@ -178,7 +178,8 @@ class _MessageDetailPage extends StatelessWidget {
     final dtStr = (message['publishedAt'] ?? message['createdAt'])?.toString();
     final dt = dtStr != null ? DateTime.tryParse(dtStr) : null;
     final content = message['content']?.toString() ?? '';
-    final deepLinkMatch = RegExp(r'assignment:\/\/([a-zA-Z0-9_-]+)').firstMatch(content);
+    final deepLinkMatch =
+        RegExp(r'assignment:\/\/([a-zA-Z0-9_-]+)').firstMatch(content);
     final assignmentId = deepLinkMatch != null ? deepLinkMatch.group(1) : null;
     return Scaffold(
       appBar: AppBar(title: const Text('Message')),
@@ -195,8 +196,7 @@ class _MessageDetailPage extends StatelessWidget {
               Text(df.format(dt),
                   style: const TextStyle(color: Colors.black54)),
             const Divider(height: 24),
-            Text(content,
-                style: const TextStyle(fontSize: 16)),
+            Text(content, style: const TextStyle(fontSize: 16)),
             if (assignmentId != null) ...[
               const SizedBox(height: 16),
               FilledButton.icon(
@@ -207,13 +207,20 @@ class _MessageDetailPage extends StatelessWidget {
                   final baseUrl = await storage.read(key: 'baseUrl');
                   final token = await storage.read(key: 'token');
                   final schoolId = await storage.read(key: 'schoolId');
-                  if (baseUrl == null || token == null || schoolId == null) return;
-                  final url = Uri.parse('$baseUrl/api/schools/$schoolId/parents/me/assignments/$assignmentId');
+                  if (baseUrl == null || token == null || schoolId == null)
+                    return;
+                  final url = Uri.parse(
+                      '$baseUrl/api/schools/$schoolId/parents/me/assignments/$assignmentId');
                   try {
-                    final res = await http.get(url, headers: { 'Authorization': 'Bearer $token', 'Accept': 'application/json' });
+                    final res = await http.get(url, headers: {
+                      'Authorization': 'Bearer $token',
+                      'Accept': 'application/json'
+                    });
                     if (res.statusCode != 200) {
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to load assignment')));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('Failed to load assignment')));
                       }
                       return;
                     }
@@ -221,42 +228,54 @@ class _MessageDetailPage extends StatelessWidget {
                     final a = json['assignment'] as Map<String, dynamic>;
                     if (!context.mounted) return;
                     showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      builder: (_) {
-                        final subj = a['subject']?['name']?.toString() ?? '';
-                        final sec = a['section']?['name']?.toString();
-                        final cls = a['class']?['name']?.toString();
-                        final due = a['dueDate']?.toString();
-                        final dueDt = due != null ? DateTime.tryParse(due) : null;
-                        final teacherName = [a['teacher']?['user']?['firstName'], a['teacher']?['user']?['lastName']]
-                            .whereType<String>()
-                            .join(' ');
-                        return Padding(
-                          padding: MediaQuery.of(context).viewInsets.add(const EdgeInsets.all(16)),
-                          child: SafeArea(
-                            child: SingleChildScrollView(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(a['title']?.toString() ?? 'Assignment', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                                  const SizedBox(height: 8),
-                                  Text('Subject: $subj${sec != null ? ' • Section: ' + sec : ''}${cls != null ? ' • Class: ' + cls : ''}'),
-                                  if (dueDt != null) Text('Due: ${DateFormat('MMM d, yyyy h:mm a').format(dueDt)}'),
-                                  if (teacherName.isNotEmpty) Text('Teacher: $teacherName'),
-                                  const Divider(height: 24),
-                                  if (a['description'] != null) Text(a['description'].toString()),
-                                  const SizedBox(height: 16),
-                                ],
+                        context: context,
+                        isScrollControlled: true,
+                        builder: (_) {
+                          final subj = a['subject']?['name']?.toString() ?? '';
+                          final sec = a['section']?['name']?.toString();
+                          final cls = a['class']?['name']?.toString();
+                          final due = a['dueDate']?.toString();
+                          final dueDt =
+                              due != null ? DateTime.tryParse(due) : null;
+                          final teacherName = [
+                            a['teacher']?['user']?['firstName'],
+                            a['teacher']?['user']?['lastName']
+                          ].whereType<String>().join(' ');
+                          return Padding(
+                            padding: MediaQuery.of(context)
+                                .viewInsets
+                                .add(const EdgeInsets.all(16)),
+                            child: SafeArea(
+                              child: SingleChildScrollView(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(a['title']?.toString() ?? 'Assignment',
+                                        style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold)),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                        'Subject: $subj${sec != null ? ' • Section: ' + sec : ''}${cls != null ? ' • Class: ' + cls : ''}'),
+                                    if (dueDt != null)
+                                      Text(
+                                          'Due: ${DateFormat('MMM d, yyyy h:mm a').format(dueDt)}'),
+                                    if (teacherName.isNotEmpty)
+                                      Text('Teacher: $teacherName'),
+                                    const Divider(height: 24),
+                                    if (a['description'] != null)
+                                      Text(a['description'].toString()),
+                                    const SizedBox(height: 16),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                        );
-                      }
-                    );
+                          );
+                        });
                   } catch (_) {
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to load assignment')));
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text('Failed to load assignment')));
                     }
                   }
                 },
