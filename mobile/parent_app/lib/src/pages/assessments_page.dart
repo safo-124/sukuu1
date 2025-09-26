@@ -90,7 +90,8 @@ class _AssessmentsPageState extends State<AssessmentsPage> {
       final children =
           (jsonMap['children'] as List? ?? []).cast<Map<String, dynamic>>();
       final match = children
-          .where((c) => c['studentId'].toString() == _selectedChild!['id'].toString())
+          .where((c) =>
+              c['studentId'].toString() == _selectedChild!['id'].toString())
           .toList();
       final list = match.isNotEmpty
           ? ((match.first['assessments'] as List? ?? [])
@@ -128,7 +129,8 @@ class _AssessmentsPageState extends State<AssessmentsPage> {
         actions: [
           IconButton(
             tooltip: _publishedOnly ? 'Showing published' : 'Showing all',
-            icon: Icon(_publishedOnly ? Icons.visibility : Icons.visibility_off),
+            icon:
+                Icon(_publishedOnly ? Icons.visibility : Icons.visibility_off),
             onPressed: () async {
               setState(() => _publishedOnly = !_publishedOnly);
               await _loadAssessments();
@@ -145,11 +147,13 @@ class _AssessmentsPageState extends State<AssessmentsPage> {
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _loading ? null : () async {
-              setState(() => _loading = true);
-              await _loadAssessments();
-              setState(() => _loading = false);
-            },
+            onPressed: _loading
+                ? null
+                : () async {
+                    setState(() => _loading = true);
+                    await _loadAssessments();
+                    setState(() => _loading = false);
+                  },
           ),
         ],
       ),
@@ -172,10 +176,14 @@ class _AssessmentsPageState extends State<AssessmentsPage> {
                             child: DropdownButtonFormField<String>(
                               value: _selectedChild?['id']?.toString(),
                               items: _children.map((c) {
-                                final name = '${c['firstName'] ?? ''} ${c['lastName'] ?? ''}'.trim();
+                                final name =
+                                    '${c['firstName'] ?? ''} ${c['lastName'] ?? ''}'
+                                        .trim();
                                 return DropdownMenuItem(
                                   value: c['id'].toString(),
-                                  child: Text(name.isEmpty ? 'Student ${c['id']}' : name),
+                                  child: Text(name.isEmpty
+                                      ? 'Student ${c['id']}'
+                                      : name),
                                 );
                               }).toList(),
                               onChanged: (v) async {
@@ -183,10 +191,12 @@ class _AssessmentsPageState extends State<AssessmentsPage> {
                                   (e) => e['id'].toString() == v,
                                   orElse: () => <String, dynamic>{},
                                 );
-                                setState(() => _selectedChild = sel.isEmpty ? null : sel);
+                                setState(() =>
+                                    _selectedChild = sel.isEmpty ? null : sel);
                                 await _loadAssessments();
                               },
-                              decoration: const InputDecoration(labelText: 'Child'),
+                              decoration:
+                                  const InputDecoration(labelText: 'Child'),
                             ),
                           ),
                         ],
@@ -215,7 +225,8 @@ class _AssessmentTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final type = a['type']?.toString() ?? 'ASSIGNMENT';
-    final title = a['title']?.toString() ?? (type == 'EXAM' ? 'Exam' : 'Assignment');
+    final title =
+        a['title']?.toString() ?? (type == 'EXAM' ? 'Exam' : 'Assignment');
     final subject = (a['subject'] as Map?)?['name']?.toString() ?? '';
     final clazz = (a['class'] as Map?)?['name']?.toString();
     final section = (a['section'] as Map?)?['name']?.toString();
@@ -233,8 +244,12 @@ class _AssessmentTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             CircleAvatar(
-              backgroundColor: type == 'EXAM' ? Colors.pink.shade50 : Colors.blue.shade50,
-              child: Icon(type == 'EXAM' ? Icons.fact_check_outlined : Icons.assignment_outlined,
+              backgroundColor:
+                  type == 'EXAM' ? Colors.pink.shade50 : Colors.blue.shade50,
+              child: Icon(
+                  type == 'EXAM'
+                      ? Icons.fact_check_outlined
+                      : Icons.assignment_outlined,
                   color: type == 'EXAM' ? Colors.pink : Colors.blue),
             ),
             const SizedBox(width: 12),
@@ -242,36 +257,43 @@ class _AssessmentTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  Text(title,
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 4),
-                  Text([
-                    if (subject.isNotEmpty) subject,
-                    if (clazz != null) 'Class: $clazz',
-                    if (section != null) 'Section: $section',
-                    if (date != null) df.format(date),
-                  ].join(' • '), style: const TextStyle(color: Colors.black54)),
+                  Text(
+                      [
+                        if (subject.isNotEmpty) subject,
+                        if (clazz != null) 'Class: $clazz',
+                        if (section != null) 'Section: $section',
+                        if (date != null) df.format(date),
+                      ].join(' • '),
+                      style: const TextStyle(color: Colors.black54)),
                 ],
               ),
             ),
             if (isPublished && marks != null)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.indigo.shade600,
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(max != null ? '$marks/$max' : marks,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold)),
               )
             else
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.grey.shade200,
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(isPublished ? '-' : 'Upcoming',
-                    style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+                    style: const TextStyle(
+                        color: Colors.black54, fontWeight: FontWeight.w600)),
               ),
           ],
         ),
