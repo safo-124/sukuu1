@@ -570,26 +570,22 @@ class _HomePageState extends State<HomePage> {
                                       onTap: _selectedChild == null
                                           ? null
                                           : () {
-                                              if (widget.goToTab != null) {
-                                                widget.goToTab!(2);
-                                              } else {
-                                                final name =
-                                                    '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
-                                                        .trim();
-                                                Navigator.of(context).push(
-                                                  MaterialPageRoute(
-                                                    builder: (_) =>
-                                                        AttendancePage(
-                                                      studentId:
-                                                          _selectedChild!['id']
-                                                              .toString(),
-                                                      studentName: name.isEmpty
-                                                          ? 'Student'
-                                                          : name,
-                                                    ),
+                                              final name =
+                                                  '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
+                                                      .trim();
+                                              Navigator.of(context).push(
+                                                MaterialPageRoute(
+                                                  builder: (_) =>
+                                                      AttendancePage(
+                                                    studentId:
+                                                        _selectedChild!['id']
+                                                            .toString(),
+                                                    studentName: name.isEmpty
+                                                        ? 'Student'
+                                                        : name,
                                                   ),
-                                                );
-                                              }
+                                                ),
+                                              );
                                             },
                                     ),
                                   ),
@@ -609,10 +605,6 @@ class _HomePageState extends State<HomePage> {
                                       onTap: _selectedChild == null
                                           ? null
                                           : () {
-                                              if (widget.goToTab != null) {
-                                                widget.goToTab!(4);
-                                                return;
-                                              }
                                               final name =
                                                   '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
                                                       .trim();
@@ -678,23 +670,19 @@ class _HomePageState extends State<HomePage> {
                         onAction: _selectedChild == null
                             ? null
                             : () {
-                                if (widget.goToTab != null) {
-                                  widget.goToTab!(1);
-                                } else {
-                                  final name =
-                                      '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
-                                          .trim();
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => GradesPage(
-                                        studentId:
-                                            _selectedChild!['id'].toString(),
-                                        studentName:
-                                            name.isEmpty ? 'Student' : name,
-                                      ),
+                                final name =
+                                    '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
+                                        .trim();
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => GradesPage(
+                                      studentId:
+                                          _selectedChild!['id'].toString(),
+                                      studentName:
+                                          name.isEmpty ? 'Student' : name,
                                     ),
-                                  );
-                                }
+                                  ),
+                                );
                               },
                       ),
                       const SizedBox(height: 8),
@@ -780,23 +768,19 @@ class _HomePageState extends State<HomePage> {
                         onAction: _selectedChild == null
                             ? null
                             : () {
-                                if (widget.goToTab != null) {
-                                  widget.goToTab!(2);
-                                } else {
-                                  final name =
-                                      '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
-                                          .trim();
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => AttendancePage(
-                                        studentId:
-                                            _selectedChild!['id'].toString(),
-                                        studentName:
-                                            name.isEmpty ? 'Student' : name,
-                                      ),
+                                final name =
+                                    '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
+                                        .trim();
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => AttendancePage(
+                                      studentId:
+                                          _selectedChild!['id'].toString(),
+                                      studentName:
+                                          name.isEmpty ? 'Student' : name,
                                     ),
-                                  );
-                                }
+                                  ),
+                                );
                               },
                       ),
                       const SizedBox(height: 8),
@@ -828,22 +812,18 @@ class _HomePageState extends State<HomePage> {
                                 .toUpperCase();
                         return GestureDetector(
                           onTap: () {
-                            if (widget.goToTab != null) {
-                              widget.goToTab!(2);
-                            } else {
-                              final name =
-                                  '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
-                                      .trim();
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => AttendancePage(
-                                    studentId: _selectedChild!['id'].toString(),
-                                    studentName:
-                                        name.isEmpty ? 'Student' : name,
-                                  ),
+                            final name =
+                                '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
+                                    .trim();
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => AttendancePage(
+                                  studentId: _selectedChild!['id'].toString(),
+                                  studentName:
+                                      name.isEmpty ? 'Student' : name,
                                 ),
-                              );
-                            }
+                              ),
+                            );
                           },
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
@@ -902,10 +882,6 @@ class _HomePageState extends State<HomePage> {
                         onAction: _selectedChild == null
                             ? null
                             : () {
-                                if (widget.goToTab != null) {
-                                  widget.goToTab!(4);
-                                  return;
-                                }
                                 final name =
                                     '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
                                         .trim();
