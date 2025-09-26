@@ -12,6 +12,7 @@ import 'fees_page.dart';
 import 'profile_page.dart'; // used for AppBar actions navigation
 import 'promotions_page.dart';
 import '../ui/glass.dart';
+import 'assessments_page.dart';
 
 class _PlaceholderPage extends StatelessWidget {
   final String title;
@@ -381,9 +382,9 @@ class _MoreTab extends StatelessWidget {
           ),
           const _MoreItem(
             icon: Icons.school_outlined,
-            title: 'Grades',
-            subtitle: 'View recent grades and report cards',
-            target: _MoreTarget.grades,
+            title: 'Assessments',
+            subtitle: 'Assignments, tests, exams and grades',
+            target: _MoreTarget.assessments,
           ),
           const _MoreItem(
             icon: Icons.fact_check_outlined,
@@ -420,7 +421,7 @@ class _MoreTab extends StatelessWidget {
   }
 }
 
-enum _MoreTarget { grades, attendance, timetable, promotions, profile }
+enum _MoreTarget { assessments, attendance, timetable, promotions, profile }
 
 class _MoreItem extends StatelessWidget {
   final IconData icon;
@@ -447,9 +448,9 @@ class _MoreItem extends StatelessWidget {
         trailing: const Icon(Icons.chevron_right),
         onTap: () {
           switch (target) {
-            case _MoreTarget.grades:
+            case _MoreTarget.assessments:
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const _GradesTab()),
+                MaterialPageRoute(builder: (_) => const AssessmentsPage()),
               );
               break;
             case _MoreTarget.attendance:

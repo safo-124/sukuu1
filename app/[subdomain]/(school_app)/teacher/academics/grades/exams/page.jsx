@@ -217,7 +217,19 @@ export default function TeacherExamGradesPage() {
 				}
 			} catch {}
 			dirtyIdsRef.current.clear();
-			toast.success(data.message || 'Exam grades saved');
+		toast.success(data.message || 'Exam grades saved');
+	};
+	};
+	const publishExamGrades = async () => {
+		if (!school?.id || !selected.examScheduleId || !selected.sectionId) return;
+		const res = await fetch(`/api/schools/${school.id}/academics/grades/publish/by-target`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ examScheduleId: selected.examScheduleId, sectionId: selected.sectionId }),
+		});
+		const out = await res.json().catch(()=>({}));
+		if (!res.ok) return toast.error(out.error || 'Failed to publish');
+		toast.success(`Published ${out.count || 0} grades`);
 	};
 
 	const availableSections = useMemo(() => sections, [sections]);
@@ -303,8 +315,7 @@ export default function TeacherExamGradesPage() {
 
 			<div className="flex gap-2">
 				<Button onClick={submitExamGrades} disabled={!selected.examScheduleId || !selected.sectionId}>Save Exam Grades</Button>
+				<Button variant="secondary" onClick={publishExamGrades} disabled={!selected.examScheduleId || !selected.sectionId}>Publish</Button>
 			</div>
 		</div>
 	);
-}
-

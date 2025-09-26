@@ -63,7 +63,7 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: 'Validation Error', issues: parsed.error.issues }, { status: 400 });
     }
 
-    const { academicYearId, schoolLevelId, classId, subjectId, examWeight, classworkWeight, assignmentWeight, isDefault, gradingScaleId } = parsed.data;
+  const { academicYearId, schoolLevelId, classId, subjectId, examWeight, classworkWeight, assignmentWeight, isDefault, gradingScaleId, overallRankingEnabled } = parsed.data;
 
     // validate referenced entities belong to this school
     const [year, level, klass, subject, scale] = await Promise.all([
@@ -92,6 +92,7 @@ export async function POST(request, { params }) {
         assignmentWeight,
         gradingScaleId: gradingScaleId ?? null,
         isDefault: Boolean(isDefault),
+        overallRankingEnabled: Boolean(overallRankingEnabled ?? false),
       },
     });
 

@@ -91,7 +91,7 @@ export async function POST(request, { params }) {
         });
         if (existing) {
           if (isAdmin) {
-            await tx.grade.update({ where: { id: existing.id }, data: { marksObtained } });
+            await tx.grade.update({ where: { id: existing.id }, data: { marksObtained, comments: g.comments ?? undefined } });
           } else {
             continue;
           }
@@ -106,6 +106,7 @@ export async function POST(request, { params }) {
               sectionId: effectiveSectionId ?? (assignment.sectionId || (assignment.class ? undefined : undefined)),
               assignmentId,
               marksObtained,
+              comments: g.comments ?? undefined,
             },
           });
         }
