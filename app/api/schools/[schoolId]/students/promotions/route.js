@@ -5,6 +5,9 @@ import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { promotionRequestSchema } from '@/validators/student.validators';
+import { getSchoolSetting } from '@/lib/schoolSettings';
+import { upsertSectionRankings } from '@/lib/analytics/grades';
+import { notifyParentsPromotionTransfer } from '@/lib/notify';
 
 export async function POST(request, { params }) {
   const session = await getServerSession(authOptions);
@@ -91,7 +94,7 @@ export async function POST(request, { params }) {
                 updatedAt: new Date()
               }
             });
-            out.push({ studentId: current.studentId, action: 'TRANSFERRED', updatedEnrollmentId: current.id });
+            out.push({ studentId: current.studentId, action: 'TRANSFERRED', updatedEnrollmentId: current.id, fromSectionId: current.sectionId, toSectionId: targetSectionId, academicYearId: current.academicYearId });
         } else {
           // Cross-year promotion: close current and create new
           await tx.studentEnrollment.update({ where: { id: current.id }, data: { isCurrent: false, status: 'Promoted', updatedAt: new Date() } });
@@ -106,11 +109,142 @@ export async function POST(request, { params }) {
               enrollmentDate: new Date(),
             }
           });
-          out.push({ studentId: current.studentId, newEnrollmentId: newEnroll.id, action: 'PROMOTED' });
+          out.push({ studentId: current.studentId, newEnrollmentId: newEnroll.id, action: 'PROMOTED', fromSectionId: current.sectionId, toSectionId: targetSectionId, academicYearId: targetAcademicYearId });
         }
       }
       return out;
     });
+
+    // --- Post-processing (fire-and-forget best-effort) ---
+    (async () => {
+      try {
+  // Settings
+        const notifyParents = await getSchoolSetting(schoolId, 'notifyParentsOnPromotion', true);
+        const autoAssignFees = await getSchoolSetting(schoolId, 'autoAssignFeesOnPromotion', true);
+
+        // Resolve target class and year (from targetSection)
+        const targetClassId = targetSection.class.id;
+        const targetYearId = targetAcademicYearId;
+
+        // Group processed by action for readability
+        const promotedIds = processed.filter(p => p.action === 'PROMOTED').map(p => p.studentId);
+        const transferredIds = processed.filter(p => p.action === 'TRANSFERRED').map(p => p.studentId);
+
+        // 1) Optional: auto-assign fee structures for target class in target year
+        if (autoAssignFees && promotedIds.length) {
+          try {
+            const feeStructures = await prisma.feeStructure.findMany({
+              where: { schoolId, academicYearId: targetYearId, classId: targetClassId },
+              select: { id: true },
+            });
+            if (feeStructures.length) {
+              await prisma.$transaction(async (tx) => {
+                for (const sid of promotedIds) {
+                  for (const fs of feeStructures) {
+                    const exists = await tx.studentFeeAssignment.findFirst({ where: { schoolId, studentId: sid, academicYearId: targetYearId, feeStructureId: fs.id } });
+                    if (!exists) {
+                      await tx.studentFeeAssignment.create({
+                        data: {
+                          schoolId,
+                          studentId: sid,
+                          academicYearId: targetYearId,
+                          feeStructureId: fs.id,
+                          classId: targetClassId,
+                          isActive: true,
+                        },
+                      });
+                    }
+                  }
+                }
+              });
+            }
+          } catch (e) {
+            console.warn('autoAssignFeesOnPromotion failed', e?.message || e);
+          }
+        }
+
+        // 2) For same-year transfers: migrate grade.sectionId and recompute rankings for current term
+        const transferOps = processed.filter(p => p.action === 'TRANSFERRED');
+        if (transferOps.length) {
+          try {
+            // Find current term for the (same) academic year
+            const ayId = transferOps[0].academicYearId;
+            const year = await prisma.academicYear.findFirst({ where: { id: ayId, schoolId }, include: { terms: true } });
+            if (year) {
+              const now = new Date();
+              const term = year.terms.find(t => new Date(t.startDate) <= now && now <= new Date(t.endDate)) || year.terms[0] || null;
+              if (term) {
+                // Batch update grades per student across fromSection -> toSection in this academic year
+                await prisma.$transaction(async (tx) => {
+                  for (const tr of transferOps) {
+                    await tx.grade.updateMany({
+                      where: { schoolId, studentId: tr.studentId, academicYearId: ayId, sectionId: tr.fromSectionId },
+                      data: { sectionId: tr.toSectionId },
+                    });
+                  }
+                });
+                // Recompute rankings for both old and new sections
+                const oldSections = [...new Set(transferOps.map(tr => tr.fromSectionId))];
+                const newSections = [...new Set(transferOps.map(tr => tr.toSectionId))];
+                for (const sid of oldSections) {
+                  await upsertSectionRankings({ schoolId, sectionId: sid, termId: term.id, academicYearId: ayId, publish: false });
+                }
+                for (const sid of newSections) {
+                  await upsertSectionRankings({ schoolId, sectionId: sid, termId: term.id, academicYearId: ayId, publish: false });
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('Grade migration / ranking recompute failed for transfers', e?.message || e);
+          }
+        }
+
+        // 3) Notify parents (announcement + email/push)
+        if (notifyParents && (promotedIds.length || transferredIds.length)) {
+          const studentIds = [...new Set([...promotedIds, ...transferredIds])];
+          const students = await prisma.student.findMany({
+            where: { id: { in: studentIds }, schoolId },
+            select: { id: true, firstName: true, lastName: true },
+          });
+          const links = await prisma.parentStudent.findMany({ where: { studentId: { in: studentIds } }, select: { parentId: true, studentId: true } });
+          const parentIds = [...new Set(links.map(l => l.parentId))];
+          const parents = parentIds.length ? await prisma.parent.findMany({ where: { id: { in: parentIds }, schoolId }, select: { id: true, user: { select: { id: true, email: true, firstName: true, lastName: true } } } }) : [];
+
+          const now = new Date();
+          // Create a general announcement for the group
+          try {
+            const announcement = await prisma.announcement.create({
+              data: {
+                title: promotedIds.length && transferredIds.length
+                  ? 'Promotions and Transfers'
+                  : promotedIds.length
+                    ? 'Student Promotion'
+                    : 'Student Transfer',
+                content: 'Student placement has been updated by the school. You may review the changes in the app.',
+                publishedAt: now,
+                isGlobal: false,
+                audience: { roles: ['PARENT'] },
+                schoolId,
+                authorId: session.user.id,
+              },
+            });
+
+            await notifyParentsPromotionTransfer({
+              schoolId,
+              students,
+              parents,
+              promotedIds,
+              transferredIds,
+              announcement,
+            });
+          } catch (e) {
+            console.warn('Parent promotion/transfer announcement failed', e?.message || e);
+          }
+        }
+      } catch (e) {
+        console.warn('Promotions post-processing failed', e?.message || e);
+      }
+    })();
 
     return NextResponse.json({ success: true, processed, skipped: results.filter(r=> r.status==='SKIPPED') }, { status: 200 });
   } catch (error) {
