@@ -1,5 +1,5 @@
-name: parent_app
-description: Flutter app for parents to view children and grades for sukuu1
+name: sukuu_parent
+description: Sukuu Parent - A school app for parents to view their children's info and grades
 publish_to: 'none'
 version: 0.1.0+1
 
@@ -18,10 +18,18 @@ dependencies:
   fl_chart: ^0.66.0
   path_provider: ^2.1.4
 
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.2
+  flutter_launcher_icons: ^0.13.1
+
 
 flutter:
   uses-material-design: true
+
+flutter_icons:
+  android: true
+  ios: false
+  image_path: "school_icon.png"

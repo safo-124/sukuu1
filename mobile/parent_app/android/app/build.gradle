@@ -5,6 +5,8 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+import java.io.FileInputStream
+
 def localProperties = new Properties()
 def localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
@@ -24,7 +26,8 @@ if (flutterVersionName == null) {
 }
 
 android {
-    namespace = "com.example.parent_app"
+    // Use a unique package/namespace for Play Store
+    namespace = "com.sukuu.parent"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -34,8 +37,8 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.parent_app"
+        // Unique Application ID (shown on Play Store)
+        applicationId = "com.sukuu.parent"
         // You can update the following values to match your application needs.
         // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
         minSdk = flutter.minSdkVersion
@@ -44,11 +47,31 @@ android {
         versionName = flutterVersionName
     }
 
+    // Signing configuration (reads from android/key.properties)
+    def keystorePropertiesFile = rootProject.file("key.properties")
+    def keystoreProperties = new Properties()
+    if (keystorePropertiesFile.exists()) {
+        keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+    }
+
+    signingConfigs {
+        release {
+            if (!keystoreProperties.isEmpty()) {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.debug
+            // Use release signing config when available, otherwise fall back to debug for local runs
+            signingConfig keystoreProperties.isEmpty() ? signingConfigs.debug : signingConfigs.release
+            minifyEnabled false
+            shrinkResources false
+            // You can enable R8/proguard later if needed
         }
     }
 }
