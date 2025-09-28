@@ -6,5 +6,5 @@
 /// same Wi‑Fi can reach your dev server without adb reverse.
 const String kDefaultApiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'http://192.168.1.55:3000',
+  defaultValue: 'https://sukuu1.vercel.app',
 );
