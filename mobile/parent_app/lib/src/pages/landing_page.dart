@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'main_tabs_page.dart';
 import 'login_page.dart';
+import '../ui/enhanced_components.dart';
 
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
@@ -52,46 +53,41 @@ class _LandingPageState extends State<LandingPage> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Animated gradient background
-          TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0, end: 1),
-            duration: const Duration(seconds: 2),
-            curve: Curves.easeInOut,
-            builder: (context, value, child) {
-              return Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      const Color(0xFFEEF2FF),
-                      Color.lerp(const Color(0xFFE0E7FF),
-                          const Color(0xFFDBEAFE), value)!,
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-              );
-            },
-          ),
+      body: AnimatedGradientBackground(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Floating particles
+            Positioned.fill(
+              child: FloatingParticles(
+                numberOfParticles: 40,
+                particleColor: Theme.of(context).primaryColor,
+                maxParticleSize: 3.0,
+              ),
+            ),
 
-          // Decorative blobs
-          Positioned(
-            top: -size.width * 0.2,
-            left: -size.width * 0.1,
-            child: _BlobCircle(
-                diameter: size.width * 0.6,
-                colors: const [Color(0xFF6366F1), Color(0xFF818CF8)]),
-          ),
-          Positioned(
-            bottom: -size.width * 0.15,
-            right: -size.width * 0.2,
-            child: _BlobCircle(
-                diameter: size.width * 0.7,
-                colors: const [Color(0xFF22C55E), Color(0xFF86EFAC)]),
-          ),
+            // Decorative blobs
+            Positioned(
+              top: -size.width * 0.3,
+              left: -size.width * 0.2,
+              child: _EnhancedBlobCircle(
+                  diameter: size.width * 0.8,
+                  colors: const [Color(0xFF6366F1), Color(0xFF818CF8)]),
+            ),
+            Positioned(
+              bottom: -size.width * 0.2,
+              right: -size.width * 0.3,
+              child: _EnhancedBlobCircle(
+                  diameter: size.width * 0.9,
+                  colors: const [Color(0xFF10B981), Color(0xFF34D399)]),
+            ),
+            Positioned(
+              top: size.height * 0.1,
+              right: -size.width * 0.1,
+              child: _EnhancedBlobCircle(
+                  diameter: size.width * 0.4,
+                  colors: const [Color(0xFF06B6D4), Color(0xFF22D3EE)]),
+            ),
 
           // Content
           SafeArea(
@@ -177,35 +173,94 @@ class _LandingPageState extends State<LandingPage> {
               ),
             ),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-class _BlobCircle extends StatelessWidget {
+class _EnhancedBlobCircle extends StatefulWidget {
   final double diameter;
   final List<Color> colors;
 
-  const _BlobCircle({required this.diameter, required this.colors});
+  const _EnhancedBlobCircle({
+    required this.diameter,
+    required this.colors,
+  });
+
+  @override
+  _EnhancedBlobCircleState createState() => _EnhancedBlobCircleState();
+}
+
+class _EnhancedBlobCircleState extends State<_EnhancedBlobCircle>
+    with TickerProviderStateMixin {
+  late AnimationController _rotationController;
+  late AnimationController _pulseController;
+
+  @override
+  void initState() {
+    super.initState();
+    _rotationController = AnimationController(
+      duration: const Duration(seconds: 20),
+      vsync: this,
+    )..repeat();
+    _pulseController = AnimationController(
+      duration: const Duration(seconds: 3),
+      vsync: this,
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _rotationController.dispose();
+    _pulseController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return IgnorePointer(
       ignoring: true,
-      child: Container(
-        width: diameter,
-        height: diameter,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: [
-              colors.first.withOpacity(0.18),
-              colors.last.withOpacity(0.10),
-              Colors.transparent,
-            ],
-          ),
-        ),
+      child: AnimatedBuilder(
+        animation: Listenable.merge([_rotationController, _pulseController]),
+        builder: (context, child) {
+          return Transform.rotate(
+            angle: _rotationController.value * 2 * 3.14159,
+            child: Transform.scale(
+              scale: 1.0 + (_pulseController.value * 0.1),
+              child: Container(
+                width: widget.diameter,
+                height: widget.diameter,
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    colors: [
+                      widget.colors[0].withOpacity(0.25),
+                      widget.colors[1].withOpacity(0.15),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 0.7, 1.0],
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          widget.colors[0].withOpacity(0.2),
+                          widget.colors[1].withOpacity(0.05),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

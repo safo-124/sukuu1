@@ -12,6 +12,7 @@ import 'fees_page.dart';
 import 'profile_page.dart'; // used for AppBar actions navigation
 import 'promotions_page.dart';
 import '../ui/glass.dart';
+import '../ui/enhanced_components.dart';
 
 class _PlaceholderPage extends StatelessWidget {
   final String title;
@@ -82,40 +83,67 @@ class _MainTabsPageState extends State<MainTabsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white, // Clean white background
       body: IndexedStack(index: _currentIndex, children: _pages),
-      bottomNavigationBar: GlassBottomBar(
-        child: Theme(
-          data: Theme.of(context).copyWith(
-            navigationBarTheme: Theme.of(context).navigationBarTheme.copyWith(
-                  backgroundColor: Colors.transparent,
-                  surfaceTintColor: Colors.transparent,
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              spreadRadius: 1,
+              blurRadius: 8,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildNavItem(Icons.home, 'Home', 0),
+                _buildNavItem(Icons.chat_bubble_outline, 'Chat', 1), 
+                _buildNavItem(Icons.location_on_outlined, 'Location', 2),
+                _buildNavItem(Icons.person_outline, 'Profile', 3),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(IconData icon, String label, int index) {
+    final isSelected = _currentIndex == index;
+    return GestureDetector(
+      onTap: () => setState(() => _currentIndex = index),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.blue : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? Colors.white : Colors.grey,
+              size: 24,
+            ),
+            if (isSelected) ...[
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
                 ),
-          ),
-          child: NavigationBar(
-            selectedIndex: _currentIndex,
-            onDestinationSelected: (i) => setState(() => _currentIndex = i),
-            labelBehavior: (Theme.of(context).platform == TargetPlatform.iOS)
-                ? NavigationDestinationLabelBehavior.alwaysHide
-                : NavigationDestinationLabelBehavior.onlyShowSelected,
-            destinations: [
-              const NavigationDestination(
-                  icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(Icons.home),
-                  label: 'Home'),
-              NavigationDestination(
-                  icon: _badgeIcon(Icons.mail_outline, _unread),
-                  selectedIcon: _badgeIcon(Icons.mail, _unread),
-                  label: 'Messages'),
-              const NavigationDestination(
-                  icon: Icon(Icons.receipt_long_outlined),
-                  selectedIcon: Icon(Icons.receipt_long),
-                  label: 'Fees'),
-              const NavigationDestination(
-                  icon: Icon(Icons.more_horiz),
-                  selectedIcon: Icon(Icons.more_horiz),
-                  label: 'More'),
+              ),
             ],
-          ),
+          ],
         ),
       ),
     );

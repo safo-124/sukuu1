@@ -42,6 +42,10 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> _recentRemarks = [];
   int _pendingExplanations =
       0; // number of attendance items requesting explanation
+  // Full attendance list for calendar markers
+  List<Map<String, dynamic>> _attendanceAll = [];
+  // Calendar anchor month (first day of month)
+  DateTime _calendarMonth = DateTime(DateTime.now().year, DateTime.now().month, 1);
 
   // Promotion summary state
   Map<String, dynamic>? _latestPromotion;
@@ -148,14 +152,27 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _loadAttendance() async {
     if (_selectedChild == null) {
-      setState(() => _recentAttendance = []);
+      setState(() {
+        _recentAttendance = [];
+        _attendanceAll = [];
+      });
       return;
     }
     setState(() => _loadingAttendance = true);
     try {
+      // Build from/to for current calendar month window
+      final ym = _calendarMonth;
+      final from = DateTime(ym.year, ym.month, 1);
+      final to = DateTime(ym.year, ym.month + 1, 0);
+      final fromStr = DateFormat('yyyy-MM-dd').format(from);
+      final toStr = DateFormat('yyyy-MM-dd').format(to);
+      final url = Uri.parse('$_baseUrl/api/schools/$_schoolId/parents/me/children/attendance')
+          .replace(queryParameters: {
+        'from': fromStr,
+        'to': toStr,
+      });
       final res = await http.get(
-        Uri.parse(
-            '$_baseUrl/api/schools/$_schoolId/parents/me/children/attendance'),
+        url,
         headers: {
           'Authorization': 'Bearer $_token',
           'Accept': 'application/json'
@@ -183,6 +200,8 @@ class _HomePageState extends State<HomePage> {
         return db.compareTo(da);
       });
       setState(() {
+        _attendanceAll = att;
+        // Keep recent list for card and Recent section (latest 5 by date)
         _recentAttendance = att.take(5).toList();
         _pendingExplanations = att
             .where((e) =>
@@ -289,6 +308,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final df = DateFormat('EEE, MMM d');
     return Scaffold(
+      backgroundColor: Colors.white, // Clean white background
       appBar: AppBar(
         flexibleSpace: const GlassAppBarFlex(),
         title: Text(_schoolName?.isNotEmpty == true ? _schoolName! : 'Home'),
@@ -355,74 +375,85 @@ class _HomePageState extends State<HomePage> {
                   child: ListView(
                     padding: EdgeInsets.zero,
                     children: [
-                      // Hero header with gradient + glass overlay
+                      // Clean header + search (light style)
                       Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Color(0xFF3F51B5), Color(0xFF673AB7)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                        ),
-                        child: GlassContainer(
-                          opacity: 0.18,
-                          border: Border.all(color: Colors.white24, width: 0.6),
-                          padding: const EdgeInsets.fromLTRB(16, 24, 16, 20),
-                          borderRadius: BorderRadius.zero,
-                          child: SafeArea(
-                            bottom: false,
-                            child: Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 28,
-                                  backgroundColor:
-                                      Colors.white.withOpacity(0.2),
-                                  backgroundImage: (_schoolLogoUrl != null &&
-                                          _schoolLogoUrl!.isNotEmpty)
-                                      ? NetworkImage(_schoolLogoUrl!)
-                                      : null,
-                                  child: (_schoolLogoUrl == null ||
-                                          _schoolLogoUrl!.isEmpty)
-                                      ? const Icon(Icons.school,
-                                          color: Colors.white)
-                                      : null,
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        _schoolName?.isNotEmpty == true
-                                            ? _schoolName!
-                                            : 'Welcome',
-                                        style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.w700),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'Hello, ${_parentName ?? 'Parent'}',
-                                        style: TextStyle(
-                                            color:
-                                                Colors.white.withOpacity(0.9)),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
+                        color: Colors.white,
+                        padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
+                        child: SafeArea(
+                          bottom: false,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Good Morning',
+                                          style: TextStyle(
+                                            color: Colors.grey[600],
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          _parentName?.isNotEmpty == true ? _parentName! : 'Parent',
+                                          style: const TextStyle(
+                                            fontSize: 26,
+                                            fontWeight: FontWeight.w800,
+                                            color: Color(0xFF0F172A),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
+                                  // Right-side icons (notification + avatar)
+                                  IconButton(
+                                    onPressed: (){},
+                                    icon: const Icon(Icons.notifications_none),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  CircleAvatar(
+                                    radius: 18,
+                                    backgroundImage: (_schoolLogoUrl != null && _schoolLogoUrl!.isNotEmpty)
+                                        ? NetworkImage(_schoolLogoUrl!)
+                                        : null,
+                                    child: (_schoolLogoUrl == null || _schoolLogoUrl!.isEmpty)
+                                        ? const Icon(Icons.person_outline)
+                                        : null,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              // Search bar
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF3F4F6),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: const Color(0xFFE5E7EB)),
                                 ),
-                              ],
-                            ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.search, color: Colors.grey[600]),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        'Search any thing',
+                                        style: TextStyle(color: Colors.grey[600], fontSize: 15),
+                                      ),
+                                    ),
+                                    Icon(Icons.mic_none, color: Colors.grey[600]),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-
-                      const SizedBox(height: 12),
 
                       // Promotion summary card
                       if (_loadingPromotion)
@@ -520,144 +551,150 @@ class _HomePageState extends State<HomePage> {
 
                       const SizedBox(height: 16),
 
-                      // Quick Actions in glass tiles
+                      // Icon grid (8 items) like the reference design
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Column(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: GridView.count(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          crossAxisCount: 4,
+                          crossAxisSpacing: 14,
+                          mainAxisSpacing: 18,
                           children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: GlassContainer(
-                                    padding: EdgeInsets.zero,
-                                    child: _QuickActionCard(
-                                      color: Colors.indigo,
-                                      icon: Icons.leaderboard_outlined,
-                                      title: 'Grades',
-                                      onTap: _selectedChild == null
-                                          ? null
-                                          : () {
-                                              final name =
-                                                  '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
-                                                      .trim();
-                                              Navigator.of(context).push(
-                                                MaterialPageRoute(
-                                                  builder: (_) => GradesPage(
-                                                    studentId:
-                                                        _selectedChild!['id']
-                                                            .toString(),
-                                                    studentName: name.isEmpty
-                                                        ? 'Student'
-                                                        : name,
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: GlassContainer(
-                                    padding: EdgeInsets.zero,
-                                    child: _QuickActionCard(
-                                      color: Colors.teal,
-                                      icon: Icons.calendar_month_outlined,
-                                      title: 'Attendance',
-                                      badgeCount: _pendingExplanations > 0
-                                          ? _pendingExplanations
-                                          : null,
-                                      onTap: _selectedChild == null
-                                          ? null
-                                          : () {
-                                              final name =
-                                                  '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
-                                                      .trim();
-                                              Navigator.of(context).push(
-                                                MaterialPageRoute(
-                                                  builder: (_) =>
-                                                      AttendancePage(
-                                                    studentId:
-                                                        _selectedChild!['id']
-                                                            .toString(),
-                                                    studentName: name.isEmpty
-                                                        ? 'Student'
-                                                        : name,
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            _menuIcon(
+                              title: 'Attendance',
+                              icon: Icons.menu_book_outlined,
+                              color: Colors.blue,
+                              onTap: () => _openAttendance(),
+                              selected: true,
                             ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: GlassContainer(
-                                    padding: EdgeInsets.zero,
-                                    child: _QuickActionCard(
-                                      color: Colors.deepOrange,
-                                      icon: Icons.chat_bubble_outline,
-                                      title: 'Remarks',
-                                      onTap: _selectedChild == null
-                                          ? null
-                                          : () {
-                                              final name =
-                                                  '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
-                                                      .trim();
-                                              Navigator.of(context).push(
-                                                MaterialPageRoute(
-                                                  builder: (_) => RemarksPage(
-                                                    studentId:
-                                                        _selectedChild!['id']
-                                                            .toString(),
-                                                    studentName: name.isEmpty
-                                                        ? 'Student'
-                                                        : name,
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: GlassContainer(
-                                    padding: EdgeInsets.zero,
-                                    child: _QuickActionCard(
-                                      color: Colors.deepPurple,
-                                      icon: Icons.schedule,
-                                      title: 'Timetable',
-                                      onTap: _selectedChild == null
-                                          ? null
-                                          : () {
-                                              final name =
-                                                  '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
-                                                      .trim();
-                                              Navigator.of(context).push(
-                                                MaterialPageRoute(
-                                                  builder: (_) => TimetablePage(
-                                                    studentId:
-                                                        _selectedChild!['id']
-                                                            .toString(),
-                                                    studentName: name.isEmpty
-                                                        ? 'Student'
-                                                        : name,
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            _menuIcon(
+                              title: 'Classes',
+                              icon: Icons.class_outlined,
+                              color: Colors.green,
+                              onTap: () => _openTimetable(),
+                            ),
+                            _menuIcon(
+                              title: 'Circular',
+                              icon: Icons.campaign_outlined,
+                              color: Colors.orange,
+                              onTap: () => _comingSoon('Circular'),
+                            ),
+                            _menuIcon(
+                              title: 'Result',
+                              icon: Icons.assessment_outlined,
+                              color: Colors.purple,
+                              onTap: () => _openGrades(),
+                            ),
+                            _menuIcon(
+                              title: 'Behavior',
+                              icon: Icons.emoji_emotions_outlined,
+                              color: Colors.teal,
+                              onTap: () => _comingSoon('Behavior'),
+                            ),
+                            _menuIcon(
+                              title: 'Fees',
+                              icon: Icons.account_balance_wallet_outlined,
+                              color: Colors.red,
+                              onTap: () => _comingSoon('Fees'),
+                            ),
+                            _menuIcon(
+                              title: 'Library',
+                              icon: Icons.local_library_outlined,
+                              color: Colors.indigo,
+                              onTap: () => _comingSoon('Library'),
+                            ),
+                            _menuIcon(
+                              title: 'Meeting',
+                              icon: Icons.video_call_outlined,
+                              color: Colors.pink,
+                              onTap: () => _comingSoon('Meeting'),
                             ),
                           ],
                         ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Attendance section (title + action)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'Attendance',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: _openAttendance,
+                              child: const Text('Detailed view >'),
+                            )
+                          ],
+                        ),
+                      ),
+
+                      // Today Attendance card
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFFE5E7EB)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Today Attendance',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _todayCheckInText(),
+                                    style: TextStyle(color: Colors.grey[600]),
+                                  ),
+                                ],
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: _todayStatusColor().withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: _todayStatusColor()),
+                                ),
+                                child: Text(
+                                  _todayStatusText(),
+                                  style: TextStyle(
+                                    color: _todayStatusColor(),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // Simple Calendar
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: _simpleCalendar(_calendarMonth),
                       ),
 
                       const SizedBox(height: 20),
@@ -1001,6 +1038,364 @@ class _HomePageState extends State<HomePage> {
           BoxDecoration(color: color, borderRadius: BorderRadius.circular(999)),
       child: Text(label,
           style: const TextStyle(color: Colors.white, fontSize: 12)),
+    );
+  }
+
+  // New UI helpers
+  Widget _menuIcon({
+    required String title,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+    bool selected = false,
+  }) {
+    final bg = color.withOpacity(0.08);
+    return InkWell(
+      onTap: _selectedChild == null ? null : onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: color.withOpacity(0.15)),
+            ),
+            child: Icon(icon, color: color),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: _selectedChild == null
+                  ? Colors.grey
+                  : const Color(0xFF0F172A),
+            ),
+          ),
+          if (selected) ...[
+            const SizedBox(height: 6),
+            Container(
+              width: 20,
+              height: 5,
+              decoration: BoxDecoration(
+                color: Colors.blue,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _openGrades() {
+    if (_selectedChild == null) return;
+    final name =
+        '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
+            .trim();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => GradesPage(
+          studentId: _selectedChild!['id'].toString(),
+          studentName: name.isEmpty ? 'Student' : name,
+        ),
+      ),
+    );
+  }
+
+  void _openAttendance() {
+    if (_selectedChild == null) return;
+    final name =
+        '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
+            .trim();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AttendancePage(
+          studentId: _selectedChild!['id'].toString(),
+          studentName: name.isEmpty ? 'Student' : name,
+        ),
+      ),
+    );
+  }
+
+  void _openTimetable() {
+    if (_selectedChild == null) return;
+    final name =
+        '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'
+            .trim();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TimetablePage(
+          studentId: _selectedChild!['id'].toString(),
+          studentName: name.isEmpty ? 'Student' : name,
+        ),
+      ),
+    );
+  }
+
+  void _comingSoon(String feature) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$feature is coming soon')),
+    );
+  }
+
+  String _todayCheckInText() {
+    // Find today's attendance for the selected child
+    if (_recentAttendance.isEmpty) return 'No record for today';
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    Map<String, dynamic>? todayEntry;
+    for (final a in _recentAttendance) {
+      final ds = a['date']?.toString();
+      if (ds == null) continue;
+      final d = DateTime.tryParse(ds);
+      if (d == null) continue;
+      final dd = DateTime(d.year, d.month, d.day);
+      if (dd == today) {
+        todayEntry = a;
+        break;
+      }
+    }
+    if (todayEntry == null) return 'No record for today';
+    final checkIn = todayEntry['checkInTime'] ?? todayEntry['checkIn'] ?? todayEntry['in'];
+    if (checkIn is String && checkIn.isNotEmpty) {
+      return 'Check in: $checkIn';
+    }
+    return 'Check in: —';
+  }
+
+  String _todayStatusText() {
+    if (_recentAttendance.isEmpty) return '—';
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    for (final a in _recentAttendance) {
+      final ds = a['date']?.toString();
+      if (ds == null) continue;
+      final d = DateTime.tryParse(ds);
+      if (d == null) continue;
+      final dd = DateTime(d.year, d.month, d.day);
+      if (dd == today) {
+        final s = (a['status']?.toString() ?? '').toUpperCase();
+        switch (s) {
+          case 'PRESENT':
+            return 'Present';
+          case 'ABSENT':
+            return 'Absent';
+          case 'LATE':
+            return 'Late';
+          case 'EXCUSED':
+            return 'Excused';
+          default:
+            return '—';
+        }
+      }
+    }
+    return '—';
+  }
+
+  Color _todayStatusColor() {
+    final s = _todayStatusText();
+    return _statusColor(s);
+  }
+
+  String _dayStatus(DateTime date) {
+    // Return PRESENT, ABSENT, LATE, EXCUSED or '' if none for that date
+    for (final a in _attendanceAll) {
+      final ds = a['date']?.toString();
+      if (ds == null) continue;
+      final d = DateTime.tryParse(ds);
+      if (d == null) continue;
+      if (d.year == date.year && d.month == date.month && d.day == date.day) {
+        return (a['status']?.toString() ?? '').toUpperCase();
+      }
+    }
+    return '';
+  }
+
+  Color _statusDotColor(String status) {
+    switch (status) {
+      case 'PRESENT':
+        return Colors.green;
+      case 'ABSENT':
+        return Colors.red;
+      case 'LATE':
+        return Colors.orange;
+      case 'EXCUSED':
+        return Colors.blueGrey;
+      default:
+        return Colors.transparent;
+    }
+  }
+
+  Widget _simpleCalendar(DateTime anchorMonth) {
+    final year = anchorMonth.year;
+    final month = anchorMonth.month;
+    final first = DateTime(year, month, 1);
+    final nextMonth = DateTime(year, month + 1, 1);
+    final lastDay = nextMonth.subtract(const Duration(days: 1)).day;
+    final firstWeekday = first.weekday; // 1=Mon .. 7=Sun
+
+    // Weekday labels Mon..Sun
+    const weekNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+    final cells = <Widget>[];
+    // Leading blanks (firstWeekday-1)
+    for (int i = 0; i < firstWeekday - 1; i++) {
+      cells.add(const SizedBox());
+    }
+    final today = DateTime.now();
+    for (int day = 1; day <= lastDay; day++) {
+      final date = DateTime(year, month, day);
+      final isToday = today.year == year && today.month == month && today.day == day;
+      final wd = date.weekday; // 6=Sat,7=Sun
+      final isWeekend = wd == 6 || wd == 7;
+      final textColor = isToday
+          ? Colors.white
+          : isWeekend
+              ? Colors.grey[500]
+              : const Color(0xFF0F172A);
+      final bgColor = isToday ? Colors.blue : Colors.transparent;
+      final status = _dayStatus(date);
+      final dotColor = _statusDotColor(status);
+      cells.add(
+        Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '$day',
+                  style: TextStyle(fontWeight: FontWeight.w600, color: textColor),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: dotColor,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              DateFormat('MMMM yyyy').format(anchorMonth),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+            Row(
+              children: [
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _calendarMonth = DateTime(
+                        anchorMonth.year,
+                        anchorMonth.month - 1,
+                        1,
+                      );
+                    });
+                    // Refresh attendance for the new month
+                    _loadAttendance();
+                  },
+                  icon: const Icon(Icons.chevron_left, color: Colors.grey),
+                ),
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _calendarMonth = DateTime(
+                        anchorMonth.year,
+                        anchorMonth.month + 1,
+                        1,
+                      );
+                    });
+                    // Refresh attendance for the new month
+                    _loadAttendance();
+                  },
+                  icon: const Icon(Icons.chevron_right, color: Colors.grey),
+                ),
+              ],
+            )
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: weekNames
+              .map((w) => Expanded(
+                    child: Center(
+                      child: Text(
+                        w,
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFF6B7280)),
+                      ),
+                    ),
+                  ))
+              .toList(),
+        ),
+        const SizedBox(height: 8),
+        GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 7,
+          children: [
+            ...List.generate(firstWeekday - 1, (_) => const SizedBox()),
+            ...cells,
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            _legendDot(Colors.green, 'Present'),
+            const SizedBox(width: 12),
+            _legendDot(Colors.red, 'Absent'),
+            const SizedBox(width: 12),
+            _legendDot(Colors.orange, 'Late'),
+            const SizedBox(width: 12),
+            _legendDot(Colors.blueGrey, 'Excused'),
+          ],
+        )
+      ],
+    );
+  }
+
+  Widget _legendDot(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(999),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
+      ],
     );
   }
 }

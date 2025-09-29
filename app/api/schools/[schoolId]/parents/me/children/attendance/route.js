@@ -11,6 +11,9 @@ export async function GET(request, { params }) {
     const session = await getApiSession(request);
     const p = await params;
     const schoolId = p?.schoolId?.toString();
+    const { searchParams } = new URL(request.url || '');
+    const fromParam = searchParams.get('from'); // YYYY-MM-DD
+    const toParam = searchParams.get('to');     // YYYY-MM-DD
 
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (session.user.role !== 'PARENT') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -48,14 +51,26 @@ export async function GET(request, { params }) {
       return NextResponse.json({ children: emptyChildren });
     }
 
-    // Fetch recent attendance for those enrollments (limit last 30 by date)
+    // Optionally filter by date range if provided
+    let dateFilter = undefined;
+    if (fromParam || toParam) {
+      const gte = fromParam ? new Date(`${fromParam}T00:00:00.000Z`) : undefined;
+      const lte = toParam ? new Date(`${toParam}T23:59:59.999Z`) : undefined;
+      dateFilter = { gte, lte };
+    }
+
+    // Fetch attendance (date range if provided, else recent with cap)
     const attendance = await prisma.attendance.findMany({
-      where: { studentEnrollmentId: { in: enrollmentIds }, schoolId },
+      where: {
+        studentEnrollmentId: { in: enrollmentIds },
+        schoolId,
+        ...(dateFilter ? { date: dateFilter } : {}),
+      },
       select: { id: true, studentEnrollmentId: true, date: true, status: true, remarks: true, sectionId: true,
         absenceExplanations: { select: { id: true, status: true, requestNote: true, responseText: true, createdAt: true, updatedAt: true }, orderBy: { createdAt: 'desc' }, take: 1 }
       },
       orderBy: { date: 'desc' },
-      take: 300, // approx 10 per child if 30 children, adjust as needed
+      ...(dateFilter ? {} : { take: 300 }), // limit only when not filtering by range
     });
 
     // Map enrollmentId -> studentId
