@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class MeetingsPage extends StatefulWidget {
   final bool showTitle;
@@ -57,6 +58,25 @@ class _MeetingsPageState extends State<MeetingsPage> {
       setState(() => _error = e.toString());
     } finally {
       setState(() => _loading = false);
+    }
+  }
+
+  Uri? _extractFirstUrl(String text) {
+    final match = RegExp(r'(https?:\/\/[^\s]+)').firstMatch(text);
+    if (match != null) {
+      final url = match.group(0)!;
+      return Uri.tryParse(url);
+    }
+    return null;
+  }
+
+  Future<void> _openUrl(Uri url) async {
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unable to open link')));
+      }
     }
   }
 
@@ -119,6 +139,8 @@ class _MeetingsPageState extends State<MeetingsPage> {
   }
 
   void _showEventDetails(Map<String, dynamic> e, DateTime? start, DateTime? end) {
+    final desc = (e['description']?.toString() ?? '');
+    final joinUrl = _extractFirstUrl(desc);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -134,7 +156,18 @@ class _MeetingsPageState extends State<MeetingsPage> {
             if (end != null) Text('Ends: ${_dtf.format(end)}'),
             if ((e['location']?.toString() ?? '').isNotEmpty) Text('Location: ${e['location']}'),
             const Divider(height: 20),
-            if ((e['description']?.toString() ?? '').isNotEmpty) Text(e['description'].toString()),
+            if (desc.isNotEmpty) Text(desc),
+            if (joinUrl != null) ...[
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton.icon(
+                  icon: const Icon(Icons.link),
+                  label: const Text('Join'),
+                  onPressed: () => _openUrl(joinUrl),
+                ),
+              ),
+            ],
           ],
         ),
       ),

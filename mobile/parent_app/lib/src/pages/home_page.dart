@@ -54,6 +54,9 @@ class _HomePageState extends State<HomePage> {
   // Promotion summary state
   Map<String, dynamic>? _latestPromotion;
   bool _loadingPromotion = false;
+  // Next meeting/event
+  Map<String, dynamic>? _nextEvent;
+  bool _loadingNextEvent = false;
 
   @override
   void initState() {
@@ -94,6 +97,7 @@ class _HomePageState extends State<HomePage> {
       if (_children.isNotEmpty) _selectedChild = _children.first;
 
       await _loadLatestPromotion();
+  await _loadNextEvent();
       await _loadGrades();
       await _loadAttendance();
       await _loadRemarks();
@@ -103,6 +107,34 @@ class _HomePageState extends State<HomePage> {
       setState(() {
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _loadNextEvent() async {
+    setState(() => _loadingNextEvent = true);
+    try {
+      if (_baseUrl == null || _token == null || _schoolId == null) return;
+      final url = Uri.parse(
+        '$_baseUrl/api/schools/$_schoolId/parents/me/events',
+      ).replace(queryParameters: {
+        'upcoming': 'true',
+        'limit': '1',
+      });
+      final res = await http.get(url, headers: {
+        'Authorization': 'Bearer $_token',
+        'Accept': 'application/json',
+      });
+      if (res.statusCode == 200) {
+        final json = jsonDecode(res.body) as Map<String, dynamic>;
+        final events = (json['events'] as List? ?? []).cast<Map<String, dynamic>>();
+        setState(() => _nextEvent = events.isNotEmpty ? events.first : null);
+      } else {
+        setState(() => _nextEvent = null);
+      }
+    } catch (_) {
+      setState(() => _nextEvent = null);
+    } finally {
+      setState(() => _loadingNextEvent = false);
     }
   }
 
@@ -529,6 +561,85 @@ class _HomePageState extends State<HomePage> {
                                   ),
                           ),
                         ),
+
+                      // Upcoming meeting mini-card
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: GlassContainer(
+                          padding: const EdgeInsets.all(16),
+                          child: _loadingNextEvent
+                              ? const SizedBox(
+                                  height: 20,
+                                  child: Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    ),
+                                  ),
+                                )
+                              : (_nextEvent == null)
+                                  ? Row(
+                                      children: [
+                                        Icon(Icons.event_available, color: Colors.grey.shade600),
+                                        const SizedBox(width: 12),
+                                        const Expanded(
+                                          child: Text('No upcoming meetings',
+                                              style: TextStyle(color: Colors.black54)),
+                                        ),
+                                        TextButton(
+                                          onPressed: _openMeetings,
+                                          child: const Text('View all'),
+                                        )
+                                      ],
+                                    )
+                                  : Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.pink.withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          child: const Icon(Icons.video_call_outlined, color: Colors.pink),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(_nextEvent!['title']?.toString() ?? 'Meeting',
+                                                  style: const TextStyle(fontWeight: FontWeight.w700)),
+                                              const SizedBox(height: 4),
+                                              Builder(builder: (context) {
+                                                final s = _nextEvent!['startDate']?.toString();
+                                                final e = _nextEvent!['endDate']?.toString();
+                                                final start = s != null ? DateTime.tryParse(s) : null;
+                                                final end = e != null ? DateTime.tryParse(e) : null;
+                                                final dfEvent = DateFormat('EEE, MMM d • h:mm a');
+                                                final when = start != null ? dfEvent.format(start) : '';
+                                                final whenEnd = end != null ? dfEvent.format(end) : '';
+                                                final loc = _nextEvent!['location']?.toString() ?? '';
+                                                return Text([
+                                                  if (when.isNotEmpty) when,
+                                                  if (whenEnd.isNotEmpty) 'to $whenEnd',
+                                                  if (loc.isNotEmpty) '• $loc',
+                                                ].join('  '), style: const TextStyle(color: Colors.black54));
+                                              }),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        TextButton(
+                                          onPressed: _openMeetings,
+                                          child: const Text('View all'),
+                                        )
+                                      ],
+                                    ),
+                        ),
+                      ),
                       // Child selector in glass card
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),

@@ -9,8 +9,7 @@ import { getApiSession } from '@/lib/apiAuth';
 export async function GET(request, { params }) {
     try {
         const session = await getApiSession(request);
-        const p = await params;
-        const schoolId = p?.schoolId?.toString();
+        const schoolId = params?.schoolId?.toString();
         const { searchParams } = new URL(request.url || '');
         const fromParam = searchParams.get('from'); // YYYY-MM-DD
         const toParam = searchParams.get('to'); // YYYY-MM-DD

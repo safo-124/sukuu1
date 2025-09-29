@@ -99,12 +99,12 @@ class _MainTabsPageState extends State<MainTabsPage> {
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildNavItem(Icons.home, 'Home', 0),
-                _buildNavItem(Icons.markunread_chat_alt_outlined, 'Messages', 1, badge: _unread),
+                _buildNavItem(Icons.chat_bubble_outline, 'Messages', 1, badge: _unread),
                 _buildNavItem(Icons.payments_outlined, 'Fees', 2),
                 _buildNavItem(Icons.apps_outlined, 'More', 3),
               ],
@@ -149,7 +149,7 @@ class _MainTabsPageState extends State<MainTabsPage> {
     return GestureDetector(
       onTap: () => setState(() => _currentIndex = index),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
         decoration: BoxDecoration(
           color: isSelected ? Colors.blue : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
