@@ -28,7 +28,7 @@ ThemeData buildLightTheme() {
         fontSize: 20,
       ),
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       elevation: 0,
       color: Colors.white,
       surfaceTintColor: Colors.transparent,
@@ -100,7 +100,7 @@ ThemeData buildDarkTheme() {
         fontSize: 20,
       ),
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       elevation: 0,
       color: const Color(0xFF0F172A),
       surfaceTintColor: Colors.transparent,

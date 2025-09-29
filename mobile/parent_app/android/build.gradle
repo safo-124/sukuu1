@@ -5,6 +5,9 @@ allprojects {
     }
 }
 
+// Ensure Kotlin uses JVM toolchain 17
+// Kotlin toolchain will use the available JDK; kotlinOptions in app module targets 17 bytecode.
+
 rootProject.buildDir = "../build"
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
