@@ -104,9 +104,9 @@ class _MainTabsPageState extends State<MainTabsPage> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildNavItem(Icons.home, 'Home', 0),
-                _buildNavItem(Icons.chat_bubble_outline, 'Chat', 1), 
-                _buildNavItem(Icons.location_on_outlined, 'Location', 2),
-                _buildNavItem(Icons.person_outline, 'Profile', 3),
+                _buildNavItem(Icons.markunread_chat_alt_outlined, 'Messages', 1, badge: _unread),
+                _buildNavItem(Icons.payments_outlined, 'Fees', 2),
+                _buildNavItem(Icons.apps_outlined, 'More', 3),
               ],
             ),
           ),
@@ -115,8 +115,37 @@ class _MainTabsPageState extends State<MainTabsPage> {
     );
   }
 
-  Widget _buildNavItem(IconData icon, String label, int index) {
+  Widget _buildNavItem(IconData icon, String label, int index, {int badge = 0}) {
     final isSelected = _currentIndex == index;
+    final iconWidget = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Icon(icon, color: isSelected ? Colors.white : Colors.grey, size: 24),
+        if (badge > 0)
+          Positioned(
+            right: -6,
+            top: -4,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.red.shade200 : Colors.redAccent,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              constraints: const BoxConstraints(minWidth: 18),
+              child: Text(
+                badge > 99 ? '99+' : '$badge',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  height: 1.1,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
     return GestureDetector(
       onTap: () => setState(() => _currentIndex = index),
       child: Container(
@@ -128,11 +157,7 @@ class _MainTabsPageState extends State<MainTabsPage> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              color: isSelected ? Colors.white : Colors.grey,
-              size: 24,
-            ),
+            iconWidget,
             if (isSelected) ...[
               const SizedBox(width: 8),
               Text(
@@ -945,20 +970,18 @@ class _TimetableTabState extends State<_TimetableTab> {
       grouped[d]!.add(e);
     }
     return Scaffold(
-      appBar: AppBar(
-          title: const Text('Timetable'),
-          flexibleSpace: const GlassAppBarFlex(),
-          actions: [
-            IconButton(
-              tooltip: 'Profile',
-              icon: const Icon(Icons.person_outline),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ProfilePage()),
-                );
-              },
-            )
-          ]),
+      appBar:
+          AppBar(title: const Text('Timetable'), flexibleSpace: const GlassAppBarFlex(), actions: [
+        IconButton(
+          tooltip: 'Profile',
+          icon: const Icon(Icons.person_outline),
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ProfilePage()),
+            );
+          },
+        )
+      ]),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null

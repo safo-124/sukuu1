@@ -10,6 +10,10 @@ import 'timetable_page.dart';
 import 'landing_page.dart';
 import 'profile_page.dart';
 import '../ui/glass.dart';
+import 'messages_page.dart';
+import 'fees_page.dart';
+import 'library_loans_page.dart';
+import 'meetings_page.dart';
 
 class HomePage extends StatefulWidget {
   final void Function(int index)?
@@ -578,7 +582,7 @@ class _HomePageState extends State<HomePage> {
                               title: 'Circular',
                               icon: Icons.campaign_outlined,
                               color: Colors.orange,
-                              onTap: () => _comingSoon('Circular'),
+                              onTap: () => _openMessages(),
                             ),
                             _menuIcon(
                               title: 'Result',
@@ -590,25 +594,25 @@ class _HomePageState extends State<HomePage> {
                               title: 'Behavior',
                               icon: Icons.emoji_emotions_outlined,
                               color: Colors.teal,
-                              onTap: () => _comingSoon('Behavior'),
+                              onTap: () => _openRemarks(),
                             ),
                             _menuIcon(
                               title: 'Fees',
                               icon: Icons.account_balance_wallet_outlined,
                               color: Colors.red,
-                              onTap: () => _comingSoon('Fees'),
+                              onTap: () => _openFees(),
                             ),
                             _menuIcon(
                               title: 'Library',
                               icon: Icons.local_library_outlined,
                               color: Colors.indigo,
-                              onTap: () => _comingSoon('Library'),
+                              onTap: () => _openLibrary(),
                             ),
                             _menuIcon(
                               title: 'Meeting',
                               icon: Icons.video_call_outlined,
                               color: Colors.pink,
-                              onTap: () => _comingSoon('Meeting'),
+                              onTap: () => _openMeetings(),
                             ),
                           ],
                         ),
@@ -1082,7 +1086,7 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 6),
             Container(
               width: 20,
-              height: 5,
+              height: 4,
               decoration: BoxDecoration(
                 color: Colors.blue,
                 borderRadius: BorderRadius.circular(999),
@@ -1136,6 +1140,57 @@ class _HomePageState extends State<HomePage> {
           studentName: name.isEmpty ? 'Student' : name,
         ),
       ),
+    );
+  }
+
+  void _openMessages() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const MessagesPage()),
+    );
+  }
+
+  void _openFees() {
+    if (_selectedChild == null) return;
+    final name = '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'.trim();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FeesPage(
+          studentId: _selectedChild!['id'].toString(),
+          studentName: name.isEmpty ? 'Student' : name,
+        ),
+      ),
+    );
+  }
+
+  void _openLibrary() {
+    if (_selectedChild == null) return;
+    final name = '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'.trim();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => LibraryLoansPage(
+          studentId: _selectedChild!['id'].toString(),
+          studentName: name.isEmpty ? 'Student' : name,
+        ),
+      ),
+    );
+  }
+
+  void _openRemarks() {
+    if (_selectedChild == null) return;
+    final name = '${_selectedChild?['firstName'] ?? ''} ${_selectedChild?['lastName'] ?? ''}'.trim();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RemarksPage(
+          studentId: _selectedChild!['id'].toString(),
+          studentName: name.isEmpty ? 'Student' : name,
+        ),
+      ),
+    );
+  }
+
+  void _openMeetings() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const MeetingsPage()),
     );
   }
 
