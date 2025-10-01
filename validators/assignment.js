@@ -19,6 +19,9 @@ export const createAssignmentSchema = z.object({
     correctAnswer: z.string().min(1, "Correct answer required").optional(),
     marks: z.coerce.number().min(0).optional(),
   })).nullable().optional(), // Only for OBJECTIVE type
+  // New: tests
+  isTest: z.boolean().optional().default(false),
+  testDeliveryMode: z.enum(["ONLINE", "IN_PERSON"]).optional().nullable(),
   // schoolId is usually added by the API based on the route, not from payload
 });
 

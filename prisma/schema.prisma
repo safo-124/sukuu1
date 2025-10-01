@@ -158,6 +158,12 @@ enum ScholarshipType {
   FIXED
 }
 
+// Delivery mode for tests (online vs in-person)
+enum TestDeliveryMode {
+  ONLINE
+  IN_PERSON
+}
+
 // --------------------
 // CORE TENANCY & USERS
 // --------------------
@@ -874,6 +880,9 @@ model Assignment {
   attachments          Json?
   type                 AssignmentType        @default(SUBJECT)
   objectives           Json?                 // For OBJECTIVE type: array of questions, options, correct answers
+  // New: Treat some assignments as Tests with a delivery mode
+  isTest               Boolean               @default(false)
+  testDeliveryMode     TestDeliveryMode?
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   schoolId             String

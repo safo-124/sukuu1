@@ -24,6 +24,9 @@ export default function TeacherContinuousGradesPage() {
   const [allowedSubjectsForSection, setAllowedSubjectsForSection] = useState(null);
   const [marks, setMarks] = useState({});
   const [testLabel, setTestLabel] = useState('');
+  const [creatingTest, setCreatingTest] = useState(false);
+  const [newTest, setNewTest] = useState({ title: '', mode: 'IN_PERSON', maxMarks: '', dueDate: '' });
+  const [testFiles, setTestFiles] = useState([]);
   const searchParams = useSearchParams();
 
   const inputRefs = useRef({});
@@ -169,6 +172,52 @@ export default function TeacherContinuousGradesPage() {
   toast.success(data.message || 'Test grades saved');
   };
 
+  const createNewTest = async () => {
+    if (!school?.id || !selected.subjectId || !selected.sectionId || !newTest.title || !newTest.dueDate) {
+      return toast.error('Subject, Section, Title and Due Date are required');
+    }
+    try {
+      setCreatingTest(true);
+      let fileUrls = [];
+      if (testFiles && testFiles.length) {
+        const formData = new FormData();
+        for (const f of testFiles) formData.append('files', f);
+        const up = await fetch('/api/upload-files', { method: 'POST', body: formData });
+        const upJ = await up.json().catch(()=>({}));
+        if (!up.ok) throw new Error(upJ.error || 'File upload failed');
+        fileUrls = upJ.fileUrls || [];
+      }
+      const payload = {
+        title: newTest.title,
+        description: testLabel || undefined,
+        dueDate: newTest.dueDate,
+        subjectId: selected.subjectId,
+        sectionId: selected.sectionId,
+        classId: undefined,
+        teacherId: 'self', // API resolves teacher when role is TEACHER
+        maxMarks: newTest.maxMarks ? Number(newTest.maxMarks) : null,
+        attachments: fileUrls,
+        type: 'SUBJECT',
+        isTest: true,
+        testDeliveryMode: newTest.mode,
+      };
+      const res = await fetch(`/api/schools/${school.id}/academics/assignments`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+      });
+      const data = await res.json().catch(()=>({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to create test');
+      toast.success('Test created');
+      setNewTest({ title: '', mode: 'IN_PERSON', maxMarks: '', dueDate: '' });
+      setTestFiles([]);
+      // refresh assignments list to allow linking and grading
+      loadAssignments();
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setCreatingTest(false);
+    }
+  };
+
   const availableSections = useMemo(() => sections, [sections]);
 
   return (
@@ -219,6 +268,44 @@ export default function TeacherContinuousGradesPage() {
         <div>
           <label className="block text-sm mb-1">Test Label</label>
           <Input value={testLabel} onChange={e => setTestLabel(e.target.value)} placeholder="e.g., Class Test 1" disabled={!!selected.assignmentId} />
+        </div>
+      </div>
+
+      <div className="rounded-md border p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="font-medium">Create a Test</h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-sm mb-1">Title</label>
+            <Input value={newTest.title} onChange={e=>setNewTest(t=>({...t, title: e.target.value}))} placeholder="e.g., Class Test 1" />
+          </div>
+          <div>
+            <label className="block text-sm mb-1">Mode</label>
+            <Select value={newTest.mode} onValueChange={(v)=>setNewTest(t=>({...t, mode: v}))}>
+              <SelectTrigger><SelectValue placeholder="Delivery mode" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="IN_PERSON">Face to Face</SelectItem>
+                <SelectItem value="ONLINE">Online</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="block text-sm mb-1">Max Marks</label>
+            <Input type="number" value={newTest.maxMarks} onChange={e=>setNewTest(t=>({...t, maxMarks: e.target.value}))} placeholder="e.g., 20" />
+          </div>
+          <div>
+            <label className="block text-sm mb-1">Due Date</label>
+            <Input type="datetime-local" value={newTest.dueDate} onChange={e=>setNewTest(t=>({...t, dueDate: e.target.value}))} />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm mb-1">Upload Test (optional)</label>
+            <input type="file" multiple onChange={(e)=>setTestFiles(Array.from(e.target.files||[]))} />
+            <p className="text-xs text-muted-foreground mt-1">Attach a PDF or materials for a face-to-face test, or instructions for an online test.</p>
+          </div>
+          <div className="md:col-span-4">
+            <Button onClick={createNewTest} disabled={creatingTest || !selected.subjectId || !selected.sectionId}>Create Test</Button>
+          </div>
         </div>
       </div>
 

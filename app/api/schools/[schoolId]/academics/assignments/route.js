@@ -108,7 +108,10 @@ export async function POST(request, { params }) {
     }
 
     // Determine teacherId: enforce current teacher if user is TEACHER
-    const teacherIdToUse = session.user?.role === 'TEACHER' ? (session.user?.staffProfileId || '') : parsedData.teacherId;
+    let teacherIdToUse = session.user?.role === 'TEACHER' ? (session.user?.staffProfileId || '') : parsedData.teacherId;
+    if (parsedData.teacherId === 'self' && session.user?.role === 'TEACHER') {
+      teacherIdToUse = session.user?.staffProfileId || '';
+    }
     if (!teacherIdToUse) {
       return NextResponse.json({ error: 'Teacher not resolved.' }, { status: 400 });
     }
@@ -169,6 +172,8 @@ export async function POST(request, { params }) {
         attachments: parsedData.attachments,
         type: parsedData.type || "SUBJECT",
         objectives: parsedData.type === "OBJECTIVE" ? parsedData.objectives : null,
+        isTest: !!parsedData.isTest,
+        testDeliveryMode: parsedData.testDeliveryMode ?? null,
         schoolId: parsedSchoolId,
       },
     });
