@@ -204,6 +204,41 @@ function AdminTimetablePage() {
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [suggestionError, setSuggestionError] = useState('');
 
+  // Compute allowed teachers for the selected subject (and section's level if provided)
+  const allowedTeachersForSuggestion = useMemo(() => {
+    if (!suggestionFormData.subjectId) return teachers;
+    const subject = subjects.find(s => s.id === suggestionFormData.subjectId);
+    if (!subject) return teachers;
+    const levelId = (() => {
+      if (!suggestionFormData.sectionId) return null;
+      const sec = sections.find(se => se.id === suggestionFormData.sectionId);
+      return sec?.class?.schoolLevelId || null;
+    })();
+    const staffIds = (subject.staffSubjectLevels || [])
+      .filter(link => (levelId ? link?.schoolLevel?.id === levelId : true))
+      .map(link => link?.staff?.id)
+      .filter(Boolean);
+    const staffIdSet = new Set(staffIds);
+    const filtered = teachers.filter(t => staffIdSet.has(t.id));
+    return filtered.length ? filtered : teachers;
+  }, [suggestionFormData.subjectId, suggestionFormData.sectionId, subjects, sections, teachers]);
+
+  // Auto-select the only available teacher when there is exactly one
+  useEffect(() => {
+    if (allowedTeachersForSuggestion.length === 1) {
+      const only = allowedTeachersForSuggestion[0];
+      if (!suggestionFormData.staffId || suggestionFormData.staffId !== only.id) {
+        setSuggestionFormData(prev => ({ ...prev, staffId: only.id }));
+      }
+    } else if (
+      suggestionFormData.staffId &&
+      !allowedTeachersForSuggestion.some(t => t.id === suggestionFormData.staffId)
+    ) {
+      // Clear selection if it's no longer valid for the chosen subject/section
+      setSuggestionFormData(prev => ({ ...prev, staffId: '' }));
+    }
+  }, [allowedTeachersForSuggestion, suggestionFormData.staffId]);
+
   // Overlay state for grid (pinned/unavailability)
   const [overlayPinnedSet, setOverlayPinnedSet] = useState(new Set()); // keys of form `${day}-${time}`
   const [overlayStaffUnavSet, setOverlayStaffUnavSet] = useState(new Set());
@@ -1112,8 +1147,11 @@ function AdminTimetablePage() {
         <div className="flex flex-col sm:flex-row gap-2">
           {isAdmin && (
             <>
-              <Button className={primaryButtonClasses} onClick={() => setIsGenOptionsOpen(true)} disabled={isGenerating || isLoadingDeps} title="Configure and Run Generation">
+              <Button className={primaryButtonClasses} onClick={() => runAutoGeneration()} disabled={isGenerating || isLoadingDeps} title="Run automatic generation now">
                 <Rocket className="mr-2 h-4 w-4" /> Generate Timetable
+              </Button>
+              <Button variant="outline" className={outlineButtonClasses} onClick={() => setIsGenOptionsOpen(true)} disabled={isGenerating || isLoadingDeps} title="Advanced generation options">
+                Advanced Options
               </Button>
               <Button variant="outline" className={outlineButtonClasses} onClick={() => { setIsReqDialogOpen(true); fetchRequirements(reqFilterSectionId); }} disabled={isLoadingDeps} title="Manage Subject Requirements">
                 Manage Subject Requirements
@@ -1796,12 +1834,34 @@ function AdminTimetablePage() {
                 <SelectTrigger className={`${filterInputClasses} mt-1`}> <SelectValue placeholder="Select subject" /> </SelectTrigger>
                 <SelectContent><SelectItem value="none">Any Subject</SelectItem>{Array.isArray(subjects) && subjects.map(sub => <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>)}</SelectContent>
               </Select>
+              {suggestionFormData.subjectId && (
+                <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                  {(() => {
+                    const subject = subjects.find(s => s.id === suggestionFormData.subjectId);
+                    const names = (subject?.staffSubjectLevels || [])
+                      .filter(link => {
+                        if (!link?.staff?.user) return false;
+                        const sec = sections.find(se => se.id === suggestionFormData.sectionId);
+                        const levelId = sec?.class?.schoolLevelId || null;
+                        return levelId ? (link?.schoolLevel?.id === levelId) : true;
+                      })
+                      .map(link => `${link.staff.user.firstName || ''} ${link.staff.user.lastName || ''}`.trim())
+                      .filter(Boolean);
+                    return names.length ? `Teachers for this subject${suggestionFormData.sectionId ? ' (at this level)' : ''}: ${names.join(', ')}` : 'No linked teachers found; showing all teachers.';
+                  })()}
+                </div>
+              )}
             </div>
             <div>
               <Label htmlFor="s_staffId" className={descriptionTextClasses}>Teacher <span className="text-red-500">*</span></Label>
               <Select name="staffId" value={suggestionFormData.staffId || ''} onValueChange={(value) => handleSuggestionSelectChange('staffId', value)} disabled={isLoadingDeps}>
                 <SelectTrigger className={`${filterInputClasses} mt-1`}> <SelectValue placeholder="Select teacher" /> </SelectTrigger>
-                <SelectContent><SelectItem value="none">Any Teacher</SelectItem>{Array.isArray(teachers) && teachers.map(teach => <SelectItem key={teach.id} value={teach.id}>{getTeacherFullName(teach.id)}</SelectItem>)}</SelectContent>
+                <SelectContent>
+                  <SelectItem value="none">Any Teacher</SelectItem>
+                  {Array.isArray(allowedTeachersForSuggestion) && allowedTeachersForSuggestion.map(teach => (
+                    <SelectItem key={teach.id} value={teach.id}>{getTeacherFullName(teach.id)}</SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div>
