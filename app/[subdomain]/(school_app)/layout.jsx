@@ -146,7 +146,10 @@ function getNavigationSections(schoolSubdomain, role) {
       { href: `/${schoolSubdomain}/resources/hostel`, label: 'Hostel', icon: Home },
       { href: `/${schoolSubdomain}/resources/stores`, label: 'Store', icon: Store },
     ];
-    const communicationItems = [ { href: `/${schoolSubdomain}/communication/announcements`, label: 'Announcements', icon: Newspaper } ];
+    const communicationItems = [
+      { href: `/${schoolSubdomain}/communication/announcements`, label: 'Announcements', icon: Newspaper },
+      { href: `/${schoolSubdomain}/communications/events`, label: 'Events & Meetings', icon: CalendarDays },
+    ];
     const schoolSetupItems = [
       { href: `/${schoolSubdomain}/settings/academic-years`, label: 'Academic Years', icon: CalendarDays },
       { href: `/${schoolSubdomain}/settings/profile`, label: 'School Profile', icon: Settings },

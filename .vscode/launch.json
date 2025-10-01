@@ -1,0 +1,23 @@
+{
+  "$schema": "vscode://schemas/launch",
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Flutter: Parent App (device)",
+      "type": "dart",
+      "request": "launch",
+      "program": "mobile/parent_app/lib/main.dart",
+      "cwd": "${workspaceFolder}",
+      "flutterMode": "debug"
+    },
+    {
+      "name": "Flutter: Parent App (Chrome)",
+      "type": "dart",
+      "request": "launch",
+      "program": "mobile/parent_app/lib/main.dart",
+      "cwd": "${workspaceFolder}",
+      "flutterMode": "debug",
+      "deviceId": "chrome"
+    }
+  ]
+}

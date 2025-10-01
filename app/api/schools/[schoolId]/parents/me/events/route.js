@@ -24,8 +24,13 @@ export async function GET(request, { params }) {
         const toParam = searchParams.get('to');
         const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '50', 10), 1), 200);
 
+        // Show events that are global, school-wide for parents, or specifically targeted to this parent
         const where = {
-            OR: [{ isGlobal: true }, { schoolId }],
+            OR: [
+                { isGlobal: true },
+                { AND: [{ schoolId }, { forParents: true }] },
+                { targets: { some: { parent: { userId: session.user.id } } } },
+            ],
         };
         if (upcoming) {
             where.startDate = { gte: new Date() };
@@ -47,6 +52,8 @@ export async function GET(request, { params }) {
                 startDate: true,
                 endDate: true,
                 location: true,
+                joinUrl: true,
+                forParents: true,
                 isGlobal: true,
                 createdAt: true,
                 updatedAt: true,

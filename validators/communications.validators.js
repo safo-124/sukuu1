@@ -24,3 +24,29 @@ export const updateAnnouncementSchema = z.object({
   isGlobal: z.boolean().optional(),
   audience: audienceSchema.optional(),
 }).partial();
+
+// Events/Meetings
+export const createEventSchema = z.object({
+  title: z.string().min(1).max(200),
+  description: z.string().optional().nullable(),
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime().optional().nullable(),
+  location: z.string().optional().nullable(),
+  isGlobal: z.boolean().optional().default(false),
+  forParents: z.boolean().optional().default(false),
+  joinUrl: z.string().url().optional().nullable(),
+  // Target specific parents for 1:1 or small-group meetings
+  parentIds: z.array(z.string()).optional().default([]),
+});
+
+export const updateEventSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  description: z.string().optional().nullable(),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional().nullable(),
+  location: z.string().optional().nullable(),
+  isGlobal: z.boolean().optional(),
+  forParents: z.boolean().optional(),
+  joinUrl: z.string().url().optional().nullable(),
+  parentIds: z.array(z.string()).optional(),
+}).partial();

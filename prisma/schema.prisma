@@ -340,6 +340,8 @@ model Parent {
   absenceExplanationsResponded AbsenceExplanation[] @relation("AbsenceRespondedBy")
   paymentRequests PaymentRequest[]
   parentMessages ParentTeacherMessage[]
+  // Back-relation for targeted parent events/meetings
+  eventTargets EventParentTarget[]
 
   @@index([userId])
   @@index([schoolId])
@@ -1260,13 +1262,32 @@ model Event {
   startDate   DateTime
   endDate     DateTime?
   location    String?
+  // Optional video meeting link (Zoom/Google Meet)
+  joinUrl     String?
+  // If true, event is intended for all parents in the school (in addition to global)
+  forParents  Boolean   @default(false)
   isGlobal    Boolean   @default(false)
   schoolId    String?
   school      School?   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  // Targets for specific parents (1:1 or multi-parent meetings)
+  targets     EventParentTarget[]
 
   @@index([schoolId, startDate])
+}
+
+// Explicit mapping of events to specific parents (for targeted meetings)
+model EventParentTarget {
+  id       String @id @default(cuid())
+  eventId  String
+  event    Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  parentId String
+  parent   Parent @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, parentId])
+  @@index([parentId])
 }
 
 // Track which users (parents) have read an announcement
