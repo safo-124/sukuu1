@@ -554,7 +554,7 @@ export default function ManageStudentsPage() {
               <UserPlus className="mr-2 h-4 w-4" /> Add New Student 
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+          <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 max-h-[85vh] overflow-y-auto">
             <DialogHeader> 
               <DialogTitle className={titleTextClasses}>Enroll New Student</DialogTitle> 
               <DialogDescription className={descriptionTextClasses}>Enter the student's details for enrollment.</DialogDescription> 
@@ -636,7 +636,7 @@ export default function ManageStudentsPage() {
 
       {/* Edit Student Dialog */}
       <Dialog open={isEditStudentDialogOpen} onOpenChange={(open)=>{ setIsEditStudentDialogOpen(open); if(!open){ setEditStudentFormData(null); setEditTargetStudent(null); setEditFormError(''); }}}>
-        <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+        <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className={titleTextClasses}>Edit Student</DialogTitle>
             <DialogDescription className={descriptionTextClasses}>Update the student's profile information.</DialogDescription>
