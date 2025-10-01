@@ -30,6 +30,7 @@ export default function TeacherSidebar({ subdomain, onNavigate, collapsed = fals
   { href: `/${subdomain}/teacher/academics/grades/exams`, label: 'Exam Grades', icon: Percent },
   { href: `/${subdomain}/teacher/academics/grades/continuous`, label: 'Assignment Grades', icon: Percent },
   { href: `/${subdomain}/teacher/academics/grades/tests`, label: 'Test Grades', icon: Percent },
+        { href: `/${subdomain}/teacher/academics/grades/summary`, label: 'Grades Summary', icon: Percent },
         { href: `/${subdomain}/teacher/academics/timetable`, label: 'My Timetable', icon: CalendarDays },
         { href: `/${subdomain}/teacher/academics/examinations`, label: 'Examinations', icon: GraduationCap },
       ]
