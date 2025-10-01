@@ -13,7 +13,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
-import { Search, UserPlus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2 } from 'lucide-react';
+import { Search, UserPlus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, Edit2, Trash2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 const glassCardClasses = 'p-6 md:p-8 rounded-xl backdrop-blur-xl backdrop-saturate-150 shadow-xl dark:shadow-2xl bg-white/60 border border-zinc-200/50 dark:bg-zinc-900/60 dark:border-zinc-700/50';
 
@@ -34,6 +35,11 @@ export default function ManageParentsPage() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(initialForm);
   const [submitting, setSubmitting] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '', phoneNumber: '', address: '', isActive: true, children: [] });
+  const [deletingId, setDeletingId] = useState(null);
 
   // Restrict non-admins
   useEffect(() => {
@@ -121,6 +127,58 @@ export default function ManageParentsPage() {
     }
   };
 
+  const openEdit = (p) => {
+    setEditing(p);
+    setEditForm({
+      firstName: p.firstName || '',
+      lastName: p.lastName || '',
+      email: p.email || '',
+      phoneNumber: p.phoneNumber || '',
+      address: p.address || '',
+      isActive: !!p.isActive,
+      children: (p.children || []).map(c => ({ studentIdNumber: c.studentIdNumber || '', relationToStudent: c.relationToStudent || '', isPrimaryContact: !!c.isPrimaryContact })),
+    });
+    setEditOpen(true);
+  };
+
+  const submitEdit = async (e) => {
+    e.preventDefault();
+    if (!school?.id || !editing) return;
+    try {
+      const res = await fetch(`/api/schools/${school.id}/people/parents/${editing.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editForm),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update parent');
+      toast.success('Parent updated');
+      setEditOpen(false);
+      setEditing(null);
+      fetchParents(pagination.currentPage, debouncedSearch);
+    } catch (e) {
+      toast.error('Update failed', { description: e.message });
+    }
+  };
+
+  const confirmDelete = (p) => { setDeletingId(p.id); setDeleteOpen(true); };
+  const doDelete = async () => {
+    if (!school?.id || !deletingId) return;
+    const id = deletingId;
+    setDeleteOpen(false);
+    const t = toast.loading('Deleting parent...');
+    try {
+      const res = await fetch(`/api/schools/${school.id}/people/parents/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete');
+      toast.success('Parent deleted', { id: t });
+      setDeletingId(null);
+      fetchParents(pagination.currentPage, debouncedSearch);
+    } catch (e) {
+      toast.error('Delete failed', { description: e.message, id: t });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className={`flex items-center justify-between ${glassCardClasses}`}>
@@ -180,7 +238,11 @@ export default function ManageParentsPage() {
                       <span className={`text-xs font-medium px-2 py-1 rounded-full ${p.isActive ? 'bg-green-100 text-green-700' : 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'}`}>{p.isActive ? 'Active' : 'Inactive'}</span>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="outline" size="sm" onClick={() => toggleActive(p.id, `${p.firstName} ${p.lastName}`)}>{p.isActive ? 'Deactivate' : 'Activate'}</Button>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button variant="outline" size="sm" onClick={() => openEdit(p)}><Edit2 className="h-4 w-4 mr-1"/>Edit</Button>
+                        <Button variant="destructive" size="sm" onClick={() => confirmDelete(p)}><Trash2 className="h-4 w-4 mr-1"/>Delete</Button>
+                        <Button variant="outline" size="sm" onClick={() => toggleActive(p.id, `${p.firstName} ${p.lastName}`)}>{p.isActive ? 'Deactivate' : 'Activate'}</Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -263,6 +325,83 @@ export default function ManageParentsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Parent Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Parent</DialogTitle>
+            <DialogDescription>Update the parent’s details and children.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={submitEdit} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label>First Name</Label>
+                <Input value={editForm.firstName} onChange={(e) => setEditForm((f) => ({ ...f, firstName: e.target.value }))} required />
+              </div>
+              <div>
+                <Label>Last Name</Label>
+                <Input value={editForm.lastName} onChange={(e) => setEditForm((f) => ({ ...f, lastName: e.target.value }))} required />
+              </div>
+              <div className="sm:col-span-2">
+                <Label>Email</Label>
+                <Input type="email" value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} required />
+              </div>
+              <div>
+                <Label>Phone</Label>
+                <Input value={editForm.phoneNumber} onChange={(e) => setEditForm((f) => ({ ...f, phoneNumber: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Address</Label>
+                <Input value={editForm.address} onChange={(e) => setEditForm((f) => ({ ...f, address: e.target.value }))} />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Children (by Admission Number)</Label>
+                <Button type="button" variant="outline" size="sm" onClick={() => setEditForm((f)=>({ ...f, children: [...(f.children||[]), { studentIdNumber: '', relationToStudent: '', isPrimaryContact: false }] }))}>Add Child</Button>
+              </div>
+              <div className="space-y-3">
+                {(editForm.children || []).map((c, idx) => (
+                  <div key={idx} className="grid grid-cols-1 sm:grid-cols-7 gap-2 items-center">
+                    <div className="sm:col-span-3">
+                      <Input placeholder="Admission number" value={c.studentIdNumber} onChange={(e) => setEditForm((f)=>({ ...f, children: f.children.map((x,i)=> i===idx? { ...x, studentIdNumber: e.target.value } : x) }))} />
+                    </div>
+                    <div className="sm:col-span-3">
+                      <Input placeholder="Relation (e.g., Mother)" value={c.relationToStudent} onChange={(e) => setEditForm((f)=>({ ...f, children: f.children.map((x,i)=> i===idx? { ...x, relationToStudent: e.target.value } : x) }))} />
+                    </div>
+                    <div className="sm:col-span-1 flex items-center justify-end gap-3">
+                      <span className="text-xs text-zinc-600 dark:text-zinc-400">Primary</span>
+                      <Switch checked={!!c.isPrimaryContact} onCheckedChange={(v) => setEditForm((f)=>({ ...f, children: f.children.map((x,i)=> i===idx? { ...x, isPrimaryContact: v } : x) }))} />
+                      <Button type="button" variant="ghost" size="sm" onClick={() => setEditForm((f)=>({ ...f, children: f.children.filter((_,i)=> i!==idx) }))}>Remove</Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+              <Button type="submit">Save Changes</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Parent Confirm */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete parent?</AlertDialogTitle>
+            <AlertDialogDescription>This will remove the parent account and unlink their children. This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={doDelete} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

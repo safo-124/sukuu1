@@ -134,3 +134,30 @@ export async function PUT(request, ctx) {
     return NextResponse.json({ error: isZod ? 'Validation Error' : 'Failed to update parent.' }, { status: isZod ? 400 : 500 });
   }
 }
+
+// Delete parent: removes child links, parent profile, and associated user
+export async function DELETE(request, ctx) {
+  const params = await ctx?.params;
+  const { schoolId, parentId } = params || {};
+  const session = await getServerSession(authOptions);
+  if (!session || session.user?.schoolId !== schoolId || session.user?.role !== 'SCHOOL_ADMIN') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  try {
+    schoolIdSchema.parse(schoolId); idSchema.parse(parentId);
+    const parent = await prisma.parent.findFirst({ where: { id: parentId, schoolId }, select: { id: true, userId: true } });
+    if (!parent) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.parentStudent.deleteMany({ where: { parentId: parent.id } });
+      await tx.parent.delete({ where: { id: parent.id } });
+      await tx.user.delete({ where: { id: parent.userId } });
+    });
+
+    return NextResponse.json({ success: true }, { status: 200 });
+  } catch (error) {
+    const isZod = error instanceof z.ZodError;
+    console.error('Parents DELETE error', { message: error.message });
+    return NextResponse.json({ error: isZod ? 'Validation Error' : 'Failed to delete parent.' }, { status: isZod ? 400 : 500 });
+  }
+}
