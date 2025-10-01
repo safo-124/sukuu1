@@ -30,7 +30,7 @@ export async function GET(request, { params }) {
   const sectionId = searchParams.get('sectionId') || undefined;
     const mine = searchParams.get('mine');
 
-    const isTestParam = searchParams.get('isTest');
+  const isTestParam = searchParams.get('isTest');
     const modeParam = searchParams.get('mode'); // ONLINE | IN_PERSON
 
     const where = {
@@ -42,7 +42,8 @@ export async function GET(request, { params }) {
       ] } : {}),
       ...(status === 'upcoming' ? { dueDate: { gte: new Date() } } : {}),
       ...(status === 'past' ? { dueDate: { lt: new Date() } } : {}),
-      ...(isTestParam === '1' || isTestParam === 'true' ? { isTest: true } : {}),
+  ...(isTestParam === '1' || isTestParam === 'true' ? { isTest: true } : {}),
+  ...(isTestParam === '0' || isTestParam === 'false' ? { isTest: false } : {}),
       ...(modeParam ? { testDeliveryMode: modeParam } : {}),
     };
     if (sectionId) {

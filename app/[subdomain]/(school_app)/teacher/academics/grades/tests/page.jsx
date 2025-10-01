@@ -87,10 +87,11 @@ export default function TeacherTestGradesPage() {
   const loadTests = useCallback(async () => {
     if (!school?.id || !selected.subjectId) { setTests([]); return; }
     const secParam = selected.sectionId ? `&sectionId=${selected.sectionId}` : '';
-    const res = await fetch(`/api/schools/${school.id}/academics/assignments?isTest=1&subjectId=${selected.subjectId}${secParam}`);
+    const mineParam = isTeacher ? `&mine=1` : '';
+    const res = await fetch(`/api/schools/${school.id}/academics/assignments?isTest=1&subjectId=${selected.subjectId}${secParam}${mineParam}`);
     if (!res.ok) return setTests([]);
     const d = await res.json(); setTests(d.assignments || []);
-  }, [school?.id, selected.subjectId, selected.sectionId]);
+  }, [school?.id, selected.subjectId, selected.sectionId, isTeacher]);
 
   useEffect(() => { loadTests(); }, [loadTests]);
 

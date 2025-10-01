@@ -98,9 +98,11 @@ export default function TeacherContinuousGradesPage() {
 
   const loadAssignments = useCallback(async () => {
     if (!school?.id || !selected.subjectId) return setAssignments([]);
-    // Fetch all assignments for the subject/section (not only "mine") so titles show up
+    // Only fetch non-test assignments for this subject/section; if teacher, default to mine
     const secParam = selected.sectionId ? `&sectionId=${selected.sectionId}` : '';
-    const res = await fetch(`/api/schools/${school.id}/academics/assignments?subjectId=${selected.subjectId}${secParam}`);
+    const mineParam = isTeacher ? `&mine=1` : '';
+    const url = `/api/schools/${school.id}/academics/assignments?isTest=0&subjectId=${selected.subjectId}${secParam}${mineParam}`;
+    const res = await fetch(url);
     if (!res.ok) return setAssignments([]);
     const d = await res.json(); setAssignments(d.assignments || []);
   }, [school?.id, selected.subjectId, selected.sectionId, isTeacher]);
