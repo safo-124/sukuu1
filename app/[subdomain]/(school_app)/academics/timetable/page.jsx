@@ -192,6 +192,7 @@ function AdminTimetablePage() {
   const [rowDensity, setRowDensity] = useState('cozy'); // 'compact' | 'cozy' | 'comfortable'
   const rowHeight = useMemo(() => (rowDensity === 'compact' ? 32 : rowDensity === 'comfortable' ? 56 : 40), [rowDensity]);
   const [fitHeight, setFitHeight] = useState(true);
+  const [colorBy, setColorBy] = useState('subject'); // 'subject' | 'department'
 
   // Requirements management state
   const [isReqDialogOpen, setIsReqDialogOpen] = useState(false);
@@ -1039,6 +1040,33 @@ function AdminTimetablePage() {
     return room ? room.name : 'N/A';
   }, [rooms]);
 
+  // --- Color palette helpers for entry cards ---
+  const stringToHue = (str) => {
+    if (!str) return 210;
+    let h = 0;
+    for (let i = 0; i < str.length; i++) {
+      h = (h * 31 + str.charCodeAt(i)) >>> 0;
+    }
+    return h % 360;
+  };
+  const colorForKey = (key) => {
+    const keyStr = String(key || '');
+    const hue = stringToHue(keyStr);
+    const s = 70; const l = 45;
+    return {
+      bg: `hsla(${hue}, ${s}%, ${Math.min(92, l + 40)}%, 0.35)`,
+      border: `hsl(${hue} ${s}% ${Math.max(30, l - 5)}%)`,
+      text: '#0b1324',
+    };
+  };
+  const getColorKeyForEntry = (entry) => {
+    if (colorBy === 'department') {
+      const subj = subjects.find(s => s.id === entry.subjectId);
+      return subj?.departmentId || entry.subjectId;
+    }
+    return entry.subjectId;
+  };
+
 
   // Group entries for the grid, calculating span and position
   const positionedTimetableEntries = useMemo(() => {
@@ -1159,7 +1187,16 @@ function AdminTimetablePage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      {/* Print styles */}
+      <style jsx global>{`
+        @media print {
+          body { background: white !important; }
+          .no-print { display: none !important; }
+          .print-area { max-height: none !important; overflow: visible !important; box-shadow: none !important; }
+          .print-area * { box-shadow: none !important; }
+        }
+      `}</style>
+  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 no-print">
         <div>
           <h1 className={`text-2xl md:text-3xl font-bold ${titleTextClasses} flex items-center`}>
             <CalendarDays className="mr-3 h-8 w-8 opacity-80"/>{isTeacher ? 'My Timetable' : 'Manage Timetable'}
@@ -1168,7 +1205,7 @@ function AdminTimetablePage() {
             {isTeacher ? 'View your scheduled lessons.' : 'Create and manage class schedules for sections, teachers, and rooms.'}
           </p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2">
+  <div className="flex flex-col sm:flex-row gap-2">
           {isAdmin && (
             <>
               <Button className={primaryButtonClasses} onClick={() => runAutoGeneration()} disabled={isGenerating || isLoadingDeps} title="Run automatic generation now">
@@ -1296,6 +1333,14 @@ function AdminTimetablePage() {
             title="Switch to Table View"
           >
             <List className="mr-2 h-4 w-4" /> Table View
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => window.print()}
+            className={outlineButtonClasses}
+            title="Print Timetable"
+          >
+            Print Timetable
           </Button>
         </div>
       </div>
@@ -1772,7 +1817,7 @@ function AdminTimetablePage() {
 
 
       {/* Timetable Filters */}
-      <div className={`${glassCardClasses} flex flex-wrap items-center gap-4`}>
+  <div className={`${glassCardClasses} flex flex-wrap items-center gap-4 no-print`}>
         <h3 className={`text-md font-semibold ${titleTextClasses} mr-2`}>Filters:</h3>
         {/* Teacher context badge */}
         {isTeacher && (
@@ -1953,10 +1998,10 @@ function AdminTimetablePage() {
         <>
           {isGridView ? (
             /* Timetable Grid Display */
-            <div className={`${glassCardClasses} overflow-auto custom-scrollbar relative`}
+            <div className={`${glassCardClasses} overflow-auto custom-scrollbar relative print-area`}
                  style={{ maxHeight: fitHeight ? 'calc(100vh - 220px)' : undefined }}> {/* Fit to viewport height if enabled */}
               {/* Display Controls */}
-              <div className="flex flex-wrap items-center gap-3 mb-3">
+              <div className="flex flex-wrap items-center gap-3 mb-3 no-print">
                 <div className="flex items-center gap-2">
                   <Label className={titleTextClasses}>Days</Label>
                   <Button variant="outline" size="sm" className={outlineButtonClasses}
@@ -1976,9 +2021,16 @@ function AdminTimetablePage() {
                   <Label className={titleTextClasses}>Fit Height</Label>
                   <input type="checkbox" checked={fitHeight} onChange={(e) => setFitHeight(e.target.checked)} />
                 </div>
+                <div className="flex items-center gap-2">
+                  <Label className={titleTextClasses}>Color by</Label>
+                  <div className="inline-flex rounded-md border border-zinc-300 dark:border-zinc-700 overflow-hidden">
+                    <button type="button" className={`px-2 py-1 text-xs ${colorBy==='subject' ? 'bg-zinc-200 dark:bg-zinc-700' : ''}`} onClick={() => setColorBy('subject')}>Subject</button>
+                    <button type="button" className={`px-2 py-1 text-xs border-l border-zinc-300 dark:border-zinc-700 ${colorBy==='department' ? 'bg-zinc-200 dark:bg-zinc-700' : ''}`} onClick={() => setColorBy('department')}>Department</button>
+                  </div>
+                </div>
               </div>
               {/* Legend for overlays */}
-              <div className="flex flex-wrap items-center gap-4 mb-3 text-xs">
+              <div className="flex flex-wrap items-center gap-4 mb-3 text-xs no-print">
                 <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input type="checkbox" checked={overlayShowPinned} onChange={(e) => setOverlayShowPinned(e.target.checked)} />
                   <span className="inline-block h-3 w-3 rounded-sm bg-amber-300/60 dark:bg-amber-500/40 border border-amber-500/50"></span>
@@ -2014,7 +2066,7 @@ function AdminTimetablePage() {
                 {timeSlots.map((time, timeIndex) => (
                   <React.Fragment key={time}>
                     {/* Time Slot Header */}
-                    <div className="sticky left-0 bg-white dark:bg-zinc-950 z-20 p-2 font-medium border-b border-r border-zinc-200 dark:border-zinc-700 h-full flex items-center justify-center">
+                    <div className={`sticky left-0 z-20 p-2 font-medium border-b border-r border-zinc-200 dark:border-zinc-700 h-full flex items-center justify-center ${timeIndex % 2 === 1 ? 'bg-zinc-50 dark:bg-zinc-900/40' : 'bg-white dark:bg-zinc-950'}`}>
                       {time}
                     </div>
                     {/* Cells for each day */}
@@ -2027,6 +2079,10 @@ function AdminTimetablePage() {
                         onDrop={(e) => handleDrop(e, day.value, time)}
                         onDragLeave={handleDragLeave}
                       >
+                        {/* Zebra background stripe layer */}
+                        {timeIndex % 2 === 1 && (
+                          <div className="absolute inset-0 -z-20 bg-zinc-50 dark:bg-zinc-900/40" />
+                        )}
                         {/* Overlays background layers (optional, based on filters) */}
                         <div className="absolute inset-0 -z-10 pointer-events-none">
                           {overlayShowPinned && overlayPinnedSet.has(`${day.value}-${time}`) && (
@@ -2048,6 +2104,8 @@ function AdminTimetablePage() {
 
                             // Corrected: top in the current cell is 0 if it starts at this slot, height is full span
                             const relativeTopInCell = 0;
+                            const colorKey = getColorKeyForEntry(entry);
+                            const colors = colorForKey(colorKey);
 
                             return (
                               <div
@@ -2055,12 +2113,15 @@ function AdminTimetablePage() {
                                 draggable={isAdmin} // Only admins can drag
                                 onDragStart={(e) => handleDragStart(e, entry)}
                                 onDragEnd={handleDragEnd}
-                                className="group absolute bg-sky-100/80 dark:bg-sky-900/80 backdrop-blur-sm border border-sky-300 dark:border-sky-700 text-sky-900 dark:text-sky-100 rounded-md p-1.5 text-[11px] leading-tight cursor-pointer hover:bg-sky-200 dark:hover:bg-sky-800 transition-colors z-10 overflow-hidden break-words shadow-sm"
+                                className="group absolute backdrop-blur-sm rounded-md p-1.5 text-[11px] leading-tight cursor-pointer transition-colors z-10 overflow-hidden break-words shadow-sm"
                                 style={{
                                   top: `${relativeTopInCell}px`,
                                   height: `${entryHeight}px`,
                                   left: '3px',
                                   right: '3px',
+                                  backgroundColor: colors.bg,
+                                  border: `1px solid ${colors.border}`,
+                                  color: colors.text,
                                 }}
                                 onClick={(e) => {
                                     e.stopPropagation(); // Prevent opening Add dialog when clicking on an existing entry
