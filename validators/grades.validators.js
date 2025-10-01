@@ -52,6 +52,7 @@ export const updateGradeSchema = z.object({
   gradeLetter: z.string().max(5).optional().nullable(),
   gpa: z.coerce.number().min(0).optional().nullable(),
   comments: z.string().max(500).optional().nullable(),
+  isPublished: z.boolean().optional(),
 });
 
 // Additional grade submission schemas for tests and assignments

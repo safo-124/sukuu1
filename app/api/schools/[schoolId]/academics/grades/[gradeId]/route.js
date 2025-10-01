@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { updateGradeSchema } from '@/validators/academics.validators'; // Ensure this schema is in your validator file
+import { updateGradeSchema } from '@/validators/grades.validators';
 
 // GET handler to fetch a single grade record
 export async function GET(request, { params }) {
@@ -57,6 +57,17 @@ export async function PUT(request, { params }) {
     }
 
     const dataToUpdate = validation.data;
+
+    // If toggling publication, set timestamps and publisher accordingly
+    if (typeof dataToUpdate.isPublished === 'boolean') {
+      if (dataToUpdate.isPublished) {
+        dataToUpdate.publishedAt = new Date();
+        dataToUpdate.publishedById = session.user.id;
+      } else {
+        dataToUpdate.publishedAt = null;
+        dataToUpdate.publishedById = null;
+      }
+    }
     if (Object.keys(dataToUpdate).length === 0) {
       return NextResponse.json({ error: "No fields to update provided." }, { status: 400 });
     }

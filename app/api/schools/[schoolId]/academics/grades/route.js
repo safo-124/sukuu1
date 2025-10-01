@@ -17,15 +17,16 @@ export async function GET(request, { params }) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const subjectId = searchParams.get('subjectId') || undefined;
+  const subjectId = searchParams.get('subjectId') || undefined;
     const sectionId = searchParams.get('sectionId') || undefined;
     const examScheduleId = searchParams.get('examScheduleId') || undefined;
     const studentId = searchParams.get('studentId') || undefined;
     const termId = searchParams.get('termId') || undefined;
     const academicYearId = searchParams.get('academicYearId') || undefined;
   const publishedOnly = searchParams.get('publishedOnly') === '1';
-  const assignmentId = searchParams.get('assignmentId') || undefined;
-  const label = searchParams.get('label') || undefined; // test label stored in comments
+    const assignmentId = searchParams.get('assignmentId') || undefined;
+    const label = searchParams.get('label') || undefined; // test label stored in comments
+    const gradeType = searchParams.get('gradeType') || 'all';
     const take = Math.min(parseInt(searchParams.get('take') || '100', 10), 500);
     const skip = Math.max(parseInt(searchParams.get('skip') || '0', 10), 0);
 
@@ -39,10 +40,21 @@ export async function GET(request, { params }) {
       ...(academicYearId ? { academicYearId } : {}),
       ...(publishedOnly ? { isPublished: true } : {}),
       ...(assignmentId ? { assignmentId } : {}),
-      ...(label ? { comments: label } : {}),
+      // For tests, store the label in comments; use startsWith for partial matches
+      ...(label ? { comments: { startsWith: label } } : {}),
     };
 
     let where = { ...baseWhere };
+
+    // Apply explicit gradeType filter (exam, assignment, test)
+    if (gradeType === 'exam') {
+      where = { ...where, examScheduleId: { not: null } };
+    } else if (gradeType === 'assignment') {
+      where = { ...where, assignmentId: { not: null } };
+    } else if (gradeType === 'test') {
+      // Tests are non-exam, non-assignment grades with a label stored in comments
+      where = { ...where, examScheduleId: null, assignmentId: null, comments: { not: null } };
+    }
 
     if (session.user?.role === 'TEACHER') {
       const staffId = session.user?.staffProfileId;
@@ -74,7 +86,8 @@ export async function GET(request, { params }) {
         include: {
           subject: { select: { id: true, name: true } },
           section: { select: { id: true, name: true, class: { select: { id: true, name: true } } } },
-          examSchedule: { select: { id: true, exam: { select: { name: true } }, subject: { select: { name: true } }, class: { select: { name: true } } } },
+          examSchedule: { select: { id: true, maxMarks: true, exam: { select: { name: true } }, subject: { select: { name: true } }, class: { select: { name: true } } } },
+          assignment: { select: { id: true, title: true, maxMarks: true } },
           student: { select: { id: true, firstName: true, lastName: true, studentIdNumber: true } },
         },
         orderBy: [{ updatedAt: 'desc' }],

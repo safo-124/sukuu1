@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function GradeManagerPage() {
@@ -41,6 +43,18 @@ export default function GradeManagerPage() {
   const [assignments, setAssignments] = useState([]);
   const [rankingBusy, setRankingBusy] = useState(false);
   const [rankingEnabled, setRankingEnabled] = useState(false);
+  // Import CSV modal state
+  const [importOpen, setImportOpen] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importBusy, setImportBusy] = useState(false);
+  const [scaleToMax, setScaleToMax] = useState(true);
+  const [assumedMax, setAssumedMax] = useState(100);
+  // Quick entry panel state
+  const [qeOpen, setQeOpen] = useState(false);
+  const [qeStudents, setQeStudents] = useState([]); // [{id, firstName, lastName, studentIdNumber}]
+  const [qeMarks, setQeMarks] = useState({}); // studentId -> number|null
+  const [qeBusy, setQeBusy] = useState(false);
+  const [qeTestLabel, setQeTestLabel] = useState('');
 
   // Load filter data
   useEffect(() => {
@@ -85,7 +99,8 @@ export default function GradeManagerPage() {
       if (filters.gradeType === 'assignment' && filters.assignmentId) qs.set('assignmentId', filters.assignmentId);
       if (filters.gradeType === 'test' && filters.label) qs.set('label', filters.label);
       if (filters.studentId) qs.set('studentId', filters.studentId);
-      if (filters.publishedOnly) qs.set('publishedOnly', '1');
+  if (filters.publishedOnly) qs.set('publishedOnly', '1');
+  if (filters.gradeType) qs.set('gradeType', filters.gradeType);
       qs.set('take', String(take));
       qs.set('skip', String(skip));
       const res = await fetch(`/api/schools/${school.id}/academics/grades?${qs.toString()}`);
@@ -214,6 +229,106 @@ export default function GradeManagerPage() {
     URL.revokeObjectURL(url);
   }, [rows]);
 
+  const currentMaxMarks = useMemo(() => {
+    // Determine max marks based on context of selected grade type
+    if (filters.gradeType === 'exam') {
+      const es = examSchedules.find(e => e.id === filters.examScheduleId);
+      // Note: flat list currently lacks maxMarks; will derive when showing rows
+      // For quick entry/import, we'll show per-row max when available
+      return null;
+    }
+    if (filters.gradeType === 'assignment') {
+      const a = assignments.find(a => a.id === filters.assignmentId);
+      return a?.maxMarks ?? null;
+    }
+    if (filters.gradeType === 'test') {
+      return assumedMax || 100;
+    }
+    return null;
+  }, [filters.gradeType, filters.examScheduleId, filters.assignmentId, assignments, examSchedules, assumedMax]);
+
+  const parseCsv = (text) => {
+    // Very small CSV parser for lines of: studentId,marks[,comments]
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const out = [];
+    for (const line of lines) {
+      const parts = line.split(',');
+      const studentId = parts[0]?.trim();
+      const marksStr = parts[1]?.trim();
+      if (!studentId) continue;
+      const marks = marksStr === '' || marksStr == null ? null : Number(marksStr);
+      const comments = parts.slice(2).join(',').trim() || undefined; // allow commas in comments
+      out.push({ studentId, marksObtained: isNaN(marks) ? null : marks, comments });
+    }
+    return out;
+  };
+
+  const submitImport = async () => {
+    if (!school?.id) return;
+    if (!filters.subjectId || !filters.termId || !filters.academicYearId) {
+      return toast.error('Select Academic Year, Term, and Subject.');
+    }
+    if (filters.gradeType === 'exam' && !filters.examScheduleId) return toast.error('Select Exam Schedule.');
+    if (filters.gradeType === 'assignment' && !filters.assignmentId) return toast.error('Select Assignment.');
+    const parsed = parseCsv(importText);
+    if (!parsed.length) return toast.error('No rows parsed. Expect: studentId,marks[,comments]');
+
+    // Optionally scale marks to max
+    let targetMax = currentMaxMarks;
+    // If not known from context, try find from first matching row in current result set
+    if (!targetMax && rows.length) {
+      // Prefer assignment/exam max in current rows
+      for (const r of rows) {
+        if (r.assignment?.maxMarks) { targetMax = r.assignment.maxMarks; break; }
+        if (r.examSchedule?.maxMarks) { targetMax = r.examSchedule.maxMarks; break; }
+      }
+    }
+
+    const toSend = parsed.map(p => {
+      let marksObtained = p.marksObtained;
+      if (marksObtained != null && scaleToMax && targetMax && targetMax > 0) {
+        // If incoming marks look like percentage (<=1) scale from 1 to targetMax; if > 1 and <= 100 and targetMax != 100, heuristically scale
+        if (marksObtained <= 1) {
+          marksObtained = Number((marksObtained * targetMax).toFixed(2));
+        } else if (targetMax !== 100 && marksObtained <= 100) {
+          // Assume input is out of 100, normalize to targetMax
+          marksObtained = Number(((marksObtained / 100) * targetMax).toFixed(2));
+        }
+      }
+      return { studentId: p.studentId, marksObtained, comments: p.comments };
+    });
+
+    try {
+      setImportBusy(true);
+      let url = '';
+      let body = {};
+      if (filters.gradeType === 'exam') {
+        url = `/api/schools/${school.id}/academics/grades`;
+        body = { examScheduleId: filters.examScheduleId, termId: filters.termId, academicYearId: filters.academicYearId, subjectId: filters.subjectId, sectionId: filters.sectionId || undefined, grades: toSend };
+      } else if (filters.gradeType === 'assignment') {
+        url = `/api/schools/${school.id}/academics/grades/assignments`;
+        body = { assignmentId: filters.assignmentId, termId: filters.termId, academicYearId: filters.academicYearId, subjectId: filters.subjectId, sectionId: filters.sectionId || undefined, grades: toSend };
+      } else if (filters.gradeType === 'test') {
+        if (!filters.sectionId) return toast.error('Select Section for tests.');
+        url = `/api/schools/${school.id}/academics/grades/tests`;
+        body = { label: filters.label || qeTestLabel || 'Test', termId: filters.termId, academicYearId: filters.academicYearId, subjectId: filters.subjectId, sectionId: filters.sectionId, grades: toSend };
+      } else {
+        return toast.error('Pick grade type');
+      }
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const d = await res.json().catch(()=>({}));
+      if (!res.ok) throw new Error(d.error || 'Import failed');
+      toast.success('Import complete');
+      setImportOpen(false);
+      setImportText('');
+      fetchGrades();
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setImportBusy(false);
+    }
+  };
+
   const recomputeRankings = async () => {
     if (!filters.sectionId || !filters.termId || !filters.academicYearId) {
       return toast.error('Select Academic Year, Term and Section to compute rankings');
@@ -306,7 +421,7 @@ export default function GradeManagerPage() {
               </SelectContent>
             </Select>
           </div>
-          {filters.gradeType !== 'assignment' && (
+          {filters.gradeType === 'exam' && (
             <div>
               <label className="block text-sm mb-1">Exam Schedule</label>
               <Select
@@ -355,15 +470,216 @@ export default function GradeManagerPage() {
           </div>
         </div>
 
+        {/* Quick Entry */}
+        <div className="border rounded-md">
+          <div className="flex items-center justify-between p-3">
+            <div className="font-medium">Quick Grade Entry</div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => setQeOpen(v=>!v)}>{qeOpen ? 'Hide' : 'Show'}</Button>
+            </div>
+          </div>
+          {qeOpen && (
+            <div className="p-3 space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div>
+                  <label className="block text-sm mb-1">Grade Type</label>
+                  <Select value={filters.gradeType} onValueChange={(v)=> setFilters(f=>({ ...f, gradeType: v, examScheduleId: '', assignmentId: '', label: '' }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="exam">Exam</SelectItem>
+                      <SelectItem value="assignment">Assignment</SelectItem>
+                      <SelectItem value="test">Test</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {filters.gradeType === 'exam' && (
+                  <div>
+                    <label className="block text-sm mb-1">Exam Schedule</label>
+                    <Select value={filters.examScheduleId || ''} onValueChange={(v)=> setFilters(f=>({ ...f, examScheduleId: v }))}>
+                      <SelectTrigger><SelectValue placeholder="Select exam" /></SelectTrigger>
+                      <SelectContent>
+                        {filteredExamSchedules.map(es => (<SelectItem key={es.id} value={es.id}>{es.label}</SelectItem>))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {filters.gradeType === 'assignment' && (
+                  <div>
+                    <label className="block text-sm mb-1">Assignment</label>
+                    <Select value={filters.assignmentId || ''} onValueChange={(v)=> setFilters(f=>({ ...f, assignmentId: v }))}>
+                      <SelectTrigger><SelectValue placeholder="Select assignment" /></SelectTrigger>
+                      <SelectContent>
+                        {assignments.map(a => (<SelectItem key={a.id} value={a.id}>{a.title}</SelectItem>))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {filters.gradeType === 'test' && (
+                  <div>
+                    <label className="block text-sm mb-1">Test Label</label>
+                    <Input value={qeTestLabel} onChange={(e)=> setQeTestLabel(e.target.value)} placeholder="e.g., Quiz 1" />
+                  </div>
+                )}
+                <div className="flex items-end">
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      if (!school?.id) return;
+                      if (!filters.subjectId || !filters.sectionId) {
+                        return toast.error('Select Subject and Section first.');
+                      }
+                      try {
+                        setQeBusy(true);
+                        const qs = new URLSearchParams({ sectionId: filters.sectionId, subjectId: filters.subjectId });
+                        const res = await fetch(`/api/schools/${school.id}/academics/grades/students?${qs.toString()}`);
+                        const d = await res.json();
+                        if (!res.ok) throw new Error(d.error || 'Failed to load students');
+                        setQeStudents(d.students || []);
+                        // Initialize marks map
+                        const init = {};
+                        for (const s of d.students || []) init[s.id] = null;
+                        setQeMarks(init);
+                      } catch (e) {
+                        toast.error(e.message);
+                      } finally {
+                        setQeBusy(false);
+                      }
+                    }}
+                  >Load Students</Button>
+                </div>
+              </div>
+
+              {qeStudents.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" onClick={()=>{
+                      // Fill random demo marks
+                      const next = { ...qeMarks };
+                      for (const s of qeStudents) next[s.id] = Math.floor(40 + Math.random()*61); // 40-100
+                      setQeMarks(next);
+                    }}>Fill random</Button>
+                    <Button variant="outline" onClick={()=>{
+                      const next = { ...qeMarks };
+                      for (const s of qeStudents) next[s.id] = null;
+                      setQeMarks(next);
+                    }}>Clear</Button>
+                    <Button onClick={async ()=>{
+                      if (!school?.id) return;
+                      if (!filters.subjectId || !filters.termId || !filters.academicYearId || !filters.sectionId) {
+                        return toast.error('Select Academic Year, Term, Subject and Section.');
+                      }
+                      const entries = qeStudents.map(s=>({ studentId: s.id, marksObtained: (qeMarks[s.id]===undefined || qeMarks[s.id]===null || qeMarks[s.id]==='') ? null : Number(qeMarks[s.id]) }));
+                      try {
+                        setQeBusy(true);
+                        let url = '';
+                        let method = 'POST';
+                        let body = {};
+                        if (filters.gradeType === 'exam') {
+                          if (!filters.examScheduleId) return toast.error('Select Exam Schedule.');
+                          url = `/api/schools/${school.id}/academics/grades`;
+                          body = { examScheduleId: filters.examScheduleId, termId: filters.termId, academicYearId: filters.academicYearId, subjectId: filters.subjectId, sectionId: filters.sectionId, grades: entries };
+                        } else if (filters.gradeType === 'assignment') {
+                          if (!filters.assignmentId) return toast.error('Select Assignment.');
+                          url = `/api/schools/${school.id}/academics/grades/assignments`;
+                          body = { assignmentId: filters.assignmentId, termId: filters.termId, academicYearId: filters.academicYearId, subjectId: filters.subjectId, sectionId: filters.sectionId || null, grades: entries };
+                        } else if (filters.gradeType === 'test') {
+                          if (!qeTestLabel) return toast.error('Enter Test Label.');
+                          url = `/api/schools/${school.id}/academics/grades/tests`;
+                          body = { label: qeTestLabel, termId: filters.termId, academicYearId: filters.academicYearId, subjectId: filters.subjectId, sectionId: filters.sectionId, grades: entries };
+                        } else {
+                          return toast.error('Pick a Grade Type for quick entry.');
+                        }
+                        const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+                        const d = await res.json().catch(()=>({}));
+                        if (!res.ok) throw new Error(d.error || 'Failed to save grades');
+                        toast.success('Saved grades.');
+                        setQeOpen(false);
+                        setQeStudents([]);
+                        setQeMarks({});
+                        fetchGrades();
+                      } catch (e) {
+                        toast.error(e.message);
+                      } finally {
+                        setQeBusy(false);
+                      }
+                    }} disabled={qeBusy}>Submit</Button>
+                  </div>
+                  <div className="overflow-x-auto border rounded-md">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Student</TableHead>
+                          <TableHead>Student ID</TableHead>
+                          <TableHead className="w-40">Marks</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {qeStudents.map(s=> (
+                          <TableRow key={s.id}>
+                            <TableCell>{s.lastName}, {s.firstName}</TableCell>
+                            <TableCell>{s.studentIdNumber || '—'}</TableCell>
+                            <TableCell>
+                              <Input type="number" value={qeMarks[s.id] ?? ''} onChange={(e)=> {
+                                const v = e.target.value;
+                                setQeMarks(m=> ({ ...m, [s.id]: v === '' ? null : Number(v) }));
+                              }} />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="flex items-center justify-between">
           <div className="text-sm text-muted-foreground">{total} grades</div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => { setSkip(0); fetchGrades(); }}>Refresh</Button>
             <Button variant="outline" onClick={exportCsv}>Export CSV</Button>
+            <Button variant="outline" onClick={() => setImportOpen(true)}>Import CSV</Button>
             <Button variant="destructive" onClick={deleteSelected}>Delete Selected</Button>
             <Button onClick={publishSelected}>Publish Selected</Button>
           </div>
         </div>
+
+        {/* Import CSV Dialog */}
+        <Dialog open={importOpen} onOpenChange={setImportOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Import Grades from CSV</DialogTitle>
+              <DialogDescription>
+                Paste CSV with rows like: studentId,marks[,comments]. You can copy student IDs from Export CSV.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <textarea className="w-full h-48 border rounded-md p-2 text-sm" value={importText} onChange={e=>setImportText(e.target.value)} placeholder="abc123,78\nxyz789,65,Good work" />
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 text-sm">
+                  <Switch checked={scaleToMax} onCheckedChange={v=>setScaleToMax(!!v)} /> Scale to max marks
+                </label>
+                {filters.gradeType === 'test' && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <span>Assumed Max</span>
+                    <Input className="w-24" type="number" value={assumedMax} onChange={e=>setAssumedMax(Number(e.target.value)||100)} />
+                  </div>
+                )}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {filters.gradeType === 'exam' && 'Exam max is read from the exam schedule.'}
+                {filters.gradeType === 'assignment' && 'Assignment max is read from the assignment settings if provided.'}
+                {filters.gradeType === 'test' && 'Tests assume max = Assumed Max (default 100). If your CSV contains percentages (0-100) or decimals (0-1), scaling applies.'}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={()=>setImportOpen(false)}>Cancel</Button>
+              <Button onClick={submitImport} disabled={importBusy || !importText.trim()}>Import</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <div className="flex items-center gap-4 border rounded-md p-3">
           <div className="text-sm font-medium">Overall Ranking</div>
@@ -387,8 +703,9 @@ export default function GradeManagerPage() {
                   <TableHead>Student</TableHead>
                   <TableHead>Subject</TableHead>
                   <TableHead>Section</TableHead>
-                  <TableHead>Exam</TableHead>
+                  <TableHead>Assessment</TableHead>
                   <TableHead>Marks</TableHead>
+                  <TableHead>Max</TableHead>
                   <TableHead>Comments</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-40">Actions</TableHead>
@@ -403,7 +720,7 @@ export default function GradeManagerPage() {
                     <TableCell>{r.student?.lastName}, {r.student?.firstName}</TableCell>
                     <TableCell>{r.subject?.name || '—'}</TableCell>
                     <TableCell>{r.section?.class?.name} - {r.section?.name}</TableCell>
-                    <TableCell>{r.examSchedule?.exam?.name || '—'}</TableCell>
+                    <TableCell>{r.assignment?.title || r.examSchedule?.exam?.name || (r.comments ? `Test: ${r.comments}` : '—')}</TableCell>
                     <TableCell>
                       <Input
                         type="number"
@@ -411,13 +728,29 @@ export default function GradeManagerPage() {
                         onChange={(e) => onEditField(r.id, 'marksObtained', e.target.value === '' ? null : Number(e.target.value))}
                       />
                     </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {r.assignment?.maxMarks ?? r.examSchedule?.maxMarks ?? '—'}
+                    </TableCell>
                     <TableCell>
                       <Input
                         defaultValue={r.comments ?? ''}
                         onChange={(e) => onEditField(r.id, 'comments', e.target.value)}
                       />
                     </TableCell>
-                    <TableCell>{r.isPublished ? 'Published' : 'Draft'}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Switch checked={!!r.isPublished} onCheckedChange={async (v)=>{
+                          try {
+                            const res = await fetch(`/api/schools/${school.id}/academics/grades/${r.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isPublished: !!v }) });
+                            const d = await res.json().catch(()=>({}));
+                            if (!res.ok) throw new Error(d.error || 'Failed to update publish state');
+                            toast.success(!!v ? 'Published' : 'Unpublished');
+                            fetchGrades();
+                          } catch (e) { toast.error(e.message); }
+                        }} />
+                        <span className="text-xs text-muted-foreground">{r.isPublished ? 'Published' : 'Draft'}</span>
+                      </div>
+                    </TableCell>
                     <TableCell className="flex gap-2">
                       <Button size="sm" onClick={() => saveRow(r)} disabled={!editing[r.id]}>Save</Button>
                       <Button size="sm" variant="destructive" onClick={() => deleteRow(r)}>Delete</Button>
