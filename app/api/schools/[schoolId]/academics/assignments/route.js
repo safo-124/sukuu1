@@ -30,6 +30,9 @@ export async function GET(request, { params }) {
   const sectionId = searchParams.get('sectionId') || undefined;
     const mine = searchParams.get('mine');
 
+    const isTestParam = searchParams.get('isTest');
+    const modeParam = searchParams.get('mode'); // ONLINE | IN_PERSON
+
     const where = {
       schoolId: parsedSchoolId,
       ...(subjectId ? { subjectId } : {}),
@@ -39,6 +42,8 @@ export async function GET(request, { params }) {
       ] } : {}),
       ...(status === 'upcoming' ? { dueDate: { gte: new Date() } } : {}),
       ...(status === 'past' ? { dueDate: { lt: new Date() } } : {}),
+      ...(isTestParam === '1' || isTestParam === 'true' ? { isTest: true } : {}),
+      ...(modeParam ? { testDeliveryMode: modeParam } : {}),
     };
     if (sectionId) {
       const sec = await prisma.section.findFirst({ where: { id: sectionId, schoolId: parsedSchoolId }, select: { classId: true } });
