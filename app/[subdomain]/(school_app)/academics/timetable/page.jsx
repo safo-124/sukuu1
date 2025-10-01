@@ -588,6 +588,19 @@ function AdminTimetablePage() {
         toast.error('Generation failed', { description: msg, id: toastId });
       } else {
         toast.success(`Generated ${data.placed || 0} placements`, { id: toastId, description: 'Timetable updated.' });
+        if ((data.placed || 0) === 0) {
+          // If no placements were generated, hint about requirements/inference
+          try {
+            const reqRes = await fetch(`/api/schools/${schoolData.id}/academics/requirements`);
+            const reqData = await reqRes.json().catch(() => ({}));
+            const reqCount = Array.isArray(reqData.requirements) ? reqData.requirements.length : 0;
+            if (reqCount === 0) {
+              toast.message('No subject requirements found', {
+                description: 'Add requirements via "Manage Subject Requirements" or link subjects to classes so the generator can auto-infer.',
+              });
+            }
+          } catch {}
+        }
         // Refresh entries
         await fetchTimetableEntries();
       }
