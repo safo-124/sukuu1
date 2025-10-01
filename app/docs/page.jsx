@@ -92,10 +92,10 @@ export default function DocsPage() {
         <section className="mb-12">
           <h2 className="text-2xl font-bold text-white mb-3">Product Documentation</h2>
           <ul className="list-disc ml-6 space-y-2 text-zinc-300">
-            <li><a href="/products#academics" className="text-sky-400 hover:underline">Academics</a>: subjects, exams, grades, timetable</li>
-            <li><a href="/products#finance" className="text-sky-400 hover:underline">Finance</a>: invoices, payments, expenses, payroll</li>
-            <li><a href="/products#hr" className="text-sky-400 hover:underline">HR</a>: staff, attendance, payroll</li>
-            <li><a href="/products#resources" className="text-sky-400 hover:underline">Resources</a>: library, hostel, transport</li>
+            <li><a href="/docs/academics" className="text-sky-400 hover:underline">Academics</a>: subjects, exams, grades, timetable</li>
+            <li><a href="/docs/finance" className="text-sky-400 hover:underline">Finance</a>: invoices, payments, expenses, payroll</li>
+            <li><a href="/docs/hr" className="text-sky-400 hover:underline">HR</a>: staff, attendance, payroll</li>
+            <li><a href="/docs/resources" className="text-sky-400 hover:underline">Resources</a>: library, hostel, transport</li>
             <li><a href="/products#communication" className="text-sky-400 hover:underline">Communication</a>: announcements, events</li>
           </ul>
         </section>
