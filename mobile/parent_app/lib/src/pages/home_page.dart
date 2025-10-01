@@ -673,6 +673,8 @@ class _HomePageState extends State<HomePage> {
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           crossAxisCount: 4,
+                          // Give a little more height to each tile to avoid vertical overflows on small screens
+                          childAspectRatio: 0.9,
                           crossAxisSpacing: 14,
                           mainAxisSpacing: 18,
                           children: [
@@ -1172,8 +1174,8 @@ class _HomePageState extends State<HomePage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 56,
-            height: 56,
+            width: 52,
+            height: 52,
             decoration: BoxDecoration(
               color: bg,
               borderRadius: BorderRadius.circular(14),
@@ -1181,7 +1183,7 @@ class _HomePageState extends State<HomePage> {
             ),
             child: Icon(icon, color: color),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             title,
             textAlign: TextAlign.center,
@@ -1192,12 +1194,14 @@ class _HomePageState extends State<HomePage> {
                   ? Colors.grey
                   : const Color(0xFF0F172A),
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           if (selected) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Container(
               width: 20,
-              height: 4,
+              height: 3,
               decoration: BoxDecoration(
                 color: Colors.blue,
                 borderRadius: BorderRadius.circular(999),
@@ -1302,12 +1306,6 @@ class _HomePageState extends State<HomePage> {
   void _openMeetings() {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const MeetingsPage()),
-    );
-  }
-
-  void _comingSoon(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$feature is coming soon')),
     );
   }
 
@@ -1566,87 +1564,6 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class _QuickActionCard extends StatelessWidget {
-  final Color color;
-  final IconData icon;
-  final String title;
-  final VoidCallback? onTap;
-  final int? badgeCount;
-  const _QuickActionCard({
-    required this.color,
-    required this.icon,
-    required this.title,
-    this.onTap,
-    this.badgeCount,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final gradient = LinearGradient(
-      colors: [color, color.withOpacity(0.75)],
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-    );
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Ink(
-          decoration: BoxDecoration(
-            gradient: gradient,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                  color: color.withOpacity(0.3),
-                  blurRadius: 12,
-                  offset: const Offset(0, 6)),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Icon(icon, color: Colors.white),
-                    if (badgeCount != null && (badgeCount ?? 0) > 0)
-                      Positioned(
-                        right: -8,
-                        top: -8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            borderRadius: BorderRadius.all(Radius.circular(10)),
-                          ),
-                          constraints: const BoxConstraints(minWidth: 16),
-                          child: Text('${(badgeCount! > 99) ? 99 : badgeCount}',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold)),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(title,
-                    style: const TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.w700)),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _SectionHeader extends StatelessWidget {
   final IconData icon;
@@ -1679,13 +1596,6 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-// Tiny extension to add onTap to any widget easily
-extension _InkOnTap on Widget {
-  Widget onTap(VoidCallback onTap) => Material(
-        color: Colors.transparent,
-        child: InkWell(onTap: onTap, child: this),
-      );
-}
 
 class _ChildSelectorCard extends StatelessWidget {
   final List<Map<String, dynamic>> children;
