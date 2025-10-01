@@ -2213,20 +2213,220 @@ function AdminTimetablePage() {
   );
 }
 
-function StudentTimetablePlaceholder() {
+function StudentTimetableView() {
+  const schoolData = useSchool();
+  const { data: session } = useSession();
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [items, setItems] = useState([]);
+  const [section, setSection] = useState(null);
+  const [isGridView, setIsGridView] = useState(true);
+  const [showWeekend, setShowWeekend] = useState(false);
+  const [rowDensity, setRowDensity] = useState('cozy');
+  const rowHeight = useMemo(() => (rowDensity === 'compact' ? 32 : rowDensity === 'comfortable' ? 56 : 40), [rowDensity]);
+
   const titleTextClasses = "text-black dark:text-white";
   const descriptionTextClasses = "text-zinc-600 dark:text-zinc-400";
+  const glassCardClasses = `p-6 md:p-8 rounded-xl backdrop-blur-xl backdrop-saturate-150 shadow-xl dark:shadow-2xl bg-white/60 border border-zinc-200/50 dark:bg-zinc-900/60 dark:border-zinc-700/50`;
+  const outlineButtonClasses = "border-zinc-300 text-black hover:bg-zinc-100 dark:border-zinc-700 dark:text-white dark:hover:bg-zinc-800";
+  const primaryButtonClasses = "bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200";
+
+  const schoolTimetableStartTime = schoolData?.timetableStartTime || '08:00';
+  const schoolTimetableEndTime = schoolData?.timetableEndTime || '17:00';
+  const timeSlots = useMemo(() => {
+    const slots = [];
+    const startHour = parseInt(schoolTimetableStartTime.split(':')[0], 10);
+    const startMinute = parseInt(schoolTimetableStartTime.split(':')[1], 10);
+    const endHour = parseInt(schoolTimetableEndTime.split(':')[0], 10);
+    const endMinute = parseInt(schoolTimetableEndTime.split(':')[1], 10);
+    let currentTime = startHour * 60 + startMinute;
+    const endTotalMinutes = endHour * 60 + endMinute;
+    while (currentTime < endTotalMinutes) {
+      const hours = Math.floor(currentTime / 60);
+      const minutes = currentTime % 60;
+      slots.push(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`);
+      currentTime += 30;
+    }
+    return slots;
+  }, [schoolTimetableStartTime, schoolTimetableEndTime]);
+
+  const days = useMemo(() => (
+    showWeekend
+      ? [
+          { value: '1', label: 'Monday' },
+          { value: '2', label: 'Tuesday' },
+          { value: '3', label: 'Wednesday' },
+          { value: '4', label: 'Thursday' },
+          { value: '5', label: 'Friday' },
+          { value: '6', label: 'Saturday' },
+          { value: '0', label: 'Sunday' },
+        ]
+      : [
+          { value: '1', label: 'Monday' },
+          { value: '2', label: 'Tuesday' },
+          { value: '3', label: 'Wednesday' },
+          { value: '4', label: 'Thursday' },
+          { value: '5', label: 'Friday' },
+        ]
+  ), [showWeekend]);
+
+  const fetchData = useCallback(async () => {
+    if (!schoolData?.id) return;
+    setIsLoading(true); setError('');
+    try {
+      const res = await fetch(`/api/schools/${schoolData.id}/students/me/timetable`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load timetable');
+      setSection(data.section || null);
+      setItems(Array.isArray(data.timetable) ? data.timetable : []);
+    } catch (e) {
+      setError(e.message);
+      setItems([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [schoolData?.id]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const calculateSpanAndOffset = useCallback((startTime, endTime) => {
+    const toMin = (t) => { const [h, m] = t.split(':').map(Number); return h*60+m; };
+    const startMins = toMin(startTime);
+    const endMins = toMin(endTime);
+    const durationMins = endMins - startMins;
+    const gridStartTimeMins = (() => { const [h,m] = (timeSlots[0]||'00:00').split(':').map(Number); return h*60+m; })();
+    const offsetMins = startMins - gridStartTimeMins;
+    const topOffsetPx = (offsetMins / 30) * rowHeight;
+    const heightPx = (durationMins / 30) * rowHeight;
+    return { topOffsetPx, heightPx };
+  }, [timeSlots, rowHeight]);
+
+  const colorForKey = (key) => {
+    const keyStr = String(key || '');
+    let h = 0; for (let i = 0; i < keyStr.length; i++) h = (h * 31 + keyStr.charCodeAt(i)) >>> 0;
+    const hue = h % 360, s = 70, l = 45;
+    return { bg: `hsla(${hue}, ${s}%, ${Math.min(92, l + 40)}%, 0.35)`, border: `hsl(${hue} ${s}% ${Math.max(30, l - 5)}%)`, text: '#0b1324' };
+  };
+
   return (
     <RequireRole role="STUDENT">
       <div className="space-y-4">
-        <h1 className={`text-2xl md:text-3xl font-bold ${titleTextClasses} flex items-center`}>
-          <CalendarDays className="mr-3 h-8 w-8 opacity-80"/>My Timetable
-        </h1>
-        <div className="p-6 rounded-xl bg-white/60 dark:bg-zinc-900/60 border border-zinc-200/50 dark:border-zinc-700/50">
-          <p className={descriptionTextClasses}>
-            Your timetable view is coming soon. In the meantime, you can check your assignments and grades from the Academics section.
-          </p>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className={`text-2xl md:text-3xl font-bold ${titleTextClasses} flex items-center`}>
+              <CalendarDays className="mr-3 h-8 w-8 opacity-80"/>My Timetable
+            </h1>
+            <p className={descriptionTextClasses}>{section ? `Section: ${section.class?.name || ''} - ${section.name}` : 'No current section found.'}</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setIsGridView(true)} className={`${isGridView ? primaryButtonClasses : outlineButtonClasses}`}>Grid</Button>
+            <Button variant="outline" onClick={() => setIsGridView(false)} className={`${!isGridView ? primaryButtonClasses : outlineButtonClasses}`}>List</Button>
+            <Button variant="outline" onClick={() => window.print()} className={outlineButtonClasses}>Print</Button>
+          </div>
         </div>
+
+        {error && (
+          <Alert variant="destructive" className="bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300 dark:border-red-700/50">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {isLoading ? (
+          <div className="flex justify-center items-center h-48"><Loader2 className="h-8 w-8 animate-spin"/></div>
+        ) : items.length === 0 ? (
+          <div className={`${glassCardClasses}`}>
+            <p className={descriptionTextClasses}>No timetable entries found for your current section.</p>
+          </div>
+        ) : (
+          <>
+            {isGridView ? (
+              <div className={`${glassCardClasses} overflow-auto custom-scrollbar`}
+                   style={{ maxHeight: 'calc(100vh - 240px)' }}>
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex items-center gap-2">
+                    <Label className={titleTextClasses}>Days</Label>
+                    <Button variant="outline" size="sm" className={outlineButtonClasses}
+                            onClick={() => setShowWeekend(v => !v)}>
+                      {showWeekend ? 'Mon–Sun' : 'Mon–Fri'}
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className={titleTextClasses}>Density</Label>
+                    <div className="inline-flex rounded-md border border-zinc-300 dark:border-zinc-700 overflow-hidden">
+                      <button type="button" className={`px-2 py-1 text-xs ${rowDensity==='compact' ? 'bg-zinc-200 dark:bg-zinc-700' : ''}`} onClick={() => setRowDensity('compact')}>Compact</button>
+                      <button type="button" className={`px-2 py-1 text-xs border-l border-zinc-300 dark:border-zinc-700 ${rowDensity==='cozy' ? 'bg-zinc-200 dark:bg-zinc-700' : ''}`} onClick={() => setRowDensity('cozy')}>Cozy</button>
+                      <button type="button" className={`px-2 py-1 text-xs border-l border-zinc-300 dark:border-zinc-700 ${rowDensity==='comfortable' ? 'bg-zinc-200 dark:bg-zinc-700' : ''}`} onClick={() => setRowDensity('comfortable')}>Comfortable</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid text-sm border-t border-l border-zinc-200 dark:border-zinc-700 min-w-max"
+                     style={{ gridAutoRows: `${rowHeight}px`, gridTemplateColumns: `72px repeat(${days.length}, minmax(140px, 1fr))` }}>
+                  <div className="sticky top-0 left-0 bg-white dark:bg-zinc-950 z-40 p-2 border-b border-r border-zinc-200 dark:border-zinc-700"></div>
+                  {days.map(day => (
+                    <div key={day.value} className="sticky top-0 z-30 text-center font-semibold p-2 bg-gradient-to-b from-zinc-100 to-zinc-50 dark:from-zinc-800 dark:to-zinc-900 border-b border-r border-zinc-200 dark:border-zinc-700">{day.label}</div>
+                  ))}
+
+                  {timeSlots.map((time, timeIndex) => (
+                    <React.Fragment key={time}>
+                      <div className={`sticky left-0 z-20 p-2 font-medium border-b border-r border-zinc-200 dark:border-zinc-700 h-full flex items-center justify-center ${timeIndex % 2 === 1 ? 'bg-zinc-50 dark:bg-zinc-900/40' : 'bg-white dark:bg-zinc-950'}`}>{time}</div>
+                      {days.map(day => (
+                        <div key={`${day.value}-${time}`} className={`relative p-0 border-b border-r border-zinc-200 dark:border-zinc-700 h-full`}>
+                          {timeIndex % 2 === 1 && (<div className="absolute inset-0 -z-20 bg-zinc-50 dark:bg-zinc-900/40" />)}
+                          {items.filter(e => String(e.dayOfWeek) === day.value && e.startTime === time).map((entry) => {
+                            const { heightPx } = calculateSpanAndOffset(entry.startTime, entry.endTime);
+                            const colors = colorForKey(entry.subject?.id || entry.id);
+                            return (
+                              <div key={entry.id} className="absolute rounded-md p-1.5 text-[11px] leading-tight overflow-hidden shadow-sm"
+                                   style={{ top: 0, height: `${heightPx}px`, left: '3px', right: '3px', backgroundColor: colors.bg, border: `1px solid ${colors.border}`, color: colors.text }}>
+                                <div className="flex items-center justify-between">
+                                  <strong className="block truncate pr-2">{entry.subject?.name || 'Subject'}</strong>
+                                  <span className="text-[10px] text-zinc-700 dark:text-zinc-300">{entry.startTime}–{entry.endTime}</span>
+                                </div>
+                                <span className="block truncate text-zinc-700 dark:text-zinc-300">{entry.staff?.name || ''}</span>
+                                <span className="block truncate text-zinc-600 dark:text-zinc-400">{entry.room?.name || ''}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className={`${glassCardClasses} overflow-x-auto`}>
+                <h2 className={`text-xl font-bold ${titleTextClasses} mb-4 flex items-center`}>
+                  <List className="mr-2 h-6 w-6 opacity-80"/>Timetable List
+                </h2>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-zinc-200/80 dark:border-zinc-700/80">
+                      <TableHead className={`${titleTextClasses} font-semibold`}>Day</TableHead>
+                      <TableHead className={`${titleTextClasses} font-semibold`}>Time</TableHead>
+                      <TableHead className={`${titleTextClasses} font-semibold`}>Subject</TableHead>
+                      <TableHead className={`${titleTextClasses} font-semibold`}>Teacher</TableHead>
+                      <TableHead className={`${titleTextClasses} font-semibold hidden md:table-cell`}>Room</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items.map((e) => (
+                      <TableRow key={e.id} className="border-zinc-200/50 dark:border-zinc-800/50 hover:bg-zinc-500/5 dark:hover:bg-white/5">
+                        <TableCell className={descriptionTextClasses}>{getDayName(e.dayOfWeek)}</TableCell>
+                        <TableCell className={descriptionTextClasses}>{e.startTime} - {e.endTime}</TableCell>
+                        <TableCell className={descriptionTextClasses}>{e.subject?.name || '-'}</TableCell>
+                        <TableCell className={descriptionTextClasses}>{e.staff?.name || '-'}</TableCell>
+                        <TableCell className={`${descriptionTextClasses} hidden md:table-cell`}>{e.room?.name || '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </RequireRole>
   );
@@ -2242,7 +2442,7 @@ export default function TimetablePage() {
     );
   }
   if (session?.user?.role === 'STUDENT') {
-    return <StudentTimetablePlaceholder/>;
+    return <StudentTimetableView/>;
   }
   return <AdminTimetablePage/>;
 }
