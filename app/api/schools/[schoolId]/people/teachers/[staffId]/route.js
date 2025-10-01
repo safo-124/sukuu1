@@ -26,6 +26,7 @@ export async function GET(request, { params }) {
           }
         },
         department: { select: { id: true, name: true } },
+        departments: { include: { department: { select: { id: true, name: true } } } },
       }
     });
 
@@ -33,7 +34,32 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Teacher not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ teacher }, { status: 200 });
+    // Derive subjects per department and classes taught
+    const staffIdStr = staffId;
+    const depts = await prisma.staffDepartment.findMany({ where: { schoolId, staffId: staffIdStr }, include: { department: true } });
+    // Subjects the teacher teaches via StaffSubjectLevel
+    const ssl = await prisma.staffSubjectLevel.findMany({ where: { schoolId, staffId: staffIdStr }, include: { subject: { select: { id: true, name: true, departmentId: true } }, class: { select: { id: true, name: true } } } });
+    const subjectsByDept = {};
+    const classesBySubject = {};
+    for (const row of ssl) {
+      const deptId = row.subject?.departmentId || 'none';
+      if (!subjectsByDept[deptId]) subjectsByDept[deptId] = new Map();
+      if (row.subject) subjectsByDept[deptId].set(row.subject.id, row.subject);
+      if (row.subject) {
+        const key = row.subject.id;
+        classesBySubject[key] = classesBySubject[key] || new Map();
+        if (row.class) classesBySubject[key].set(row.class.id, row.class);
+      }
+    }
+    const departments = depts.map(d => ({ id: d.department.id, name: d.department.name }));
+    const departmentsWithSubjects = departments.map(d => ({
+      id: d.id,
+      name: d.name,
+      subjects: Array.from(subjectsByDept[d.id]?.values() || []),
+    }));
+    const subjectClasses = Object.fromEntries(Object.entries(classesBySubject).map(([sid, m]) => [sid, Array.from(m.values())]));
+
+    return NextResponse.json({ teacher, departments: departmentsWithSubjects, subjectClasses }, { status: 200 });
   } catch (error) {
     console.error('GET people/teachers/[staffId] error:', error);
     return NextResponse.json({ error: 'Failed to fetch teacher.' }, { status: 500 });

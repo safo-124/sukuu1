@@ -50,6 +50,7 @@ export async function GET(request, { params }) {
         include: {
           user: { select: { id: true, email: true, firstName: true, lastName: true, phoneNumber: true, profilePictureUrl: true, role: true } },
           department: { select: { id: true, name: true } },
+          departments: { include: { department: { select: { id: true, name: true } } } },
         },
         orderBy: [
           { user: { lastName: 'asc' } },

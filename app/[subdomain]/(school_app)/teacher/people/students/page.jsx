@@ -27,6 +27,7 @@ export default function TeacherStudentsPage() {
   const [subjects, setSubjects] = useState([]);
   const [filters, setFilters] = useState({ classId:'', levelId:'', subjectId:'' });
   const [showFilters, setShowFilters] = useState(false);
+  const [summary, setSummary] = useState(null);
 
   const loadFilters = useCallback(async () => {
     if (!school?.id) return;
@@ -66,6 +67,19 @@ export default function TeacherStudentsPage() {
 
   useEffect(() => { loadFilters(); }, [loadFilters]);
   useEffect(() => { loadStudents(); }, [loadStudents]);
+
+  useEffect(() => {
+    const loadSummary = async () => {
+      if (!school?.id) return;
+      try {
+        const res = await fetch(`/api/schools/${school.id}/teachers/me/summary`);
+        if (!res.ok) return; // optional
+        const data = await res.json();
+        setSummary(data);
+      } catch {}
+    };
+    loadSummary();
+  }, [school?.id]);
 
   // Default to first subject (mine) so the initial view shows students enrolled in my subject
   useEffect(() => {
@@ -149,6 +163,26 @@ export default function TeacherStudentsPage() {
           </div>
         </div>
       )}
+
+      {summary?.departments?.length ? (
+        <div className="rounded-lg border p-3 bg-zinc-50 dark:bg-zinc-900">
+          <div className="text-sm font-medium mb-2">My Departments & Subjects</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {summary.departments.map(d => (
+              <div key={d.id} className="text-xs">
+                <div className="font-semibold mb-1">{d.name}</div>
+                <div className="flex flex-wrap gap-2">
+                  {(d.subjects||[]).map(s => (
+                    <span key={s.id} className="px-2 py-0.5 rounded-full bg-white dark:bg-zinc-800 border text-zinc-700 dark:text-zinc-200">
+                      {s.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="overflow-x-auto border rounded-lg">
         <Table className="min-w-full">

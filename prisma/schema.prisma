@@ -275,6 +275,7 @@ model School {
   parentTeacherMessages   ParentTeacherMessage[]
   usageSnapshots          UsageSnapshot[]
   billingInvoices         BillingInvoice[]
+  staffDepartments        StaffDepartment[]
   // Advanced Timetable relations
   sectionSubjectRequirements SectionSubjectRequirement[]
   staffUnavailabilities      StaffUnavailability[]
@@ -508,6 +509,8 @@ model Department {
 
   subjects  Subject[]
   staff     Staff[]
+  // NEW: Many-to-many link to staff via StaffDepartment (in addition to legacy single departmentId on Staff)
+  staffLinks StaffDepartment[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
@@ -723,8 +726,25 @@ model Staff {
   createdAt                 DateTime               @default(now())
   updatedAt                 DateTime               @updatedAt
 
+  // NEW: Many-to-many departments membership
+  departments StaffDepartment[]
+
   @@unique([schoolId, staffIdNumber])
   @@index([userId])
+  @@index([schoolId])
+}
+
+// NEW: Explicit many-to-many link between Staff and Department for multi-department membership
+model StaffDepartment {
+  staffId      String
+  staff        Staff      @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  schoolId     String
+  school       School     @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  assignedAt   DateTime   @default(now())
+
+  @@id([staffId, departmentId])
   @@index([schoolId])
 }
 
