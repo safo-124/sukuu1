@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSchool } from '../../../../layout';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ export default function NewLoanPage() {
   const schoolData = useSchool();
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const { data: session } = useSession();
   const effectiveSubdomain = schoolData?.subdomain || params?.subdomain;
 
@@ -39,11 +40,16 @@ export default function NewLoanPage() {
         if (!bRes.ok) throw new Error(bData.error || 'Failed to load books');
         setStudents(sData.students || []);
         setBooks(bData.books || []);
+        // Prefill student if provided in query
+        const preId = searchParams?.get('studentId');
+        if (preId) {
+          setForm(prev => ({ ...prev, studentId: preId }));
+        }
       } catch (err) { toast.error('Load failed', { description: err.message }); }
       finally { setLoading(false); }
     };
     load();
-  }, [schoolData?.id]);
+  }, [schoolData?.id, searchParams]);
 
   const onSubmit = async (e) => {
     e.preventDefault(); if (!schoolData?.id) return;

@@ -28,7 +28,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'; // Added ScrollArea
 // Lucide React Icons
 import { 
   UserPlus, Edit3, Eye, Search, AlertTriangle, Users as UsersIcon, 
-  ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Loader2, ArrowUpRight, Repeat2 
+  ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Loader2, ArrowUpRight, Repeat2, BookOpen 
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 
@@ -729,6 +729,20 @@ export default function ManageStudentsPage() {
                       <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} title="Edit Student" onClick={() => openEditStudentDialog(student)}> <Edit3 className="h-4 w-4" /> </Button>
                     )}
                     <Button variant="outline" size="icon" className={`${outlineButtonClasses} h-8 w-8`} title="View Profile" onClick={() => viewStudentProfile(student.id)}> <Eye className="h-4 w-4" /> </Button>
+                    {(session?.user?.role === 'SCHOOL_ADMIN' || session?.user?.role === 'LIBRARIAN') && (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className={`${outlineButtonClasses} h-8 w-8`}
+                        title="Borrow Book"
+                        onClick={() => {
+                          const sub = schoolData?.subdomain || pathname.split('/')[1];
+                          router.push(`/${sub}/resources/library/loans/new?studentId=${student.id}`);
+                        }}
+                      >
+                        <BookOpen className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
