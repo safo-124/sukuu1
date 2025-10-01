@@ -83,6 +83,8 @@ export async function GET(request, { params }) {
             title: true,
             dueDate: true,
             maxMarks: true,
+            isTest: true,
+            testDeliveryMode: true,
             subject: { select: { id: true, name: true } },
             section: { select: { id: true, name: true, class: { select: { id: true, name: true } } } },
           },
@@ -169,7 +171,7 @@ export async function GET(request, { params }) {
       if (g.assignmentId && g.assignment) {
         entry.assessments.push({
           id: g.assignment.id,
-          type: 'ASSIGNMENT',
+          type: g.assignment.isTest ? 'TEST' : 'ASSIGNMENT',
           title: g.assignment.title,
           subject: g.assignment.subject,
           class: g.assignment.section?.class || null,
@@ -180,6 +182,8 @@ export async function GET(request, { params }) {
           isPublished: g.isPublished,
           publishedAt: g.publishedAt,
           comments: g.comments || null,
+          isTest: g.assignment.isTest === true,
+          testDeliveryMode: g.assignment.testDeliveryMode || null,
           source: { assignmentId: g.assignmentId, examScheduleId: null },
         });
       } else if (g.examScheduleId && g.examSchedule) {

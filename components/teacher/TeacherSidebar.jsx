@@ -2,7 +2,7 @@
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useState, useMemo } from 'react';
-import { LayoutDashboard, BookOpen, Percent, CalendarDays, CheckSquare, GraduationCap, Users, UserCog, Newspaper, ChevronDown, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Percent, CalendarDays, CheckSquare, Users, UserCog, Newspaper, ChevronDown, ChevronRight } from 'lucide-react';
 
 /**
  * TeacherSidebar
@@ -32,7 +32,6 @@ export default function TeacherSidebar({ subdomain, onNavigate, collapsed = fals
   { href: `/${subdomain}/teacher/academics/grades/tests`, label: 'Test Grades', icon: Percent },
         { href: `/${subdomain}/teacher/academics/grades/summary`, label: 'Grades Summary', icon: Percent },
         { href: `/${subdomain}/teacher/academics/timetable`, label: 'My Timetable', icon: CalendarDays },
-        { href: `/${subdomain}/teacher/academics/examinations`, label: 'Examinations', icon: GraduationCap },
       ]
     },
     {

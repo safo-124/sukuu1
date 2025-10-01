@@ -11,24 +11,11 @@ import 'attendance_page.dart';
 import 'fees_page.dart';
 import 'profile_page.dart'; // used for AppBar actions navigation
 import 'promotions_page.dart';
+import 'assessments_page.dart';
 import '../ui/glass.dart';
-import '../ui/enhanced_components.dart';
+// import '../ui/enhanced_components.dart';
 
-class _PlaceholderPage extends StatelessWidget {
-  final String title;
-  const _PlaceholderPage({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Text('$title coming soon',
-            style: const TextStyle(color: Colors.black54)),
-      ),
-    );
-  }
-}
+// Removed unused _PlaceholderPage
 
 class MainTabsPage extends StatefulWidget {
   const MainTabsPage({super.key});
@@ -174,37 +161,7 @@ class _MainTabsPageState extends State<MainTabsPage> {
     );
   }
 
-  static Widget _badgeIcon(IconData icon, int count) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Icon(icon),
-        if (count > 0)
-          Positioned(
-            right: -6,
-            top: -4,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-              decoration: BoxDecoration(
-                color: Colors.redAccent,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              constraints: const BoxConstraints(minWidth: 18),
-              child: Text(
-                count > 99 ? '99+' : '$count',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  height: 1.1,
-                ),
-              ),
-            ),
-          )
-      ],
-    );
-  }
+  // Removed unused _badgeIcon
 }
 
 class _GradesTab extends StatefulWidget {
@@ -360,6 +317,23 @@ class _GradesTabState extends State<_GradesTab> {
                     },
                     decoration: const InputDecoration(labelText: 'Child'),
                   ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: () {
+                    if (_selectedChild == null) return;
+                    final sid = _selectedChild!['id'].toString();
+                    final sname = (
+                      '${_selectedChild!['firstName'] ?? ''} ${_selectedChild!['lastName'] ?? ''}'
+                    ).trim();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => AssessmentsPage(studentId: sid, studentName: sname),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.view_list),
+                  label: const Text('All assessments'),
                 ),
               ],
             ),

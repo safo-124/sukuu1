@@ -63,6 +63,26 @@ class ParentsApiClient {
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> getChildrenAssessments({
+    bool publishedOnly = true,
+    bool includeUpcoming = false,
+    int limit = 100,
+  }) async {
+    final qp = <String, String>{
+      'publishedOnly': publishedOnly ? 'true' : 'false',
+      'includeUpcoming': includeUpcoming ? 'true' : 'false',
+      'limit': '$limit',
+    };
+    final uri = Uri.parse(
+            '$baseUrl/api/schools/$schoolId/parents/me/children/assessments')
+        .replace(queryParameters: qp);
+    final res = await http.get(uri, headers: _headers);
+    if (res.statusCode != 200) {
+      throw Exception('Assessments fetch failed: ${res.statusCode} ${res.body}');
+    }
+    return jsonDecode(res.body) as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> getParentMessagesToTeacher(
       {int limit = 50}) async {
     final uri = Uri.parse(
