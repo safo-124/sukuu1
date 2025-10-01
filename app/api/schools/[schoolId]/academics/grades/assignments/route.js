@@ -106,6 +106,10 @@ export async function POST(request, { params }) {
               sectionId: effectiveSectionId ?? (assignment.sectionId || (assignment.class ? undefined : undefined)),
               assignmentId,
               marksObtained,
+              // Auto-publish assignment grades upon creation
+              isPublished: true,
+              publishedAt: new Date(),
+              publishedById: session.user.id,
             },
           });
         }
@@ -117,7 +121,7 @@ export async function POST(request, { params }) {
     } catch (e) {
       console.warn('Ranking recompute skipped (assignment):', e?.message || e);
     }
-    return NextResponse.json({ success: true, message: 'Assignment grades saved.' }, { status: 200 });
+    return NextResponse.json({ success: true, message: 'Assignment grades saved and published.' }, { status: 200 });
   } catch (error) {
     console.error('POST assignment grades error:', error);
     return NextResponse.json({ error: 'Failed to save assignment grades.' }, { status: 500 });

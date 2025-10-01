@@ -173,7 +173,8 @@ export default function TeacherContinuousGradesPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Enter Classwork/Test & Assignment Grades</h1>
+  <h1 className="text-2xl font-semibold">Enter Classwork/Test & Assignment Grades</h1>
+  <p className="text-xs text-muted-foreground">Note: Test and Assignment grades are auto-published as soon as they are saved.</p>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
           <label className="block text-sm mb-1">Subject</label>
@@ -253,8 +254,8 @@ export default function TeacherContinuousGradesPage() {
       </div>
 
       <div className="flex gap-2">
-        <Button onClick={submitAssignment} disabled={!selected.assignmentId || !selected.subjectId || !selected.sectionId}>Save Assignment Grades</Button>
-        <Button variant="secondary" onClick={submitTest} disabled={!testLabel || !!selected.assignmentId || !selected.subjectId || !selected.sectionId}>Save Test Grades</Button>
+  <Button onClick={submitAssignment} disabled={!selected.assignmentId || !selected.subjectId || !selected.sectionId}>Save & Publish Assignment Grades</Button>
+  <Button variant="secondary" onClick={submitTest} disabled={!testLabel || !!selected.assignmentId || !selected.subjectId || !selected.sectionId}>Save & Publish Test Grades</Button>
       </div>
     </div>
   );

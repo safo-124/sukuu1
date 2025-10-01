@@ -63,7 +63,22 @@ export async function POST(request, { params }) {
             continue;
           }
         } else {
-          await tx.grade.create({ data: { studentId: g.studentId, subjectId, termId, academicYearId, schoolId, sectionId, marksObtained: g.marksObtained, comments: label } });
+          await tx.grade.create({
+            data: {
+              studentId: g.studentId,
+              subjectId,
+              termId,
+              academicYearId,
+              schoolId,
+              sectionId,
+              marksObtained: g.marksObtained,
+              comments: label,
+              // Auto-publish tests upon creation
+              isPublished: true,
+              publishedAt: new Date(),
+              publishedById: session.user.id,
+            },
+          });
         }
       }
     });
@@ -73,7 +88,7 @@ export async function POST(request, { params }) {
     } catch (e) {
       console.warn('Ranking recompute skipped (test):', e?.message || e);
     }
-    return NextResponse.json({ success: true, message: 'Test grades saved.' }, { status: 200 });
+    return NextResponse.json({ success: true, message: 'Test grades saved and published.' }, { status: 200 });
   } catch (error) {
     console.error('POST test grades error:', error);
     return NextResponse.json({ error: 'Failed to save test grades.' }, { status: 500 });
