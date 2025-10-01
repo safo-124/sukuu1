@@ -97,6 +97,12 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const body = await request.json();
+    // Normalize special tokens before validation
+    if (session?.user?.role === 'TEACHER') {
+      if (!body.teacherId || body.teacherId === 'self') {
+        body.teacherId = session.user?.staffProfileId || '';
+      }
+    }
 
     // Validate schoolId from path parameters
     const parsedSchoolId = schoolIdSchema.parse(schoolId);

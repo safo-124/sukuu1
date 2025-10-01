@@ -27,8 +27,9 @@ export default function TeacherSidebar({ subdomain, onNavigate, collapsed = fals
         { href: `/${subdomain}/teacher/academics/subjects`, label: 'My Subjects', icon: BookOpen },
   { href: `/${subdomain}/teacher/academics/assignments`, label: 'Assignments', icon: CheckSquare },
   { href: `/${subdomain}/teacher/academics/tests`, label: 'Tests', icon: CheckSquare },
-        { href: `/${subdomain}/teacher/academics/grades/exams`, label: 'Exam Grades', icon: Percent },
-        { href: `/${subdomain}/teacher/academics/grades/continuous`, label: 'CA Grades', icon: Percent },
+  { href: `/${subdomain}/teacher/academics/grades/exams`, label: 'Exam Grades', icon: Percent },
+  { href: `/${subdomain}/teacher/academics/grades/continuous`, label: 'Assignment Grades', icon: Percent },
+  { href: `/${subdomain}/teacher/academics/grades/tests`, label: 'Test Grades', icon: Percent },
         { href: `/${subdomain}/teacher/academics/timetable`, label: 'My Timetable', icon: CalendarDays },
         { href: `/${subdomain}/teacher/academics/examinations`, label: 'Examinations', icon: GraduationCap },
       ]

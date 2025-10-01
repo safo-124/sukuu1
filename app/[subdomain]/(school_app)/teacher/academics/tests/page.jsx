@@ -74,7 +74,7 @@ export default function TeacherTestsPage() {
       const payload = {
         title: newTest.title,
         description: '',
-        dueDate: newTest.dueDate,
+        dueDate: newTest.dueDate ? new Date(newTest.dueDate).toISOString() : undefined,
         subjectId: filters.subjectId,
         sectionId: filters.sectionId || null,
         classId: undefined,
