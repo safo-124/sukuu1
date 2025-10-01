@@ -157,10 +157,10 @@ export default function TeacherTestsPage() {
         </div>
         <div>
           <label className="block text-sm mb-1">Section (optional)</label>
-          <Select value={filters.sectionId || ''} onValueChange={(v)=>setFilters(s=>({...s, sectionId: v}))}>
+          <Select value={filters.sectionId || '__all__'} onValueChange={(v)=>setFilters(s=>({...s, sectionId: v === '__all__' ? '' : v}))}>
             <SelectTrigger><SelectValue placeholder="All sections" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All</SelectItem>
+              <SelectItem value="__all__">All</SelectItem>
               {sections.map(sec => (<SelectItem value={sec.id} key={sec.id}>{sec.class?.name} - {sec.name}</SelectItem>))}
             </SelectContent>
           </Select>
