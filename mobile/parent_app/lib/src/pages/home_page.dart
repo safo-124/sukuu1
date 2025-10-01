@@ -44,6 +44,7 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> _recentGrades = [];
   List<Map<String, dynamic>> _recentAttendance = [];
   List<Map<String, dynamic>> _recentRemarks = [];
+  // ignore: unused_field
   int _pendingExplanations =
       0; // number of attendance items requesting explanation
   // Full attendance list for calendar markers
