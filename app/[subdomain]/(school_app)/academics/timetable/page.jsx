@@ -22,8 +22,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Clock, CalendarDays, PlusCircle, Loader2, AlertTriangle, Home, BookOpen, UserCog, Layers, Filter, Maximize, Edit3, Trash2, XCircle, Grid, List, Lightbulb, Rocket } from 'lucide-react'; // Added icons
 
-// Visual constants for the timetable grid
-const GRID_ROW_HEIGHT = 48; // px per 30-minute slot (reduced from 60 to compact the grid)
+// Visual defaults for the timetable grid (row height will be dynamic below)
+// const GRID_ROW_HEIGHT = 48;
 
 // Helper function to convert day number to name (JS Date.getDay() standard: Sunday=0, Monday=1, ..., Saturday=6)
 const getDayName = (dayNum) => {
@@ -187,6 +187,12 @@ function AdminTimetablePage() {
   const [isGenOptionsOpen, setIsGenOptionsOpen] = useState(false);
   const [genOptions, setGenOptions] = useState({ includePinned: true, honorUnavailability: true, preferredStartTime: '', preferredEndTime: '', targetSectionIds: [] });
 
+  // Display controls
+  const [showWeekend, setShowWeekend] = useState(false);
+  const [rowDensity, setRowDensity] = useState('cozy'); // 'compact' | 'cozy' | 'comfortable'
+  const rowHeight = useMemo(() => (rowDensity === 'compact' ? 32 : rowDensity === 'comfortable' ? 56 : 40), [rowDensity]);
+  const [fitHeight, setFitHeight] = useState(true);
+
   // Requirements management state
   const [isReqDialogOpen, setIsReqDialogOpen] = useState(false);
   const [requirements, setRequirements] = useState([]);
@@ -305,6 +311,11 @@ function AdminTimetablePage() {
     { value: '0', label: 'Sunday' },
   ], []);
 
+  const visibleDays = useMemo(() => {
+    const base = getDayOfWeekOptions;
+    return showWeekend ? base : base.filter(d => ['1','2','3','4','5'].includes(d.value));
+  }, [getDayOfWeekOptions, showWeekend]);
+
   // Timetable start/end times from schoolData, with fallbacks
   const schoolTimetableStartTime = schoolData?.timetableStartTime || "08:00";
   const schoolTimetableEndTime = schoolData?.timetableEndTime || "17:00";
@@ -351,11 +362,11 @@ function AdminTimetablePage() {
     const gridStartTimeMins = timeToMinutes(timeSlots[0] || '00:00'); // Time of the very first slot displayed
     const offsetMins = startMins - gridStartTimeMins;
 
-    const topOffsetPx = (offsetMins / 30) * GRID_ROW_HEIGHT; // use constant row height
-    const heightPx = (durationMins / 30) * GRID_ROW_HEIGHT; // Height of the entry card
+    const topOffsetPx = (offsetMins / 30) * rowHeight; // dynamic row height
+    const heightPx = (durationMins / 30) * rowHeight; // Height of the entry card
 
     return { topOffsetPx, heightPx };
-  }, [timeSlots]);
+  }, [timeSlots, rowHeight]);
 
 
   // --- Fetching Data ---
@@ -1942,7 +1953,30 @@ function AdminTimetablePage() {
         <>
           {isGridView ? (
             /* Timetable Grid Display */
-            <div className={`${glassCardClasses} overflow-auto max-h-[70vh] custom-scrollbar relative`}> {/* Make grid scroll within card */}
+            <div className={`${glassCardClasses} overflow-auto custom-scrollbar relative`}
+                 style={{ maxHeight: fitHeight ? 'calc(100vh - 220px)' : undefined }}> {/* Fit to viewport height if enabled */}
+              {/* Display Controls */}
+              <div className="flex flex-wrap items-center gap-3 mb-3">
+                <div className="flex items-center gap-2">
+                  <Label className={titleTextClasses}>Days</Label>
+                  <Button variant="outline" size="sm" className={outlineButtonClasses}
+                          onClick={() => setShowWeekend(v => !v)}>
+                    {showWeekend ? 'Mon–Sun' : 'Mon–Fri'}
+                  </Button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className={titleTextClasses}>Density</Label>
+                  <div className="inline-flex rounded-md border border-zinc-300 dark:border-zinc-700 overflow-hidden">
+                    <button type="button" className={`px-2 py-1 text-xs ${rowDensity==='compact' ? 'bg-zinc-200 dark:bg-zinc-700' : ''}`} onClick={() => setRowDensity('compact')}>Compact</button>
+                    <button type="button" className={`px-2 py-1 text-xs border-l border-zinc-300 dark:border-zinc-700 ${rowDensity==='cozy' ? 'bg-zinc-200 dark:bg-zinc-700' : ''}`} onClick={() => setRowDensity('cozy')}>Cozy</button>
+                    <button type="button" className={`px-2 py-1 text-xs border-l border-zinc-300 dark:border-zinc-700 ${rowDensity==='comfortable' ? 'bg-zinc-200 dark:bg-zinc-700' : ''}`} onClick={() => setRowDensity('comfortable')}>Comfortable</button>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className={titleTextClasses}>Fit Height</Label>
+                  <input type="checkbox" checked={fitHeight} onChange={(e) => setFitHeight(e.target.checked)} />
+                </div>
+              </div>
               {/* Legend for overlays */}
               <div className="flex flex-wrap items-center gap-4 mb-3 text-xs">
                 <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -1963,15 +1997,15 @@ function AdminTimetablePage() {
               </div>
               {/* Note: This grid is fixed height per 30-min slot. Cards span visually using absolute positioning. */}
               <div
-                className="grid grid-cols-[100px_repeat(7,minmax(140px,1fr))] text-sm border-t border-l border-zinc-200 dark:border-zinc-700 min-w-max"
-                style={{ gridAutoRows: `${GRID_ROW_HEIGHT}px` }} // 30 minutes per GRID_ROW_HEIGHT height
+                className="grid text-sm border-t border-l border-zinc-200 dark:border-zinc-700 min-w-max"
+                style={{ gridAutoRows: `${rowHeight}px`, gridTemplateColumns: `72px repeat(${visibleDays.length}, minmax(140px, 1fr))` }}
                 onMouseLeave={handleDragLeave} // Clear dragged over cell on mouse leave
               >
                 {/* Corner for empty space */}
                 <div className="sticky top-0 left-0 bg-white dark:bg-zinc-950 z-40 p-2 border-b border-r border-zinc-200 dark:border-zinc-700"></div>
                 {/* Day Headers */}
-                {getDayOfWeekOptions.map(day => (
-                  <div key={day.value} className="sticky top-0 z-30 text-center font-bold p-2 bg-zinc-100 dark:bg-zinc-800 border-b border-r border-zinc-200 dark:border-zinc-700">
+                {visibleDays.map(day => (
+                  <div key={day.value} className="sticky top-0 z-30 text-center font-semibold p-2 bg-gradient-to-b from-zinc-100 to-zinc-50 dark:from-zinc-800 dark:to-zinc-900 border-b border-r border-zinc-200 dark:border-zinc-700">
                     {day.label}
                   </div>
                 ))}
@@ -1980,14 +2014,14 @@ function AdminTimetablePage() {
                 {timeSlots.map((time, timeIndex) => (
                   <React.Fragment key={time}>
                     {/* Time Slot Header */}
-                    <div className="sticky left-0 bg-white dark:bg-zinc-950 z-20 p-2 font-bold border-b border-r border-zinc-200 dark:border-zinc-700 min-h-[48px] flex items-center justify-center">
+                    <div className="sticky left-0 bg-white dark:bg-zinc-950 z-20 p-2 font-medium border-b border-r border-zinc-200 dark:border-zinc-700 h-full flex items-center justify-center">
                       {time}
                     </div>
                     {/* Cells for each day */}
-                    {getDayOfWeekOptions.map(day => (
+                    {visibleDays.map(day => (
                       <div
                         key={`${day.value}-${time}`}
-                        className={`relative p-0 border-b border-r border-zinc-200 dark:border-zinc-700 min-h-[48px]
+                        className={`relative p-0 border-b border-r border-zinc-200 dark:border-zinc-700 h-full
                           ${draggedOverCell?.day === day.value && draggedOverCell?.time === time ? 'bg-sky-200/50 dark:bg-sky-800/50' : ''}`}
                         onDragOver={(e) => handleDragOver(e, day.value, time)}
                         onDrop={(e) => handleDrop(e, day.value, time)}
@@ -2021,7 +2055,7 @@ function AdminTimetablePage() {
                                 draggable={isAdmin} // Only admins can drag
                                 onDragStart={(e) => handleDragStart(e, entry)}
                                 onDragEnd={handleDragEnd}
-                                className="group absolute bg-sky-100 dark:bg-sky-900 border border-sky-300 dark:border-sky-700 text-sky-800 dark:text-sky-200 rounded p-1 text-[11px] leading-tight cursor-pointer hover:bg-sky-200 dark:hover:bg-sky-800 transition-colors z-10 overflow-hidden break-words shadow-sm"
+                                className="group absolute bg-sky-100/80 dark:bg-sky-900/80 backdrop-blur-sm border border-sky-300 dark:border-sky-700 text-sky-900 dark:text-sky-100 rounded-md p-1.5 text-[11px] leading-tight cursor-pointer hover:bg-sky-200 dark:hover:bg-sky-800 transition-colors z-10 overflow-hidden break-words shadow-sm"
                                 style={{
                                   top: `${relativeTopInCell}px`,
                                   height: `${entryHeight}px`,
@@ -2033,10 +2067,13 @@ function AdminTimetablePage() {
                                     if (isAdmin) openEditDialog(entry);
                                 }}
                               >
-                                <strong className="block truncate pr-10">{getSubjectNameDisplay(entry.subjectId)}</strong>
+                                <div className="flex items-center justify-between">
+                                  <strong className="block truncate pr-2">{getSubjectNameDisplay(entry.subjectId)}</strong>
+                                  <span className="text-[10px] text-zinc-600 dark:text-zinc-300">{entry.startTime}–{entry.endTime}</span>
+                                </div>
                                 <span className="block truncate text-zinc-700 dark:text-zinc-300">{getSectionFullName(entry.sectionId)}</span>
                                 <span className="block truncate text-zinc-600 dark:text-zinc-400">{getTeacherFullName(entry.staffId)}</span>
-                                <span className="block truncate text-zinc-600 dark:text-zinc-400">({getRoomNameDisplay(entry.roomId)})</span>
+                                <span className="block truncate text-zinc-600 dark:text-zinc-400">{getRoomNameDisplay(entry.roomId)}</span>
 
                                 {/* Edit/Delete buttons on hover */}
                 {isAdmin && (
