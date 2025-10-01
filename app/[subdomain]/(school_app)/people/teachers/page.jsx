@@ -160,6 +160,12 @@ export default function ManageTeachersPage() {
   const [editFormError, setEditFormError] = useState('');
   const [isLoadingDropdowns, setIsLoadingDropdowns] = useState(false);
 
+  // Department memberships (multi-membership) state for Edit dialog
+  const [deptMemberships, setDeptMemberships] = useState([]); // array of { id, name }
+  const [isLoadingMemberships, setIsLoadingMemberships] = useState(false);
+  const [addDeptId, setAddDeptId] = useState('');
+  const [isMutatingMembership, setIsMutatingMembership] = useState(false);
+
 
   // Tailwind class constants
   const titleTextClasses = "text-black dark:text-white";
@@ -202,6 +208,22 @@ export default function ManageTeachersPage() {
       toast.error("Error fetching departments for form", { description: err.message });
     } finally {
         setIsLoadingDropdowns(false);
+    }
+  }, [schoolData?.id]);
+
+  const fetchDeptMemberships = useCallback(async (staffId) => {
+    if (!schoolData?.id || !staffId) return;
+    setIsLoadingMemberships(true);
+    try {
+      const res = await fetch(`/api/schools/${schoolData.id}/people/teachers/${staffId}/departments`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to load memberships');
+      setDeptMemberships(Array.isArray(data.departments) ? data.departments : []);
+    } catch (e) {
+      setDeptMemberships([]);
+      toast.error('Failed to load department memberships', { description: e.message });
+    } finally {
+      setIsLoadingMemberships(false);
     }
   }, [schoolData?.id]);
 
@@ -334,6 +356,8 @@ export default function ManageTeachersPage() {
         isHostelWarden: !!currentHostelId,
         hostelId: currentHostelId || '',
             });
+            // Load multi-department memberships
+            fetchDeptMemberships(teacherStaffRecord.id);
         } else {
             toast.error("Teacher details not found.");
             setIsEditDialogOpen(false);
@@ -343,6 +367,48 @@ export default function ManageTeachersPage() {
         setIsEditDialogOpen(false);
     } finally {
         setIsSubmittingEdit(false);
+    }
+  };
+
+  const handleAddMembership = async () => {
+    if (!schoolData?.id || !currentEditingStaffId || !addDeptId || addDeptId === 'none') return;
+    setIsMutatingMembership(true);
+    const toastId = `add-membership-${currentEditingStaffId}-${addDeptId}`;
+    toast.loading('Adding department membership...', { id: toastId });
+    try {
+      const res = await fetch(`/api/schools/${schoolData.id}/people/teachers/${currentEditingStaffId}/departments`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ departmentId: addDeptId })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to add membership');
+      toast.success('Department added', { id: toastId });
+      setAddDeptId('');
+      fetchDeptMemberships(currentEditingStaffId);
+    } catch (e) {
+      toast.error('Add failed', { description: e.message, id: toastId });
+    } finally {
+      setIsMutatingMembership(false);
+    }
+  };
+
+  const handleRemoveMembership = async (departmentId, departmentName) => {
+    if (!schoolData?.id || !currentEditingStaffId || !departmentId) return;
+    if (!window.confirm(`Remove ${departmentName} from memberships?`)) return;
+    setIsMutatingMembership(true);
+    const toastId = `remove-membership-${currentEditingStaffId}-${departmentId}`;
+    toast.loading('Removing department...', { id: toastId });
+    try {
+      const url = new URL(`/api/schools/${schoolData.id}/people/teachers/${currentEditingStaffId}/departments`, window.location.origin);
+      url.searchParams.set('departmentId', departmentId);
+      const res = await fetch(url.toString(), { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to remove');
+      toast.success('Department removed', { id: toastId });
+      fetchDeptMemberships(currentEditingStaffId);
+    } catch (e) {
+      toast.error('Remove failed', { description: e.message, id: toastId });
+    } finally {
+      setIsMutatingMembership(false);
     }
   };
 
@@ -576,6 +642,42 @@ export default function ManageTeachersPage() {
                         isEdit={true}
                         isLoadingDeps={isLoadingDropdowns}
                     />
+                    {/* Department Memberships Editor */}
+                    <div className="mt-4 border-t pt-4 dark:border-zinc-700">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-sm font-medium text-zinc-600 dark:text-zinc-300">Department Memberships (multiple)</div>
+                      </div>
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {isLoadingMemberships ? (
+                          <Skeleton className="h-5 w-40" />
+                        ) : deptMemberships.length > 0 ? (
+                          deptMemberships.map(d => (
+                            <span key={d.id} className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs bg-white/50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-700">
+                              {d.name}
+                              <button type="button" className="text-red-600 dark:text-red-400 hover:underline" disabled={isMutatingMembership} onClick={() => handleRemoveMembership(d.id, d.name)}>Remove</button>
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-xs text-zinc-500">No memberships yet.</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Select value={addDeptId || 'none'} onValueChange={(val)=>setAddDeptId(val)} disabled={isLoadingDropdowns || isMutatingMembership}>
+                          <SelectTrigger className={`${inputTextClasses} max-w-xs`}>
+                            <SelectValue placeholder="Select department to add" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white dark:bg-zinc-900">
+                            <SelectItem value="none" disabled>Select department</SelectItem>
+                            {departments
+                              .filter(d => !deptMemberships.some(m => m.id === d.id))
+                              .map(d => (<SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>))}
+                          </SelectContent>
+                        </Select>
+                        <Button type="button" className={primaryButtonClasses} disabled={!addDeptId || addDeptId==='none' || isMutatingMembership} onClick={handleAddMembership}>
+                          {isMutatingMembership ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Adding...</> : 'Add Department'}
+                        </Button>
+                      </div>
+                    </div>
                     {editFormError && ( <p className="text-sm text-red-600 dark:text-red-400 md:col-span-full">{editFormError}</p> )}
                     <DialogFooter className="pt-6">
                         <DialogClose asChild><Button type="button" variant="outline" className={outlineButtonClasses} onClick={() => setIsEditDialogOpen(false)}>Cancel</Button></DialogClose>

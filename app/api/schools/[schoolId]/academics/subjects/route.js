@@ -79,7 +79,7 @@ export async function GET(request, { params }) {
         staffSubjectLevels: {
           where: isTeacherView ? { staffId: session.user?.staffProfileId } : undefined,
           select: {
-            staffId: true,
+            staff: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
             schoolLevel: { select: { id: true, name: true } },
           }
         },
