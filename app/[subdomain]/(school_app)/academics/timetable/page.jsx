@@ -1082,6 +1082,41 @@ function AdminTimetablePage() {
     return allPositioned;
   }, [timetableEntries, calculateSpanAndOffset]);
 
+  // Detect conflicts among currently visible entries (same staff/room/section overlapping in time on same day)
+  const conflictEntryIdSet = useMemo(() => {
+    const conflicts = new Set();
+    const byDay = new Map();
+    const toMin = (t) => { const [h,m] = String(t||'00:00').split(':').map(Number); return h*60+m; };
+    // Index by day
+    timetableEntries.forEach(e => {
+      const key = String(e.dayOfWeek);
+      if (!byDay.has(key)) byDay.set(key, []);
+      byDay.get(key).push(e);
+    });
+    // For each day, sort by start time and check overlaps
+    byDay.forEach(list => {
+      const arr = [...list].sort((a,b) => toMin(a.startTime) - toMin(b.startTime));
+      for (let i = 0; i < arr.length; i++) {
+        const a = arr[i];
+        const aStart = toMin(a.startTime), aEnd = toMin(a.endTime);
+        for (let j = i + 1; j < arr.length; j++) {
+          const b = arr[j];
+          const bStart = toMin(b.startTime), bEnd = toMin(b.endTime);
+          if (bStart >= aEnd) break; // no more overlaps possible due to sorting
+          const overlaps = aStart < bEnd && bStart < aEnd;
+          const sameStaff = a.staffId && b.staffId && a.staffId === b.staffId;
+          const sameRoom = a.roomId && b.roomId && a.roomId === b.roomId;
+          const sameSection = a.sectionId && b.sectionId && a.sectionId === b.sectionId;
+          if (overlaps && (sameStaff || sameRoom || sameSection)) {
+            conflicts.add(a.id);
+            conflicts.add(b.id);
+          }
+        }
+      }
+    });
+    return conflicts;
+  }, [timetableEntries]);
+
   // --- Drag and Drop Logic (Simplified) ---
   const [draggingEntry, setDraggingEntry] = useState(null);
   const [draggedOverCell, setDraggedOverCell] = useState(null); // { day: '1', time: '09:00' }
@@ -1186,7 +1221,7 @@ function AdminTimetablePage() {
 
 
   return (
-    <div className="space-y-8">
+  <div className="flex flex-col min-h-screen overflow-hidden space-y-6">
       {/* Print styles */}
       <style jsx global>{`
         @media print {
@@ -1205,27 +1240,68 @@ function AdminTimetablePage() {
             {isTeacher ? 'View your scheduled lessons.' : 'Create and manage class schedules for sections, teachers, and rooms.'}
           </p>
         </div>
-  <div className="flex flex-col sm:flex-row gap-2">
+  <div className="w-full lg:w-auto flex flex-col gap-2">
           {isAdmin && (
             <>
-              <Button className={primaryButtonClasses} onClick={() => runAutoGeneration()} disabled={isGenerating || isLoadingDeps} title="Run automatic generation now">
-                <Rocket className="mr-2 h-4 w-4" /> Generate Timetable
-              </Button>
-              <Button variant="outline" className={outlineButtonClasses} onClick={() => setIsGenOptionsOpen(true)} disabled={isGenerating || isLoadingDeps} title="Advanced generation options">
-                Advanced Options
-              </Button>
-              <Button variant="outline" className={outlineButtonClasses} onClick={() => { setIsReqDialogOpen(true); fetchRequirements(reqFilterSectionId); }} disabled={isLoadingDeps} title="Manage Subject Requirements">
-                Manage Subject Requirements
-              </Button>
-              <Button variant="outline" className={outlineButtonClasses} onClick={() => { setIsStaffUnavDialogOpen(true); fetchStaffUnavailability(staffUnavFilterStaffId); }} disabled={isLoadingDeps} title="Manage Staff Unavailability">
-                Manage Staff Unavailability
-              </Button>
-              <Button variant="outline" className={outlineButtonClasses} onClick={() => { setIsRoomUnavDialogOpen(true); fetchRoomUnavailability(roomUnavFilterRoomId); }} disabled={isLoadingDeps} title="Manage Room Unavailability">
-                Manage Room Unavailability
-              </Button>
-              <Button variant="outline" className={outlineButtonClasses} onClick={() => { setIsPinnedDialogOpen(true); fetchPinnedSlots(pinnedFilterSectionId, pinnedFilterStaffId); }} disabled={isLoadingDeps} title="Manage Pinned Slots">
-                Manage Pinned Slots
-              </Button>
+              {/* Row 1: Primary actions */}
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" className={primaryButtonClasses} onClick={() => runAutoGeneration()} disabled={isGenerating || isLoadingDeps} title="Run automatic generation now">
+                  <Rocket className="mr-2 h-4 w-4" /> Generate Timetable
+                </Button>
+                <Button size="sm" variant="outline" className={outlineButtonClasses} onClick={() => setIsGenOptionsOpen(true)} disabled={isGenerating || isLoadingDeps} title="Advanced generation options">
+                  Advanced Options
+                </Button>
+                <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setFormError(''); }}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className={primaryButtonClasses} onClick={openAddDialog}> <PlusCircle className="mr-2 h-4 w-4" /> Add Timetable Entry </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-lg md:max-w-2xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+                    <DialogHeader>
+                      <DialogTitle className={titleTextClasses}>{editingEntry ? 'Edit Timetable Entry' : 'Add New Timetable Entry'}</DialogTitle>
+                      <DialogDescription className={descriptionTextClasses}>
+                        {editingEntry ? 'Adjust the details for this timetable slot.' : 'Define a new teaching slot for a section, subject, teacher, and room.'}
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleSubmit} className="space-y-6 py-1">
+                      <TimetableFormFields
+                        formData={formData}
+                        onFormChange={handleFormChange}
+                        onSelectChange={handleSelectChange}
+                        sectionsList={sections}
+                        subjectsList={subjects}
+                        teachersList={teachers}
+                        roomsList={rooms}
+                        isLoadingDeps={isLoadingDeps}
+                      />
+                      {formError && ( <p className="text-sm text-red-600 dark:text-red-400 md:col-span-full">{formError}</p> )}
+                      <DialogFooter className="pt-6">
+                        <DialogClose asChild><Button type="button" variant="outline" className={outlineButtonClasses}>Cancel</Button></DialogClose>
+                        <Button type="submit" className={primaryButtonClasses} disabled={isSubmitting || isLoadingDeps}>
+                          {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>{editingEntry ? 'Saving...' : 'Creating...'}</> : editingEntry ? 'Save Changes' : 'Create Entry'}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              {/* Row 2: Management actions */}
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" className={outlineButtonClasses} onClick={() => { setIsReqDialogOpen(true); fetchRequirements(reqFilterSectionId); }} disabled={isLoadingDeps} title="Manage Subject Requirements">
+                  Manage Subject Requirements
+                </Button>
+                <Button size="sm" variant="outline" className={outlineButtonClasses} onClick={() => { setIsStaffUnavDialogOpen(true); fetchStaffUnavailability(staffUnavFilterStaffId); }} disabled={isLoadingDeps} title="Manage Staff Unavailability">
+                  Manage Staff Unavailability
+                </Button>
+                <Button size="sm" variant="outline" className={outlineButtonClasses} onClick={() => { setIsRoomUnavDialogOpen(true); fetchRoomUnavailability(roomUnavFilterRoomId); }} disabled={isLoadingDeps} title="Manage Room Unavailability">
+                  Manage Room Unavailability
+                </Button>
+                <Button size="sm" variant="outline" className={outlineButtonClasses} onClick={() => { setIsPinnedDialogOpen(true); fetchPinnedSlots(pinnedFilterSectionId, pinnedFilterStaffId); }} disabled={isLoadingDeps} title="Manage Pinned Slots">
+                  Manage Pinned Slots
+                </Button>
+              </div>
+
+              {/* Generation options dialog remains here */}
               <Dialog open={isGenOptionsOpen} onOpenChange={setIsGenOptionsOpen}>
                 <DialogContent className="sm:max-w-md bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
                   <DialogHeader>
@@ -1281,67 +1357,68 @@ function AdminTimetablePage() {
               </Dialog>
             </>
           )}
-          {/* Add Timetable Entry Button (admin only) */}
-          {isAdmin && (
-          <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setFormError(''); }}>
-            <DialogTrigger asChild>
-              <Button className={primaryButtonClasses} onClick={openAddDialog}> <PlusCircle className="mr-2 h-4 w-4" /> Add Timetable Entry </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-lg md:max-w-2xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
-              <DialogHeader>
-                <DialogTitle className={titleTextClasses}>{editingEntry ? 'Edit Timetable Entry' : 'Add New Timetable Entry'}</DialogTitle>
-                <DialogDescription className={descriptionTextClasses}>
-                  {editingEntry ? 'Adjust the details for this timetable slot.' : 'Define a new teaching slot for a section, subject, teacher, and room.'}
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-6 py-1">
-                <TimetableFormFields
-                  formData={formData}
-                  onFormChange={handleFormChange}
-                  onSelectChange={handleSelectChange}
-                  sectionsList={sections}
-                  subjectsList={subjects}
-                  teachersList={teachers}
-                  roomsList={rooms}
-                  isLoadingDeps={isLoadingDeps}
-                />
-                {formError && ( <p className="text-sm text-red-600 dark:text-red-400 md:col-span-full">{formError}</p> )}
-                <DialogFooter className="pt-6">
-                  <DialogClose asChild><Button type="button" variant="outline" className={outlineButtonClasses}>Cancel</Button></DialogClose>
-                  <Button type="submit" className={primaryButtonClasses} disabled={isSubmitting || isLoadingDeps}>
-                    {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>{editingEntry ? 'Saving...' : 'Creating...'}</> : editingEntry ? 'Save Changes' : 'Create Entry'}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-          )}
 
-          {/* View Toggle Buttons */}
-          <Button
-            variant="outline"
-            onClick={() => setIsGridView(true)}
-            className={`${isGridView ? primaryButtonClasses : outlineButtonClasses}`}
-            title="Switch to Grid View"
-          >
-            <Grid className="mr-2 h-4 w-4" /> Grid View
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setIsGridView(false)}
-            className={`${!isGridView ? primaryButtonClasses : outlineButtonClasses}`}
-            title="Switch to Table View"
-          >
-            <List className="mr-2 h-4 w-4" /> Table View
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => window.print()}
-            className={outlineButtonClasses}
-            title="Print Timetable"
-          >
-            Print Timetable
-          </Button>
+          {/* Row 3: View actions */}
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm"
+              variant="outline"
+              onClick={() => setIsGridView(true)}
+              className={`${isGridView ? primaryButtonClasses : outlineButtonClasses}`}
+              title="Switch to Grid View"
+            >
+              <Grid className="mr-2 h-4 w-4" /> Grid View
+            </Button>
+            <Button size="sm"
+              variant="outline"
+              onClick={() => setIsGridView(false)}
+              className={`${!isGridView ? primaryButtonClasses : outlineButtonClasses}`}
+              title="Switch to Table View"
+            >
+              <List className="mr-2 h-4 w-4" /> Table View
+            </Button>
+            <Button size="sm"
+              variant="outline"
+              onClick={() => {
+                const header = ['Section','Subject','Teacher','Day','Start Time','End Time','Room'];
+                const rows = timetableEntries.map(e => [
+                  getSectionFullName(e.sectionId),
+                  getSubjectNameDisplay(e.subjectId),
+                  getTeacherFullName(e.staffId),
+                  getDayNameDisplay(e.dayOfWeek),
+                  e.startTime,
+                  e.endTime,
+                  getRoomNameDisplay(e.roomId),
+                ]);
+                const esc = (v) => {
+                  const s = String(v ?? '');
+                  if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+                  return s;
+                };
+                const csv = [header, ...rows].map(r => r.map(esc).join(',')).join('\n');
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'timetable.csv';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+              }}
+              className={outlineButtonClasses}
+              title="Export CSV"
+            >
+              Export CSV
+            </Button>
+            <Button size="sm"
+              variant="outline"
+              onClick={() => window.print()}
+              className={outlineButtonClasses}
+              title="Print Timetable"
+            >
+              Print Timetable
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -1817,7 +1894,7 @@ function AdminTimetablePage() {
 
 
       {/* Timetable Filters */}
-  <div className={`${glassCardClasses} flex flex-wrap items-center gap-4 no-print`}>
+  <div className={`${glassCardClasses} py-3 flex flex-wrap items-center gap-3 no-print`}>
         <h3 className={`text-md font-semibold ${titleTextClasses} mr-2`}>Filters:</h3>
         {/* Teacher context badge */}
         {isTeacher && (
@@ -1826,7 +1903,7 @@ function AdminTimetablePage() {
           </span>
         )}
         <Select value={filterSectionId} onValueChange={(value) => setFilterSectionId(value === 'all' ? '' : value)} disabled={isLoadingDeps}>
-          <SelectTrigger className={`${filterInputClasses} w-[180px]`}> <SelectValue placeholder="Filter by Section" /> </SelectTrigger>
+          <SelectTrigger className={`${filterInputClasses} h-9 w-[180px]`}> <SelectValue placeholder="Filter by Section" /> </SelectTrigger>
           <SelectContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700">
             <SelectItem value="all">All Sections</SelectItem>
             {Array.isArray(sections) && sections.map(sec => <SelectItem key={sec.id} value={sec.id}>{getSectionFullName(sec.id)}</SelectItem>)}
@@ -1834,7 +1911,7 @@ function AdminTimetablePage() {
         </Select>
 
         <Select value={filterStaffId || (isTeacher ? teacherStaffId : '')} onValueChange={(value) => setFilterStaffId(value === 'all' ? '' : value)} disabled={isLoadingDeps || isTeacher}>
-          <SelectTrigger className={`${filterInputClasses} w-[180px]`}> <SelectValue placeholder={isTeacher ? 'Me' : 'Filter by Teacher'} /> </SelectTrigger>
+          <SelectTrigger className={`${filterInputClasses} h-9 w-[180px]`}> <SelectValue placeholder={isTeacher ? 'Me' : 'Filter by Teacher'} /> </SelectTrigger>
           <SelectContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700">
             {!isTeacher && <SelectItem value="all">All Teachers</SelectItem>}
             {Array.isArray(teachers) && teachers.map(teach => (
@@ -1846,7 +1923,7 @@ function AdminTimetablePage() {
         </Select>
 
         <Select value={filterRoomId} onValueChange={(value) => setFilterRoomId(value === 'all' ? '' : value)} disabled={isLoadingDeps}>
-          <SelectTrigger className={`${filterInputClasses} w-[180px]`}> <SelectValue placeholder="Filter by Room" /> </SelectTrigger>
+          <SelectTrigger className={`${filterInputClasses} h-9 w-[180px]`}> <SelectValue placeholder="Filter by Room" /> </SelectTrigger>
           <SelectContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700">
             <SelectItem value="all">All Rooms</SelectItem>
             {Array.isArray(rooms) && rooms.map(room => <SelectItem key={room.id} value={room.id}>{room.name}</SelectItem>)}
@@ -1854,7 +1931,7 @@ function AdminTimetablePage() {
         </Select>
 
         <Select value={filterDayOfWeek} onValueChange={(value) => setFilterDayOfWeek(value === 'all' ? '' : value)} disabled={isLoadingDeps}>
-          <SelectTrigger className={`${filterInputClasses} w-[150px]`}> <SelectValue placeholder="Filter by Day" /> </SelectTrigger>
+          <SelectTrigger className={`${filterInputClasses} h-9 w-[150px]`}> <SelectValue placeholder="Filter by Day" /> </SelectTrigger>
           <SelectContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700">
             <SelectItem value="all">All Days</SelectItem>
             {getDayOfWeekOptions.map(day => <SelectItem key={day.value} value={day.value}>{day.label}</SelectItem>)}
@@ -1998,10 +2075,10 @@ function AdminTimetablePage() {
         <>
           {isGridView ? (
             /* Timetable Grid Display */
-            <div className={`${glassCardClasses} overflow-auto custom-scrollbar relative print-area`}
-                 style={{ maxHeight: fitHeight ? 'calc(100vh - 220px)' : undefined }}> {/* Fit to viewport height if enabled */}
+      <div className={`${glassCardClasses} ${fitHeight ? 'overflow-auto' : 'overflow-visible'} custom-scrollbar relative print-area`}
+        style={{ height: fitHeight ? 'calc(100vh - 260px)' : undefined }}> {/* Fit to viewport height if enabled */}
               {/* Display Controls */}
-              <div className="flex flex-wrap items-center gap-3 mb-3 no-print">
+              <div className="flex flex-wrap items-center gap-2 mb-2 no-print text-sm">
                 <div className="flex items-center gap-2">
                   <Label className={titleTextClasses}>Days</Label>
                   <Button variant="outline" size="sm" className={outlineButtonClasses}
@@ -2030,7 +2107,7 @@ function AdminTimetablePage() {
                 </div>
               </div>
               {/* Legend for overlays */}
-              <div className="flex flex-wrap items-center gap-4 mb-3 text-xs no-print">
+              <div className="flex flex-wrap items-center gap-3 mb-2 text-xs no-print">
                 <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input type="checkbox" checked={overlayShowPinned} onChange={(e) => setOverlayShowPinned(e.target.checked)} />
                   <span className="inline-block h-3 w-3 rounded-sm bg-amber-300/60 dark:bg-amber-500/40 border border-amber-500/50"></span>
@@ -2050,7 +2127,7 @@ function AdminTimetablePage() {
               {/* Note: This grid is fixed height per 30-min slot. Cards span visually using absolute positioning. */}
               <div
                 className="grid text-sm border-t border-l border-zinc-200 dark:border-zinc-700 min-w-max"
-                style={{ gridAutoRows: `${rowHeight}px`, gridTemplateColumns: `72px repeat(${visibleDays.length}, minmax(140px, 1fr))` }}
+                style={{ gridAutoRows: `${rowHeight}px`, gridTemplateColumns: `64px repeat(${visibleDays.length}, minmax(120px, 1fr))` }}
                 onMouseLeave={handleDragLeave} // Clear dragged over cell on mouse leave
               >
                 {/* Corner for empty space */}
@@ -2078,6 +2155,19 @@ function AdminTimetablePage() {
                         onDragOver={(e) => handleDragOver(e, day.value, time)}
                         onDrop={(e) => handleDrop(e, day.value, time)}
                         onDragLeave={handleDragLeave}
+                        onDoubleClick={() => {
+                          if (!isAdmin) return;
+                          const defaultDuration = 60; // mins
+                          setEditingEntry(null);
+                          setFormError('');
+                          setFormData({
+                            ...initialTimetableFormData,
+                            dayOfWeek: day.value,
+                            startTime: time,
+                            endTime: minutesToTime(timeToMinutes(time) + defaultDuration),
+                          });
+                          setIsDialogOpen(true);
+                        }}
                       >
                         {/* Zebra background stripe layer */}
                         {timeIndex % 2 === 1 && (
@@ -2106,6 +2196,8 @@ function AdminTimetablePage() {
                             const relativeTopInCell = 0;
                             const colorKey = getColorKeyForEntry(entry);
                             const colors = colorForKey(colorKey);
+                            const hasConflict = conflictEntryIdSet.has(entry.id);
+                            const tooltip = `${getSubjectNameDisplay(entry.subjectId)}\nSection: ${getSectionFullName(entry.sectionId)}\nTeacher: ${getTeacherFullName(entry.staffId)}\nRoom: ${getRoomNameDisplay(entry.roomId)}\nTime: ${entry.startTime}–${entry.endTime}${hasConflict ? '\n! Conflict detected with another entry (same teacher/room/section)' : ''}`;
 
                             return (
                               <div
@@ -2120,9 +2212,10 @@ function AdminTimetablePage() {
                                   left: '3px',
                                   right: '3px',
                                   backgroundColor: colors.bg,
-                                  border: `1px solid ${colors.border}`,
+                                  border: `1px solid ${hasConflict ? 'rgba(220,38,38,0.85)' : colors.border}`,
                                   color: colors.text,
                                 }}
+                                title={tooltip}
                                 onClick={(e) => {
                                     e.stopPropagation(); // Prevent opening Add dialog when clicking on an existing entry
                                     if (isAdmin) openEditDialog(entry);
@@ -2135,6 +2228,10 @@ function AdminTimetablePage() {
                                 <span className="block truncate text-zinc-700 dark:text-zinc-300">{getSectionFullName(entry.sectionId)}</span>
                                 <span className="block truncate text-zinc-600 dark:text-zinc-400">{getTeacherFullName(entry.staffId)}</span>
                                 <span className="block truncate text-zinc-600 dark:text-zinc-400">{getRoomNameDisplay(entry.roomId)}</span>
+
+                                {hasConflict && (
+                                  <div className="absolute -top-1 -left-1 h-3 w-3 rounded-full bg-red-600 border border-white dark:border-zinc-900" title="Conflict detected" />
+                                )}
 
                                 {/* Edit/Delete buttons on hover */}
                 {isAdmin && (
