@@ -170,6 +170,8 @@ export default function ManageStudentsPage() {
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [originalEditData, setOriginalEditData] = useState(null);
   const [hasEditChanges, setHasEditChanges] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
 
   const [academicYears, setAcademicYears] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -502,6 +504,16 @@ export default function ManageStudentsPage() {
           payload[k] = v;
         }
       });
+      // Optional password reset by admin
+      if (newPassword || confirmNewPassword) {
+        if (!newPassword || newPassword.length < 8) {
+          throw new Error('New password must be at least 8 characters.');
+        }
+        if (newPassword !== confirmNewPassword) {
+          throw new Error('New passwords do not match.');
+        }
+        payload.newPassword = newPassword;
+      }
       if (Object.keys(payload).length === 0) {
         toast.info('No changes to save');
         setIsSavingEdit(false);
@@ -518,8 +530,9 @@ export default function ManageStudentsPage() {
       } else {
         toast.success('Student updated successfully');
         // Optimistic local list update for displayed columns
-        setStudents(prev => prev.map(s => s.id === editTargetStudent.id ? { ...s, ...payload } : s));
+        setStudents(prev => prev.map(s => s.id === editTargetStudent.id ? { ...s, ...payload, newPassword: undefined } : s));
         setIsEditStudentDialogOpen(false);
+        setNewPassword(''); setConfirmNewPassword('');
       }
     } catch (err) {
       console.error('Edit submit error', err);
@@ -665,7 +678,25 @@ export default function ManageStudentsPage() {
               />
             )}
             {!isLoadingEditStudent && editStudentFormData && (
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Admission number and admission date are immutable. Enrollment changes are handled separately.</p>
+              <>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Admission number and admission date are immutable. Enrollment changes are handled separately.</p>
+                {session?.user?.role === 'SCHOOL_ADMIN' && (
+                  <div className="mt-4 border-t pt-4">
+                    <h3 className="text-sm font-semibold">Reset Student Password</h3>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">Use this if the student forgets their password. This sets a new login password immediately.</p>
+                    <div className="grid md:grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-sm">New Password</Label>
+                        <Input type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)} placeholder="Min 8 chars, include upper/lower/digit" className="bg-white/50 dark:bg-zinc-800/50" />
+                      </div>
+                      <div>
+                        <Label className="text-sm">Confirm New Password</Label>
+                        <Input type="password" value={confirmNewPassword} onChange={e=>setConfirmNewPassword(e.target.value)} placeholder="Repeat new password" className="bg-white/50 dark:bg-zinc-800/50" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
             <DialogFooter className="pt-4">
               <DialogClose asChild>

@@ -131,6 +131,13 @@ export const updateStudentSchema = z.object({
   guardianRelation: z.string().min(1).max(50).trim().optional(),
   guardianPhone: z.string().min(1).max(20).trim().optional(),
   guardianEmail: z.string().email().max(255).optional().nullable(),
+  // Optional: allow School Admin to reset student's portal password
+  newPassword: z.string()
+    .min(8, { message: 'Password must be at least 8 characters.' })
+    .max(72, { message: 'Password cannot exceed 72 characters.' })
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/, { message: 'Password must include upper, lower, and a digit.' })
+    .optional()
+    .nullable(),
   // Note: Updating enrollment (academicYearId, sectionId) is typically a separate process
   // (e.g., promotion, transfer) and not part of a simple profile update.
   // If you need to update current enrollment via student edit, those fields could be added here as optional.

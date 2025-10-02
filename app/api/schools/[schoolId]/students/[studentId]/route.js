@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { updateStudentSchema } from '@/validators/student.validators';
+import bcrypt from 'bcryptjs';
 
 export async function GET(request, { params }) {
   const { schoolId, studentId } = await params;
@@ -136,15 +137,29 @@ export async function PATCH(request, { params }) {
   // Prevent forbidden field changes (admissionDate, studentIdNumber) even if sent
   delete data.admissionDate;
   delete data.studentIdNumber;
+  const newPassword = data.newPassword || null;
+  delete data.newPassword;
 
   try {
     const existing = await prisma.student.findFirst({ where: { id: studentId, schoolId } });
     if (!existing) {
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
-    const updated = await prisma.student.update({
-      where: { id: studentId },
-      data: Object.fromEntries(Object.entries(data).map(([k,v]) => [k, v === '' ? null : v]))
+    const updated = await prisma.$transaction(async (tx) => {
+      // 1) Update student profile fields
+      const s = await tx.student.update({
+        where: { id: studentId },
+        data: Object.fromEntries(Object.entries(data).map(([k,v]) => [k, v === '' ? null : v]))
+      });
+      // 2) If newPassword provided and student has a linked user, update hashed password
+      if (newPassword) {
+        const st = await tx.student.findUnique({ where: { id: studentId }, select: { userId: true } });
+        if (st?.userId) {
+          const hashed = await bcrypt.hash(newPassword, 10);
+          await tx.user.update({ where: { id: st.userId }, data: { hashedPassword: hashed } });
+        }
+      }
+      return s;
     });
     return NextResponse.json({ success: true, student: updated }, { status: 200 });
   } catch (e) {
