@@ -229,6 +229,8 @@ export default function ManageSubjectsPage() {
 
   const fetchDropdownDependencies = useCallback(async () => {
     if (!schoolData?.id) return;
+    // Students don't need admin dependencies; skip to avoid Unauthorized
+    if (session?.user?.role === 'STUDENT') { setIsLoadingDeps(false); return; }
     setIsLoadingDeps(true);
     try {
       const [deptRes, teacherRes, levelRes] = await Promise.all([
@@ -242,12 +244,22 @@ export default function ManageSubjectsPage() {
       const teacherData = await teacherRes.json(); setTeachers(teacherData.teachers || []);
       if (!levelRes.ok) { const d = await levelRes.json().catch(() => ({})); throw new Error(d.error || 'Failed to fetch school levels.');}
       const levelData = await levelRes.json(); setSchoolLevels(levelData.schoolLevels || []);
-    } catch (err) { toast.error("Error fetching form dependencies", { description: err.message });
+    } catch (err) {
+      // Suppress noisy toast for students (though code path should be skipped already)
+      if (session?.user?.role !== 'STUDENT') {
+        toast.error("Error fetching form dependencies", { description: err.message });
+      }
     } finally { setIsLoadingDeps(false); }
-  }, [schoolData?.id]);
+  }, [schoolData?.id, session?.user?.role]);
 
   useEffect(() => {
-    if (schoolData?.id && session) { fetchSubjects(); fetchDropdownDependencies(); fetchSubjectAverages(); }
+    if (schoolData?.id && session) {
+      fetchSubjects();
+      if (session.user?.role !== 'STUDENT') {
+        fetchDropdownDependencies();
+      }
+      fetchSubjectAverages();
+    }
   }, [schoolData, session, fetchSubjects, fetchDropdownDependencies, fetchSubjectAverages]);
 
   const handleFormChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
