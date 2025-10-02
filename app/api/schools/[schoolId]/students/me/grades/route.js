@@ -29,7 +29,7 @@ export async function GET(request, { params }) {
       },
       include: {
         subject: { select: { id: true, name: true } },
-        examSchedule: { select: { id: true, date: true, name: true, maxMarks: true } },
+        examSchedule: { select: { id: true, date: true, maxMarks: true, exam: { select: { name: true } } } },
         assignment: { select: { id: true, maxMarks: true, isTest: true, title: true } },
         term: { select: { id: true, name: true } },
         academicYear: { select: { id: true, name: true } },
@@ -44,7 +44,10 @@ export async function GET(request, { params }) {
       createdAt: g.createdAt,
       subject: g.subject,
       assignment: g.assignment ? { id: g.assignment.id, maxMarks: g.assignment.maxMarks ?? null, isTest: !!g.assignment.isTest, title: g.assignment.title } : null,
-      examSchedule: g.examSchedule,
+      // Preserve prior shape: expose examSchedule.name derived from related exam
+      examSchedule: g.examSchedule
+        ? { id: g.examSchedule.id, date: g.examSchedule.date, maxMarks: g.examSchedule.maxMarks, name: g.examSchedule.exam?.name || null }
+        : null,
       term: g.term,
       academicYear: g.academicYear,
       isPublished: true,

@@ -21,7 +21,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 // Lucide React Icons
-import { FilePlus2, Edit3, Trash2, GraduationCap, Loader2, AlertTriangle, PlusCircle, CalendarDays, Clock, CheckSquare } from 'lucide-react';
+import { FilePlus2, Edit3, Trash2, GraduationCap, Loader2, AlertTriangle, PlusCircle, CalendarDays, Clock, CheckSquare, Filter, Printer } from 'lucide-react';
 
 // --- Form Data Initial States ---
 const initialExamFormData = { id: null, name: '', termId: '', academicYearId: '' };
@@ -298,20 +298,251 @@ function AdminExaminationsPage() {
   );
 }
 
-function StudentExamsPlaceholder() {
+function StudentExams() {
+  const school = useSchool();
+  const { data: session } = useSession();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [schedules, setSchedules] = useState([]);
+  const [grades, setGrades] = useState([]);
+  const [scale, setScale] = useState([]);
+  const [subjectFilter, setSubjectFilter] = useState('all');
+  const [termFilter, setTermFilter] = useState('all');
+
+  useEffect(() => {
+    let ignore = false;
+    const run = async () => {
+      if (!school?.id || session?.user?.role !== 'STUDENT') { setLoading(false); return; }
+      try {
+        const [exRes, scRes] = await Promise.all([
+          fetch(`/api/schools/${school.id}/students/me/exams`),
+          fetch(`/api/schools/${school.id}/academics/grading-scale/default`),
+        ]);
+        const d = await exRes.json();
+        if (!exRes.ok) throw new Error(d.error || 'Failed to load exams');
+        const sc = scRes.ok ? (await scRes.json())?.details || [] : [];
+        if (!ignore) { setSchedules(d.schedules || []); setGrades(d.grades || []); setScale(sc); }
+      } catch (e) { if (!ignore) setError(e.message); }
+      finally { if (!ignore) setLoading(false); }
+    };
+    run();
+    return () => { ignore = true; };
+  }, [school?.id, session?.user?.role]);
+
   const titleTextClasses = "text-black dark:text-white";
   const descriptionTextClasses = "text-zinc-600 dark:text-zinc-400";
+  const fmtDate = (d) => { try { const x = new Date(d); return x.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); } catch { return '—'; } };
+  const pct = (marks, max) => (marks == null || max == null || max === 0) ? null : (marks / max) * 100;
+  const letter = (percent) => {
+    if (percent == null || !Array.isArray(scale)) return null;
+    for (const g of scale) { if (percent >= g.minPercentage && percent <= g.maxPercentage) return g.grade; }
+    return null;
+  };
+  const percColor = (p) => p == null ? '' : (p >= 75 ? 'text-emerald-600' : p >= 50 ? 'text-amber-600' : 'text-rose-600');
+  const handlePrint = () => window.print();
+
+  const subjectsFromData = useMemo(() => {
+    const map = new Map();
+    schedules.forEach(s => { if (s.subject) map.set(s.subject.id, s.subject.name); });
+    grades.forEach(g => { if (g.subject) map.set(g.subject.id, g.subject.name); });
+    return Array.from(map, ([id, name]) => ({ id, name }));
+  }, [schedules, grades]);
+  const termsFromData = useMemo(() => {
+    const map = new Map();
+    schedules.forEach(s => { if (s.term) map.set(s.term.id, s.term.name); });
+    grades.forEach(g => { if (g.term) map.set(g.term.id, g.term.name); });
+    return Array.from(map, ([id, name]) => ({ id, name }));
+  }, [schedules, grades]);
+
+  const filteredSchedules = useMemo(() => schedules.filter(s =>
+    (subjectFilter === 'all' || s.subject?.id === subjectFilter) &&
+    (termFilter === 'all' || s.term?.id === termFilter)
+  ), [schedules, subjectFilter, termFilter]);
+  const filteredGrades = useMemo(() => grades.filter(g =>
+    (subjectFilter === 'all' || g.subject?.id === subjectFilter) &&
+    (termFilter === 'all' || g.term?.id === termFilter)
+  ), [grades, subjectFilter, termFilter]);
+  const todayISO = new Date().toISOString().slice(0,10);
+  const upcoming = filteredSchedules.filter(s => s.date >= todayISO);
+  const past = filteredSchedules.filter(s => s.date < todayISO);
+
+  const gradeTotals = useMemo(() => {
+    const valid = filteredGrades.filter(g => g.marksObtained != null && g.maxMarks != null && g.maxMarks !== 0);
+    const count = valid.length;
+    const sumMarks = valid.reduce((a, g) => a + Number(g.marksObtained || 0), 0);
+    const sumMax = valid.reduce((a, g) => a + Number(g.maxMarks || 0), 0);
+    const meanPct = count ? (valid.reduce((a, g) => a + ((Number(g.marksObtained) / Number(g.maxMarks)) * 100), 0) / count) : null;
+    return { count, sumMarks, sumMax, meanPct };
+  }, [filteredGrades]);
+
   return (
     <RequireRole role="STUDENT">
-      <div className="space-y-4">
+      <div className="space-y-6">
         <h1 className={`text-2xl md:text-3xl font-bold ${titleTextClasses} flex items-center`}>
           <GraduationCap className="mr-3 h-8 w-8 opacity-80"/>My Exams
         </h1>
-        <div className="p-6 rounded-xl bg-white/60 dark:bg-zinc-900/60 border border-zinc-200/50 dark:border-zinc-700/50">
-          <p className={descriptionTextClasses}>
-            Your exams schedule and results page is coming soon. For now, please check your grades and assignments.
-          </p>
-        </div>
+
+        {loading && (
+          <div className="space-y-3">
+            <Skeleton className="h-6 w-40" />
+            <Skeleton className="h-28 w-full" />
+            <Skeleton className="h-6 w-40" />
+            <Skeleton className="h-28 w-full" />
+          </div>
+        )}
+        {!loading && error && (
+          <Alert variant="destructive">
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {!loading && !error && (
+          <>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div className="flex items-center gap-3 text-sm">
+                <Filter className="h-4 w-4 text-zinc-500" />
+                <div className="flex items-center gap-2">
+                  <label className="text-xs">Subject</label>
+                  <Select value={subjectFilter} onValueChange={setSubjectFilter}>
+                    <SelectTrigger className="h-8 w-48"><SelectValue placeholder="All Subjects" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Subjects</SelectItem>
+                      {subjectsFromData.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs">Term</label>
+                  <Select value={termFilter} onValueChange={setTermFilter}>
+                    <SelectTrigger className="h-8 w-44"><SelectValue placeholder="All Terms" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Terms</SelectItem>
+                      {termsFromData.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <Button variant="outline" className="print:hidden" onClick={handlePrint}><Printer className="h-4 w-4 mr-2"/> Print</Button>
+            </div>
+
+            <Card className="mt-3">
+              <CardHeader><CardTitle className={titleTextClasses}>Upcoming Schedule</CardTitle></CardHeader>
+              <CardContent>
+                <div className="rounded-md border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Time</TableHead>
+                        <TableHead>Exam</TableHead>
+                        <TableHead>Subject</TableHead>
+                        <TableHead className="text-right">Max</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {upcoming.length === 0 ? (
+                        <TableRow><TableCell colSpan={5} className="text-sm text-muted-foreground">No schedules available.</TableCell></TableRow>
+                      ) : upcoming.map(s => (
+                        <TableRow key={s.id}>
+                          <TableCell>{fmtDate(s.date)}</TableCell>
+                          <TableCell>{s.startTime} - {s.endTime}</TableCell>
+                          <TableCell>{s.exam?.name || '—'}</TableCell>
+                          <TableCell>{s.subject?.name || '—'}</TableCell>
+                          <TableCell className="text-right">{s.maxMarks}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="mt-3">
+              <CardHeader><CardTitle className={titleTextClasses}>Past Schedule</CardTitle></CardHeader>
+              <CardContent>
+                <div className="rounded-md border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Time</TableHead>
+                        <TableHead>Exam</TableHead>
+                        <TableHead>Subject</TableHead>
+                        <TableHead className="text-right">Max</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {past.length === 0 ? (
+                        <TableRow><TableCell colSpan={5} className="text-sm text-muted-foreground">No past schedules.</TableCell></TableRow>
+                      ) : past.map(s => (
+                        <TableRow key={s.id}>
+                          <TableCell>{fmtDate(s.date)}</TableCell>
+                          <TableCell>{s.startTime} - {s.endTime}</TableCell>
+                          <TableCell>{s.exam?.name || '—'}</TableCell>
+                          <TableCell>{s.subject?.name || '—'}</TableCell>
+                          <TableCell className="text-right">{s.maxMarks}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="mt-3">
+              <CardHeader><CardTitle className={titleTextClasses}>Published Results</CardTitle></CardHeader>
+              <CardContent>
+                <div className="rounded-md border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Exam</TableHead>
+                        <TableHead>Subject</TableHead>
+                        <TableHead className="text-right">Score</TableHead>
+                        <TableHead className="text-right">Max</TableHead>
+                        <TableHead className="text-right">%</TableHead>
+                        <TableHead className="text-right">Grade</TableHead>
+                        <TableHead>Published</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredGrades.length === 0 ? (
+                        <TableRow><TableCell colSpan={5} className="text-sm text-muted-foreground">No published exam grades yet.</TableCell></TableRow>
+                      ) : filteredGrades.map(g => {
+                        const p = pct(g.marksObtained, g.maxMarks);
+                        const L = letter(p);
+                        return (
+                          <TableRow key={g.id}>
+                            <TableCell>{g.examName || '—'}</TableCell>
+                            <TableCell>{g.subject?.name || '—'}</TableCell>
+                            <TableCell className="text-right">{g.marksObtained ?? '—'}</TableCell>
+                            <TableCell className="text-right">{g.maxMarks ?? '—'}</TableCell>
+                            <TableCell className={`text-right ${percColor(p)}`}>{p != null ? p.toFixed(1) + '%' : '—'}</TableCell>
+                            <TableCell className="text-right">{L || '—'}</TableCell>
+                            <TableCell>{g.createdAt ? new Date(g.createdAt).toLocaleDateString() : '—'}</TableCell>
+                          </TableRow>
+                        );
+                      }).concat([
+                        (
+                          <TableRow key="totals" className="bg-zinc-50/50 dark:bg-zinc-900/40">
+                            <TableCell className="font-medium">Totals</TableCell>
+                            <TableCell>—</TableCell>
+                            <TableCell className="text-right">{gradeTotals.count > 0 ? gradeTotals.sumMarks : '—'}</TableCell>
+                            <TableCell className="text-right">{gradeTotals.count > 0 ? gradeTotals.sumMax : '—'}</TableCell>
+                            <TableCell className={`text-right ${percColor(gradeTotals.meanPct)}`}>{gradeTotals.meanPct != null ? gradeTotals.meanPct.toFixed(1) + '%' : '—'}</TableCell>
+                            <TableCell className="text-right">{letter(gradeTotals.meanPct) || '—'}</TableCell>
+                            <TableCell>—</TableCell>
+                          </TableRow>
+                        )
+                      ])}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
     </RequireRole>
   );
@@ -327,7 +558,7 @@ export default function ExaminationsPage() {
     );
   }
   if (session?.user?.role === 'STUDENT') {
-    return <StudentExamsPlaceholder/>;
+    return <StudentExams/>;
   }
   return <AdminExaminationsPage/>;
 }
