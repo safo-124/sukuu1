@@ -81,13 +81,9 @@ export default function TeacherStudentsPage() {
     loadSummary();
   }, [school?.id]);
 
-  // Default to first subject (mine) so the initial view shows students enrolled in my subject
-  useEffect(() => {
-    if (!filters.subjectId && subjects.length > 0) {
-      setFilters(f => ({ ...f, subjectId: subjects[0].id }));
-      setPage(1);
-    }
-  }, [subjects]);
+  // Do NOT auto-select a subject by default. Leaving subject empty ensures
+  // class-teacher sections are included and avoids over-filtering that can
+  // lead to empty results when a teacher teaches multiple subjects.
 
   const onChangeFilter = (name, value) => { setFilters(f => ({ ...f, [name]: value })); setPage(1); };
   const onSearchKey = (e) => { if (e.key === 'Enter') { setPage(1); loadStudents(); } };
