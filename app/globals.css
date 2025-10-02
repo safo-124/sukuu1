@@ -76,6 +76,8 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  /* Accent runtime variable (can be set via JS) */
+  --accent-color: oklch(62% 0.22 275); /* default violet-ish */
 }
 
 .dark {
@@ -110,6 +112,7 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  --accent-color: oklch(62% 0.22 275);
 }
 
 @layer base {
@@ -130,6 +133,22 @@ html, body, #__next {
 body {
   transition: background-color 0.3s ease; /* Smooth theme transition */
 }
+
+/* Provide a few named color raw values for quick accents */
+:root {
+  --violet-500-raw: 62% 0.22 275;
+  --sky-500-raw: 75% 0.104 219;
+  --emerald-500-raw: 68% 0.17 151;
+  --rose-500-raw: 65% 0.27 14;
+  --orange-500-raw: 70% 0.17 66;
+  --amber-500-raw: 82% 0.15 84;
+  --indigo-500-raw: 58% 0.20 277;
+}
+
+/* Utility that uses the accent color */
+.accent-ring { box-shadow: 0 0 0 2px oklch(var(--accent-color) / .4) !important; }
+.accent-bg { background-color: oklch(var(--accent-color)) !important; }
+.accent-text { color: oklch(var(--accent-color)) !important; }
 
 /* Light Mode Body Background */
 html:not(.dark) body {

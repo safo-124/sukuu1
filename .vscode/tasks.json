@@ -45,23 +45,39 @@
 				"$eslint-stylish"
 			],
 			"group": "build"
+		},
+		{
+			"label": "Flutter: pub get (parent_app)",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"pub",
+				"get"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}/mobile/parent_app"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "Flutter: run (Chrome)",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"run",
+				"-d",
+				"chrome"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}/mobile/parent_app"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "Prisma migrate dev (preferences)",
+			"type": "shell",
+			"command": "npx prisma migrate dev --name user_preferences",
+			"group": "build"
 		}
-	,
-	{
-		"label": "Flutter: pub get (parent_app)",
-		"type": "shell",
-		"command": "flutter",
-		"args": ["pub", "get"],
-		"options": { "cwd": "${workspaceFolder}/mobile/parent_app" },
-		"problemMatcher": []
-	},
-	{
-		"label": "Flutter: run (Chrome)",
-		"type": "shell",
-		"command": "flutter",
-		"args": ["run", "-d", "chrome"],
-		"options": { "cwd": "${workspaceFolder}/mobile/parent_app" },
-		"problemMatcher": []
-	}
 	]
 }

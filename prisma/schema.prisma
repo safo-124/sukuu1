@@ -304,6 +304,7 @@ model User {
   lastName          String?
   phoneNumber       String?
   profilePictureUrl String?
+  preferences       Json?
   role              UserRole
   isActive          Boolean   @default(true)
   lastLogin         DateTime?
