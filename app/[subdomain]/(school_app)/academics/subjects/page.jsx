@@ -1,7 +1,7 @@
 // app/[subdomain]/(school_app)/academics/subjects/page.jsx
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSchool } from '../../layout';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
@@ -171,6 +171,8 @@ export default function ManageSubjectsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingDeps, setIsLoadingDeps] = useState(true); // For dropdowns
   const [error, setError] = useState('');
+  // Student-only: subject average percentages mapping { [subjectId]: number }
+  const [subjectAvgPct, setSubjectAvgPct] = useState({});
 
   const [isDialogOpen, setIsDialogOpen] = useState(false); // This is the state for the add/edit dialog
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false); // State for the edit dialog specifically
@@ -203,6 +205,28 @@ export default function ManageSubjectsPage() {
     } finally { setIsLoading(false); }
   }, [schoolData?.id, session?.user?.role]);
 
+  // Student-only: compute average percentages per subject from published grades
+  const fetchSubjectAverages = useCallback(async () => {
+    if (!schoolData?.id || session?.user?.role !== 'STUDENT') return;
+    try {
+      const res = await fetch(`/api/schools/${schoolData.id}/students/me/grades`);
+      if (!res.ok) return; // non-blocking
+      const d = await res.json();
+      const bySubject = new Map(); // id -> { sumPct, count }
+      (d.grades || []).forEach(g => {
+        const sid = g.subject?.id; if (!sid) return;
+        const max = g.assignment?.maxMarks ?? g.examSchedule?.maxMarks ?? null;
+        if (g.marksObtained == null || max == null || max === 0) return;
+        const pct = (g.marksObtained / max) * 100;
+        const agg = bySubject.get(sid) || { sum: 0, n: 0 };
+        agg.sum += pct; agg.n += 1; bySubject.set(sid, agg);
+      });
+      const out = {};
+      bySubject.forEach((v, k) => { out[k] = v.n ? v.sum / v.n : undefined; });
+      setSubjectAvgPct(out);
+    } catch {}
+  }, [schoolData?.id, session?.user?.role]);
+
   const fetchDropdownDependencies = useCallback(async () => {
     if (!schoolData?.id) return;
     setIsLoadingDeps(true);
@@ -223,8 +247,8 @@ export default function ManageSubjectsPage() {
   }, [schoolData?.id]);
 
   useEffect(() => {
-    if (schoolData?.id && session) { fetchSubjects(); fetchDropdownDependencies(); }
-  }, [schoolData, session, fetchSubjects, fetchDropdownDependencies]);
+    if (schoolData?.id && session) { fetchSubjects(); fetchDropdownDependencies(); fetchSubjectAverages(); }
+  }, [schoolData, session, fetchSubjects, fetchDropdownDependencies, fetchSubjectAverages]);
 
   const handleFormChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   const handleSelectChange = (name, value) => setFormData(prev => ({ ...prev, [name]: value === 'none' ? '' : value }));
@@ -387,7 +411,14 @@ export default function ManageSubjectsPage() {
                 ))
               ) : subjects.length > 0 ? subjects.map((subject) => (
                 <TableRow key={subject.id} className="border-zinc-200/50 dark:border-zinc-800/50 hover:bg-zinc-500/5 dark:hover:bg-white/5">
-                  <TableCell className={`${descriptionTextClasses} font-medium`}>{subject.name}</TableCell>
+                  <TableCell className={`${descriptionTextClasses} font-medium`}>{subject.name}
+                    {subjectAvgPct[subject.id] != null && (
+                      <span className="ml-2 text-xs text-zinc-500">Avg {subjectAvgPct[subject.id].toFixed(1)}%</span>
+                    )}
+                    {schoolData?.subdomain && (
+                      <Link className="ml-3 text-xs text-sky-600 hover:underline" href={`/${schoolData.subdomain}/academics/grades/student-summary?subjectId=${subject.id}`}>View</Link>
+                    )}
+                  </TableCell>
                   <TableCell className={`${descriptionTextClasses} hidden sm:table-cell`}>{subject.subjectCode || 'N/A'}</TableCell>
                   <TableCell className={`${descriptionTextClasses} hidden md:table-cell`}>{subject.weeklyHours ?? 'N/A'}</TableCell>
                   <TableCell className={`${descriptionTextClasses}`}>

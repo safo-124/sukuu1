@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useSchool } from '../../../layout';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
@@ -25,6 +26,7 @@ function letterFromScale(percent, scale) {
 export default function StudentGradesSummaryPage() {
   const school = useSchool();
   const { data: session } = useSession();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState([]);
   const [scale, setScale] = useState([]);
@@ -53,6 +55,7 @@ export default function StudentGradesSummaryPage() {
           const gradeLetter = percent != null ? letterFromScale(percent, sc) : (gr.gradeLetter ?? null);
           return {
             id: gr.id,
+            subjectId: gr.subject?.id || null,
             subjectName: gr.subject?.name || 'Subject',
             marksObtained: gr.marksObtained,
             maxMarks: max,
@@ -75,16 +78,23 @@ export default function StudentGradesSummaryPage() {
     run();
   }, [school?.id]);
 
+  // Optionally filter by subjectId from query params
+  const filteredRows = useMemo(() => {
+    const filterSubjectId = searchParams?.get('subjectId');
+    if (!filterSubjectId) return rows;
+    return rows.filter(r => String(r.subjectId) === String(filterSubjectId));
+  }, [rows, searchParams]);
+
   // Group by subject
   const bySubject = useMemo(() => {
     const map = new Map();
-    for (const r of rows) {
+    for (const r of filteredRows) {
       const key = r.subjectName;
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(r);
     }
     return Array.from(map.entries()).map(([subjectName, items]) => ({ subjectName, items }));
-  }, [rows]);
+  }, [filteredRows]);
 
   return (
     <div className="space-y-6">

@@ -235,6 +235,7 @@ function getNavigationSections(schoolSubdomain, role) {
           { title: 'Academics', items: [
             { href: `/${schoolSubdomain}/academics/assignments`, label: 'My Assignments', icon: CheckSquare },
             { href: `/${schoolSubdomain}/academics/grades`, label: 'My Grades', icon: Percent },
+            { href: `/${schoolSubdomain}/academics/grades/student-summary`, label: 'My Grades Summary', icon: Percent },
             { href: `/${schoolSubdomain}/student/rankings`, label: 'My Rankings', icon: PieChart },
             { href: `/${schoolSubdomain}/academics/timetable`, label: 'My Timetable', icon: CalendarDays },
             { href: `/${schoolSubdomain}/academics/examinations`, label: 'My Exams', icon: GraduationCap },
