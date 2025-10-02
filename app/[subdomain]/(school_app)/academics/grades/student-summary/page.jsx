@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { useSchool } from '../../../layout';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
@@ -27,6 +28,7 @@ export default function StudentGradesSummaryPage() {
   const school = useSchool();
   const { data: session } = useSession();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState([]);
   const [scale, setScale] = useState([]);
@@ -96,10 +98,24 @@ export default function StudentGradesSummaryPage() {
     return Array.from(map.entries()).map(([subjectName, items]) => ({ subjectName, items }));
   }, [filteredRows]);
 
+  const activeFilterSubjectName = useMemo(() => {
+    const filterSubjectId = searchParams?.get('subjectId');
+    if (!filterSubjectId) return null;
+    const first = filteredRows[0];
+    return first?.subjectName || null;
+  }, [filteredRows, searchParams]);
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">My Grades Summary</h1>
       <p className="text-sm text-muted-foreground">Subject-wise published grades with percentages and grade letters.</p>
+
+      {activeFilterSubjectName && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200 p-3 text-sm flex items-center justify-between">
+          <span>Filtered by subject: <span className="font-medium">{activeFilterSubjectName}</span></span>
+          <Link href={pathname} className="text-sky-700 hover:underline dark:text-sky-400">Clear filter</Link>
+        </div>
+      )}
 
       {loading ? (
         <div className="grid gap-4">

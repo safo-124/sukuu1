@@ -412,9 +412,11 @@ export default function ManageSubjectsPage() {
               ) : subjects.length > 0 ? subjects.map((subject) => (
                 <TableRow key={subject.id} className="border-zinc-200/50 dark:border-zinc-800/50 hover:bg-zinc-500/5 dark:hover:bg-white/5">
                   <TableCell className={`${descriptionTextClasses} font-medium`}>{subject.name}
-                    {subjectAvgPct[subject.id] != null && (
-                      <span className="ml-2 text-xs text-zinc-500">Avg {subjectAvgPct[subject.id].toFixed(1)}%</span>
-                    )}
+                    {subjectAvgPct[subject.id] != null && (() => {
+                      const v = subjectAvgPct[subject.id];
+                      const color = v >= 75 ? 'text-emerald-600' : v >= 50 ? 'text-amber-600' : 'text-rose-600';
+                      return <span className={`ml-2 text-xs ${color}`}>Avg {v.toFixed(1)}%</span>;
+                    })()}
                     {schoolData?.subdomain && (
                       <Link className="ml-3 text-xs text-sky-600 hover:underline" href={`/${schoolData.subdomain}/academics/grades/student-summary?subjectId=${subject.id}`}>View</Link>
                     )}
