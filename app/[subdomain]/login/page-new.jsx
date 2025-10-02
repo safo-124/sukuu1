@@ -127,7 +127,7 @@ export default function SchoolAdminLoginPage() {
 
   if (isVerifyingSchool) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+      <div className="min-h-[100svh] bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 grid place-items-center p-4">
         {/* Animated Background */}
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute -inset-10 opacity-50">
@@ -157,9 +157,9 @@ export default function SchoolAdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-[100svh] bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 grid place-items-center p-4">
       {/* Animated Background */}
-      <div className="absolute inset-0 overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -inset-10 opacity-50">
           <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl animate-blob"></div>
           <div className="absolute top-1/3 right-1/4 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-2000"></div>
@@ -169,7 +169,9 @@ export default function SchoolAdminLoginPage() {
 
       {/* Login Card */}
       <div className="relative w-full max-w-md">
-        <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl p-8 shadow-2xl">
+        {/* Soft gradient ring behind card */}
+        <div className="absolute -inset-[2px] rounded-2xl bg-gradient-to-r from-fuchsia-500/30 via-sky-400/25 to-indigo-400/25 blur-xl" aria-hidden></div>
+        <div className="relative backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl p-8 shadow-2xl ring-1 ring-white/10">
           {/* Header */}
           <div className="text-center mb-8">
             <div className="flex justify-center mb-6">
@@ -270,35 +272,13 @@ export default function SchoolAdminLoginPage() {
                 ) : (
                   <div className="flex items-center gap-2">
                     <LogIn className="h-5 w-5" />
-                    <span>Sign In as Administrator</span>
+                    <span>Sign In</span>
                   </div>
                 )}
               </Button>
             </form>
           )}
 
-          {/* Teacher Login Section */}
-          {schoolExistsAndActive && (
-            <div className="mt-8 pt-6 border-t border-white/20">
-              <p className="text-center text-sm text-gray-300 mb-4">
-                Are you a teacher or staff member?
-              </p>
-              <Link href={`/${subdomain}/teacher-login`}>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full h-12 border-white/20 text-white hover:bg-white/10 rounded-xl transition-all duration-200"
-                  disabled={!schoolExistsAndActive}
-                >
-                  <div className="flex items-center gap-2">
-                    <GraduationCap className="h-5 w-5" />
-                    <span>Teacher & Staff Login</span>
-                    <ChevronRight className="h-4 w-4 ml-auto" />
-                  </div>
-                </Button>
-              </Link>
-            </div>
-          )}
 
           {/* Footer */}
           <div className="mt-8 pt-6 border-t border-white/20 text-center">

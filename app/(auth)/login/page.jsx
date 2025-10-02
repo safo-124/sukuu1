@@ -43,14 +43,14 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
+    <div className="min-h-[100svh] grid place-items-center relative overflow-hidden">
       {/* Animated Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      <div className="absolute inset-0 bg-gradient-to-br from-[#0b1220] via-[#0f1e3a] to-[#1b2a4a]">
         <div className="absolute inset-0">
           {/* Floating shapes for visual interest */}
-          <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '2s'}}></div>
-          <div className="absolute top-3/4 left-1/2 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '4s'}}></div>
+          <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-purple-500/15 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/15 rounded-full blur-3xl animate-pulse" style={{animationDelay: '2s'}}></div>
+          <div className="absolute top-3/4 left-1/2 w-48 h-48 bg-indigo-500/15 rounded-full blur-3xl animate-pulse" style={{animationDelay: '4s'}}></div>
         </div>
       </div>
 
@@ -86,7 +86,9 @@ export default function LoginPage() {
         </div>
 
         {/* Login Form Card */}
-        <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl shadow-black/20 animate-slide-up">
+  {/* Soft gradient ring behind card */}
+  <div className="absolute -inset-[2px] rounded-3xl bg-gradient-to-r from-fuchsia-500/30 via-sky-400/25 to-indigo-400/25 blur-xl" aria-hidden></div>
+  <div className="relative backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl shadow-black/20 animate-slide-up ring-1 ring-white/10">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Email Field */}
             <div className="space-y-2">
@@ -156,7 +158,7 @@ export default function LoginPage() {
                 </div>
               ) : (
                 <div className="flex items-center justify-center gap-2">
-                  Sign in to Dashboard
+                  Sign In
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </div>
               )}

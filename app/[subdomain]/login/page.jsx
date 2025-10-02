@@ -64,18 +64,34 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900">
-      {/* Animated Blobs */}
-      <div className="absolute inset-0 opacity-30">
-        <div className="blob blob-1"></div>
-        <div className="blob blob-2"></div>
-        <div className="blob blob-3"></div>
+    <div className="min-h-[100svh] relative overflow-hidden bg-gradient-to-br from-[#0b1220] via-[#0f1e3a] to-[#1b2a4a]">
+      {/* Background: animated aurora blobs + subtle radial glow + dotted texture */}
+      <style jsx global>{`
+        @keyframes blobFloat {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          50% { transform: translate(20px, -10px) scale(1.05); }
+        }
+        .blob { position: absolute; filter: blur(60px); border-radius: 9999px; opacity: 0.35; animation: blobFloat 14s ease-in-out infinite; }
+        .blob-1 { width: 38rem; height: 38rem; left: -10rem; top: -8rem; background: radial-gradient(closest-side, #7c3aed, transparent); }
+        .blob-2 { width: 32rem; height: 32rem; right: -8rem; top: 4rem; background: radial-gradient(closest-side, #2563eb, transparent); animation-delay: .8s; }
+        .blob-3 { width: 36rem; height: 36rem; left: 10%; bottom: -10rem; background: radial-gradient(closest-side, #22d3ee, transparent); animation-delay: 1.6s; }
+      `}</style>
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="blob blob-1" />
+        <div className="blob blob-2" />
+        <div className="blob blob-3" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,.18),transparent_60%)]" />
+        <div className="absolute inset-0 opacity-[.08] [background-image:radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)]" />
       </div>
 
-      {/* Glass Container */}
-      <div className="relative min-h-screen flex items-center justify-center p-4">
+      {/* Card Container (centered on all screens) */}
+      <div className="relative min-h-[100svh] grid place-items-center p-4 sm:p-6">
         <div className="w-full max-w-md">
-          <div className="backdrop-blur-xl bg-white/10 border-white/20 rounded-2xl p-8 shadow-2xl">
+          {/* Soft gradient ring behind card */}
+          <div className="relative">
+            <div className="absolute -inset-[2px] rounded-2xl bg-gradient-to-r from-fuchsia-500/30 via-sky-400/25 to-indigo-400/25 blur-xl" aria-hidden />
+          </div>
+          <div className="relative backdrop-blur-2xl bg-white/10 border border-white/15 rounded-2xl p-6 sm:p-8 shadow-2xl ring-1 ring-white/10">
             {/* Header */}
             <div className="text-center mb-8">
               <div className="flex justify-center mb-6">
@@ -154,23 +170,10 @@ export default function LoginPage() {
                 className="w-full h-12 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg transition-all duration-200 transform hover:scale-[1.02]"
                 disabled={loading}
               >
-                {loading ? "Signing In..." : "Sign In as Administrator"}
+                {loading ? "Signing In..." : "Sign In"}
               </Button>
             </form>
 
-            {/* Teacher Login */}
-            <div className="mt-8 pt-6 border-t border-white/20">
-              <p className="text-center text-sm text-gray-300 mb-4">Are you a teacher or staff member?</p>
-              <Link href={`/${subdomain}/teacher-login`}>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full h-12 border-white/20 text-white hover:bg-white/10 rounded-xl transition-all duration-200"
-                >
-                  Teacher & Staff Login
-                </Button>
-              </Link>
-            </div>
 
             {/* Footer */}
             <div className="mt-8 pt-6 border-t border-white/20 text-center">
