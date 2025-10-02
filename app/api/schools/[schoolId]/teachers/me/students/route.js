@@ -101,11 +101,44 @@ export async function GET(request, { params }) {
     // Ensure sections belong to current academic year (through class relation)
     const sectionsFromSSLIds = sectionsFromSSL.filter(s => s.class?.academicYearId === academicYearId).map(s => s.id);
 
+    // Sections inferred via Assignments created by this teacher (acts as a proxy for teaching a subject)
+    //  - Direct section assignments: include those sections if they belong to current academic year
+    //  - Class-wide assignments: include all sections of those classes in current academic year
+    const assignmentSections = await prisma.assignment.findMany({
+      where: {
+        schoolId,
+        teacherId: staffId,
+        ...(subjectIdFilter ? { subjectId: subjectIdFilter } : {}),
+        section: { class: { academicYearId } }
+      },
+      select: { sectionId: true }
+    });
+    const assignmentClasses = await prisma.assignment.findMany({
+      where: {
+        schoolId,
+        teacherId: staffId,
+        ...(subjectIdFilter ? { subjectId: subjectIdFilter } : {}),
+        class: { academicYearId }
+      },
+      select: { classId: true }
+    });
+    const assignmentSectionIdsDirect = assignmentSections.map(a => a.sectionId).filter(Boolean);
+    let assignmentSectionIdsViaClass = [];
+    if (assignmentClasses.length) {
+      const classIds = Array.from(new Set(assignmentClasses.map(a => a.classId).filter(Boolean)));
+      if (classIds.length) {
+        const secs = await prisma.section.findMany({ where: { classId: { in: classIds } }, select: { id: true } });
+        assignmentSectionIdsViaClass = secs.map(s => s.id);
+      }
+    }
+
     // Aggregate all candidate section IDs
     let candidateSectionIds = Array.from(new Set([
       ...classTeacherSectionIds,
       ...timetableSectionIds,
-      ...sectionsFromSSLIds
+      ...sectionsFromSSLIds,
+      ...assignmentSectionIdsDirect,
+      ...assignmentSectionIdsViaClass
     ])).filter(Boolean);
 
     // Apply direct filters (level, class, section)
@@ -204,6 +237,52 @@ export async function GET(request, { params }) {
             if (row.subject) {
               subjectsBySection[e.sectionId] = subjectsBySection[e.sectionId] || new Map();
               subjectsBySection[e.sectionId].set(row.subject.id, row.subject);
+            }
+          }
+        }
+      }
+      // Subjects via Assignments (section-scoped and class-scoped)
+      const assignmentSubjectsBySection = await prisma.assignment.findMany({
+        where: {
+          schoolId,
+          teacherId: staffId,
+          sectionId: { in: candidateSectionIds },
+          ...(subjectIdFilter ? { subjectId: subjectIdFilter } : {}),
+          section: { class: { academicYearId } }
+        },
+        select: { sectionId: true, subject: { select: { id: true, name: true } } }
+      });
+      for (const row of assignmentSubjectsBySection) {
+        if (!row.sectionId || !row.subject) continue;
+        subjectsBySection[row.sectionId] = subjectsBySection[row.sectionId] || new Map();
+        subjectsBySection[row.sectionId].set(row.subject.id, row.subject);
+      }
+      // Class-scoped assignments: expand to all sections of that class in current year
+      const classScopedAssignments = await prisma.assignment.findMany({
+        where: {
+          schoolId,
+          teacherId: staffId,
+          class: { academicYearId },
+          ...(subjectIdFilter ? { subjectId: subjectIdFilter } : {})
+        },
+        select: { classId: true, subject: { select: { id: true, name: true } } }
+      });
+      if (classScopedAssignments.length) {
+        const classIds = Array.from(new Set(classScopedAssignments.map(a => a.classId).filter(Boolean)));
+        if (classIds.length) {
+          const classSections = await prisma.section.findMany({ where: { classId: { in: classIds } }, select: { id: true, classId: true } });
+          const sectionsByClass = new Map();
+          for (const s of classSections) {
+            if (!sectionsByClass.has(s.classId)) sectionsByClass.set(s.classId, []);
+            sectionsByClass.get(s.classId).push(s.id);
+          }
+          for (const a of classScopedAssignments) {
+            if (!a.classId || !a.subject) continue;
+            const secIds = sectionsByClass.get(a.classId) || [];
+            for (const sid of secIds) {
+              if (!candidateSectionIds.includes(sid)) continue; // only annotate within candidate set
+              subjectsBySection[sid] = subjectsBySection[sid] || new Map();
+              subjectsBySection[sid].set(a.subject.id, a.subject);
             }
           }
         }
