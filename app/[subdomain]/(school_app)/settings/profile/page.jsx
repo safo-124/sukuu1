@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import RequireRole from '@/components/auth/RequireRole';
 import { useSchool } from '../../layout'; // Assumes useSchool provides comprehensive school data
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
@@ -33,7 +34,7 @@ const initialProfileFormData = {
   // subdomain, customDomain, isActive are usually not editable via this form
 };
 
-export default function SchoolProfilePage() {
+function SchoolProfileInner() {
   const schoolData = useSchool(); // This context provides the currently loaded school data
   const { data: session } = useSession();
 
@@ -213,5 +214,13 @@ export default function SchoolProfilePage() {
 
       {/* Optional: Add sections for Feature Flags, Security Settings, etc. */}
     </div>
+  );
+}
+
+export default function SchoolProfilePage() {
+  return (
+    <RequireRole role="SCHOOL_ADMIN" fallback={<div className="min-h-[200px] flex items-center justify-center text-sm text-muted-foreground">You don't have permission to view School Settings.</div>}>
+      <SchoolProfileInner />
+    </RequireRole>
   );
 }

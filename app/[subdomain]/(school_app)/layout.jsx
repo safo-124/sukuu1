@@ -78,9 +78,11 @@ function SchoolHeader({ schoolName, schoolLogoUrl, onToggleSidebar, userSession 
               <DropdownMenuItem asChild>
                 <Link href={`/${params.subdomain}/teacher/profile`}>Profile</Link>
               </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href={`/${params.subdomain}/settings/profile`}>School Settings</Link>
-              </DropdownMenuItem>
+              {userSession?.user?.role === 'SCHOOL_ADMIN' && (
+                <DropdownMenuItem asChild>
+                  <Link href={`/${params.subdomain}/settings/profile`}>School Settings</Link>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => {
                 const role = userSession?.user?.role;
@@ -156,7 +158,6 @@ function getNavigationSections(schoolSubdomain, role) {
     ];
 
     switch (role) {
-      case 'SUPER_ADMIN':
       case 'SCHOOL_ADMIN':
         return [
           { items: commonItems },
@@ -169,6 +170,19 @@ function getNavigationSections(schoolSubdomain, role) {
           { title: 'Communication', items: communicationItems },
           { title: 'School Setup', items: schoolSetupItems },
         ];
+      case 'SUPER_ADMIN':
+        // Super admins can view most sections, but School Setup (tenant-specific settings)
+        // is restricted to the school's own admin.
+        return [
+          { items: commonItems },
+          { title: 'Academics', items: academicItems },
+          { title: 'People', items: peopleItems },
+          { title: 'Attendance', items: attendanceItems },
+          { title: 'Finance', items: financeItems },
+          { title: 'Human Resources', items: hrItems },
+          { title: 'Resources', items: resourceItems },
+          { title: 'Communication', items: communicationItems },
+        ];
       case 'HR_MANAGER':
         return [
           { items: commonItems },
@@ -176,7 +190,6 @@ function getNavigationSections(schoolSubdomain, role) {
           { title: 'Attendance', items: attendanceItems },
           { title: 'Human Resources', items: hrItems },
           { title: 'Communication', items: communicationItems },
-          { title: 'School Setup', items: [ { href: `/${schoolSubdomain}/settings/profile`, label: 'School Profile', icon: Settings } ] },
         ];
       case 'ACCOUNTANT':
         return [
@@ -196,7 +209,6 @@ function getNavigationSections(schoolSubdomain, role) {
           { title: 'Human Resources', items: hrItems },
           { title: 'Resources', items: resourceItems.filter(i => ['Buildings','Rooms'].includes(i.label)) },
           { title: 'Communication', items: communicationItems },
-          { title: 'School Setup', items: schoolSetupItems },
         ];
       case 'PROCUREMENT_OFFICER': {
         // Custom dashboard link for procurement
