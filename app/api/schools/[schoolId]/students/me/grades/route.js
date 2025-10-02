@@ -11,12 +11,21 @@ export async function GET(request, { params }) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {
+    // Resolve the student's ID first to avoid relation filter pitfalls
+    const student = await prisma.student.findFirst({
+      where: { schoolId, userId: session.user.id },
+      select: { id: true },
+    });
+    if (!student) {
+      // Gracefully return empty list instead of erroring
+      return NextResponse.json({ grades: [] }, { status: 200 });
+    }
+
     const grades = await prisma.grade.findMany({
       where: {
         schoolId,
         isPublished: true,
-        // Use relation filter with 'is' to filter by student's linked user
-        student: { is: { userId: session.user.id } },
+        studentId: student.id,
       },
       include: {
         subject: { select: { id: true, name: true } },
