@@ -50,8 +50,9 @@ export async function middleware(request) {
       const lowerTenantPath = tenantRelativePath.toLowerCase() || '/';
 
       const isLoginPath = lowerTenantPath === '/login' || lowerTenantPath === '/teacher-login';
-      const isTeacherLogin = lowerTenantPath === '/teacher-login';
+  const isTeacherLogin = lowerTenantPath === '/teacher-login';
       const isTeacherDashboard = lowerTenantPath.startsWith('/dashboard/teacher');
+  const isSettingsPath = lowerTenantPath.startsWith('/settings');
 
       const teacherAllowedPrefixes = [
         '/dashboard/teacher',
@@ -161,6 +162,11 @@ export async function middleware(request) {
             url.pathname = buildTenantPath('/login');
             return NextResponse.redirect(url);
           }
+          // Only SCHOOL_ADMIN may access School Settings
+          if (isSettingsPath && role !== 'SCHOOL_ADMIN') {
+            url.pathname = buildTenantPath('/dashboard');
+            return NextResponse.redirect(url);
+          }
         }
       }
     } catch (e) {
@@ -196,7 +202,8 @@ export async function middleware(request) {
       const lowerPath = pathname.toLowerCase();
       const isLoginPath = lowerPath === '/login' || lowerPath === '/teacher-login';
       const isTeacherLogin = lowerPath === '/teacher-login';
-      const isTeacherDashboard = lowerPath.startsWith('/dashboard/teacher');
+  const isTeacherDashboard = lowerPath.startsWith('/dashboard/teacher');
+  const isSettingsPath = lowerPath.startsWith('/settings');
 
       // Teacher allowed prefixes (tenant-relative – no subdomain prefix here)
       const teacherAllowedPrefixes = [
@@ -314,6 +321,11 @@ export async function middleware(request) {
           }
           if (isTeacherLogin) {
             url.pathname = '/login';
+            return NextResponse.redirect(url);
+          }
+          // Only SCHOOL_ADMIN may access School Settings
+          if (isSettingsPath && role !== 'SCHOOL_ADMIN') {
+            url.pathname = '/dashboard';
             return NextResponse.redirect(url);
           }
         }
