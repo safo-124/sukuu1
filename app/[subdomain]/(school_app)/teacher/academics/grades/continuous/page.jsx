@@ -130,30 +130,19 @@ export default function TeacherContinuousGradesPage() {
 
   // Removed test label flow from assignments page
 
-  useEffect(() => {
-    if (!selected.sectionId || !selected.subjectId) return;
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    autosaveTimer.current = setTimeout(async () => {
-  const job = selected.assignmentId ? buildAssignmentJob() : null;
-      if (!job) return;
-      setSaving('saving'); setSaveMessage('Saving changes...');
-      try {
-        const res = await fetch(job.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(job.payload) });
-        const out = await res.json().catch(()=>({}));
-        if (!res.ok) throw new Error(out.error || 'Failed to save');
-        const savedIds = new Set(job.payload.grades.map(g => g.studentId));
-        dirtyIdsRef.current.forEach(id => { if (savedIds.has(id)) dirtyIdsRef.current.delete(id); });
-        setSaving('saved'); setSaveMessage(out.message || 'All changes saved');
-      } catch (err) { setSaving('error'); setSaveMessage('Failed to save'); }
-    }, 800);
-    return () => clearTimeout(autosaveTimer.current);
-  }, [marks, selected.assignmentId, selected.subjectId, selected.sectionId, termYear.termId, termYear.academicYearId]);
+  // Autosave disabled: teachers must click Save to submit grades
 
   const submitAssignment = async () => {
     const job = buildAssignmentJob(); if (!job) return;
-  const res = await fetch(job.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(job.payload) });
-  const data = await res.json().catch(()=>({})); if (!res.ok) return toast.error(data.error || 'Failed to save assignment grades');
-  toast.success(data.message || 'Assignment grades saved');
+    setSaving('saving');
+    const res = await fetch(job.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(job.payload) });
+    const data = await res.json().catch(()=>({}));
+    if (!res.ok) { setSaving('error'); setSaveMessage(data.error || 'Failed to save'); return toast.error(data.error || 'Failed to save assignment grades'); }
+    // Clear saved dirty ids
+    const savedIds = new Set(job.payload.grades.map(g => g.studentId));
+    dirtyIdsRef.current.forEach(id => { if (savedIds.has(id)) dirtyIdsRef.current.delete(id); });
+    setSaving('saved'); setSaveMessage('All changes saved');
+    toast.success(data.message || 'Assignment grades saved');
   };
 
   // Removed submitTest; handled on Tests Grades page
@@ -213,7 +202,9 @@ export default function TeacherContinuousGradesPage() {
 
       <div className="overflow-x-auto">
         <div className="flex items-center justify-between mb-2">
-          <div className="text-xs text-muted-foreground">{saving === 'saving' ? 'Saving…' : saving === 'saved' ? 'All changes saved' : saving === 'error' ? saveMessage : 'Autosave ready'}</div>
+          <div className="text-xs text-muted-foreground">
+            {saving === 'saving' ? 'Saving…' : saving === 'saved' ? 'All changes saved' : saving === 'error' ? saveMessage : 'Changes are not auto-saved. Use the Save button.'}
+          </div>
         </div>
         <table className="min-w-full text-sm">
           <thead>

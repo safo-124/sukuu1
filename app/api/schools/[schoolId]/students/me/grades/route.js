@@ -20,7 +20,8 @@ export async function GET(request, { params }) {
       },
       include: {
         subject: { select: { id: true, name: true } },
-        examSchedule: { select: { id: true, date: true, name: true } },
+        examSchedule: { select: { id: true, date: true, name: true, maxMarks: true } },
+        assignment: { select: { id: true, maxMarks: true, isTest: true, title: true } },
         term: { select: { id: true, name: true } },
         academicYear: { select: { id: true, name: true } },
       },
@@ -33,6 +34,7 @@ export async function GET(request, { params }) {
       comments: g.comments ?? null,
       createdAt: g.createdAt,
       subject: g.subject,
+      assignment: g.assignment ? { id: g.assignment.id, maxMarks: g.assignment.maxMarks ?? null, isTest: !!g.assignment.isTest, title: g.assignment.title } : null,
       examSchedule: g.examSchedule,
       term: g.term,
       academicYear: g.academicYear,

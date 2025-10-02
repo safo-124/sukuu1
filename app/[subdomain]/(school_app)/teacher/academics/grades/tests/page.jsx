@@ -119,36 +119,29 @@ export default function TeacherTestGradesPage() {
     };
   };
 
-  useEffect(() => {
-    if (!selected.sectionId || !selected.subjectId) return;
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    autosaveTimer.current = setTimeout(async () => {
-      const job = selected.testAssignmentId ? buildAssignmentTestJob() : buildLabelTestJob();
-      if (!job) return;
-      setSaving('saving'); setSaveMessage('Saving changes...');
-      try {
-        const res = await fetch(job.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(job.payload) });
-        const out = await res.json().catch(()=>({}));
-        if (!res.ok) throw new Error(out.error || 'Failed to save');
-        const savedIds = new Set(job.payload.grades.map(g => g.studentId));
-        dirtyIdsRef.current.forEach(id => { if (savedIds.has(id)) dirtyIdsRef.current.delete(id); });
-        setSaving('saved'); setSaveMessage(out.message || 'All changes saved');
-      } catch (err) { setSaving('error'); setSaveMessage('Failed to save'); }
-    }, 800);
-    return () => clearTimeout(autosaveTimer.current);
-  }, [marks, selected.testAssignmentId, testLabel, selected.subjectId, selected.sectionId, termYear.termId, termYear.academicYearId]);
+  // Autosave disabled: teachers must click Save to submit grades
 
   const submitAssignmentTest = async () => {
     const job = buildAssignmentTestJob(); if (!job) return;
+    setSaving('saving');
     const res = await fetch(job.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(job.payload) });
-    const data = await res.json().catch(()=>({})); if (!res.ok) return toast.error(data.error || 'Failed to save test grades');
+    const data = await res.json().catch(()=>({}));
+    if (!res.ok) { setSaving('error'); setSaveMessage(data.error || 'Failed to save'); return toast.error(data.error || 'Failed to save test grades'); }
+    const savedIds = new Set(job.payload.grades.map(g => g.studentId));
+    dirtyIdsRef.current.forEach(id => { if (savedIds.has(id)) dirtyIdsRef.current.delete(id); });
+    setSaving('saved'); setSaveMessage('All changes saved');
     toast.success(data.message || 'Test grades saved');
   };
 
   const submitLabelTest = async () => {
     const job = buildLabelTestJob(); if (!job) return;
+    setSaving('saving');
     const res = await fetch(job.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(job.payload) });
-    const data = await res.json().catch(()=>({})); if (!res.ok) return toast.error(data.error || 'Failed to save test grades');
+    const data = await res.json().catch(()=>({}));
+    if (!res.ok) { setSaving('error'); setSaveMessage(data.error || 'Failed to save'); return toast.error(data.error || 'Failed to save test grades'); }
+    const savedIds = new Set(job.payload.grades.map(g => g.studentId));
+    dirtyIdsRef.current.forEach(id => { if (savedIds.has(id)) dirtyIdsRef.current.delete(id); });
+    setSaving('saved'); setSaveMessage('All changes saved');
     toast.success(data.message || 'Test grades saved');
   };
 
@@ -208,7 +201,7 @@ export default function TeacherTestGradesPage() {
 
       <div className="overflow-x-auto">
         <div className="flex items-center justify-between mb-2">
-          <div className="text-xs text-muted-foreground">{saving === 'saving' ? 'Saving…' : saving === 'saved' ? 'All changes saved' : saving === 'error' ? saveMessage : 'Autosave ready'}</div>
+          <div className="text-xs text-muted-foreground">{saving === 'saving' ? 'Saving…' : saving === 'saved' ? 'All changes saved' : saving === 'error' ? saveMessage : 'Changes are not auto-saved. Use the Save button.'}</div>
         </div>
         <table className="min-w-full text-sm">
           <thead>
