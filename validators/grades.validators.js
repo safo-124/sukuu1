@@ -1,8 +1,7 @@
 // validators/grades.validators.js
 import { z } from 'zod';
 
-// Define the base schema with all fields as they would appear when fully formed.
-// The .refine() method will be applied *after* .object() and before .partial() or export.
+
 export const baseGradingWeightConfigSchema = z.object({
   academicYearId: z.string().min(1, "Academic Year is required."),
   schoolLevelId: z.string().nullable().optional(),

@@ -323,7 +323,8 @@ const initialAssignmentFormData = {
 
 function ModernAssignmentForm({ 
   formData, onFormChange, onSelectChange, onFileChange, onRemoveAttachment,
-  subjects, sections, teachers, isLoadingDeps 
+  subjects, sections, teachers, isLoadingDeps,
+  selectedFiles = [], onRemoveSelectedFile,
 }) {
   const [objectives, setObjectives] = useState(formData.objectives || []);
   const [currentStep, setCurrentStep] = useState(1);
@@ -584,6 +585,37 @@ function ModernAssignmentForm({
                 </p>
               </div>
             </div>
+
+            {/* Show newly selected files waiting to be uploaded on save */}
+            {Array.isArray(selectedFiles) && selectedFiles.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Selected (will upload on save):
+                </Label>
+                {selectedFiles.map((file, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <File className="w-5 h-5 text-blue-500" />
+                      <div className="text-sm truncate max-w-xs">
+                        <div className="text-gray-900 dark:text-gray-100 truncate">{file.name}</div>
+                        <div className="text-[11px] text-gray-500">{(file.size/1024/1024).toFixed(2)} MB</div>
+                      </div>
+                    </div>
+                    {onRemoveSelectedFile && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onRemoveSelectedFile(index)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Show existing attachments */}
             {formData.attachments?.length > 0 && (
@@ -893,6 +925,10 @@ export default function ModernAssignmentsPage() {
 
   const handleFileChange = (e) => {
     setSelectedFiles(Array.from(e.target.files || []));
+  };
+
+  const handleRemoveSelectedFile = (index) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleRemoveAttachment = (index) => {
@@ -1219,6 +1255,8 @@ export default function ModernAssignmentsPage() {
               onFormChange={handleFormChange}
               onSelectChange={handleSelectChange}
               onFileChange={handleFileChange}
+              selectedFiles={selectedFiles}
+              onRemoveSelectedFile={handleRemoveSelectedFile}
               onRemoveAttachment={handleRemoveAttachment}
               subjects={subjects}
               sections={sections}

@@ -1,0 +1,65 @@
+---
+title: Sukuu Platform - Module Map
+---
+flowchart LR
+  subgraph School App (Tenant)
+    SA[Dashboard]
+    AC[Academics]
+    AC --> AC1[Levels]
+    AC --> AC2[Departments]
+    AC --> AC3[Classes]
+    AC --> AC4[Subjects]
+    AC --> AC5[Timetable]
+    AC --> AC6[Examinations]
+    AC --> AC7[Grades]
+
+    PE[People]
+    PE --> STU[Students]
+    PE --> PAR[Parents]
+    PE --> TCH[Teachers]
+    PE --> ACC[Accountants]
+    PE --> LIB[Librarians]
+    PE --> HRM[HR Staff]
+
+    AT[Attendance]
+    AT --> ATS[Students]
+    AT --> ATF[Staff]
+
+    FI[Finance]
+    FI --> F1[Fee Structures]
+    FI --> F2[Invoices]
+    FI --> F3[Payments]
+    FI --> F4[Expenses]
+    FI --> F5[Scholarships]
+
+    HR[Human Resources]
+    HR --> H1[Payroll]
+    HR --> H2[Leave Types]
+    HR --> H3[Leave Applications]
+
+    RS[Resources]
+    RS --> R1[Buildings]
+    RS --> R2[Rooms]
+    RS --> R3[Library]
+    RS --> R4[Transport]
+    RS --> R5[Hostel]
+    RS --> R6[Stores]
+
+    CM[Communication]
+    CM --> C1[Announcements]
+    CM --> C2[Events]
+
+    SS[School Setup]
+    SS --> S1[Academic Years]
+    SS --> S2[School Profile]
+  end
+
+  subgraph Superadmin
+    SU1[Schools]
+    SU2[Requests]
+    SU3[Settings]
+    SU4[Analytics]
+  end
+
+  SA -->|Links by role| AC & PE & AT & FI & HR & RS & CM & SS
+  SU1 & SU2 & SU3 & SU4 -->|API| API[(Next.js API Routes)]

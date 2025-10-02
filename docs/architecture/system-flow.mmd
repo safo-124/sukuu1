@@ -1,0 +1,51 @@
+---
+title: Sukuu Platform - High-Level Flow
+---
+flowchart TD
+  subgraph Client Apps
+    A[Marketing Site] -->|Next.js pages| B[Auth/Login]
+    B --> C[School App UI]
+    B --> D[Superadmin UI]
+    C --> E[Teacher Portal]
+    C --> F[Student Portal]
+    C --> G[Parents]
+    C --> H[Staff Roles]
+    I[Mobile Parent App\n(Flutter)] -->|REST/JSON| J[API Routes]
+  end
+
+  subgraph Next.js App Router
+    J[API Routes] --> K[lib/auth (NextAuth)]
+    J --> L[lib/prisma]
+    J --> M[lib/schoolSettings]
+    J --> N[lib/notify, billing, utils]
+  end
+
+  subgraph Middleware
+    O[Edge Middleware\n- Tenant routing\n- Role redirects\n- Guards /settings] --> P[App Router]
+  end
+
+  subgraph Database
+    Q[(PostgreSQL)]
+    L <--> Q
+    M <--> Q
+  end
+
+  subgraph Identity
+    R[NextAuth Providers]\n--> K
+    K --> S[Session/JWT]
+    S --> P
+  end
+
+  %% Navigation flows
+  E -->|Assignments/Grades/Timetable| J
+  F -->|Subjects/Exams/Grades| J
+  H -->|Admin Modules| J
+  D -->|Manage Tenants/Settings| J
+  C -->|School Settings (admin only)| J
+
+  %% Storage/Uploads (optional)
+  T[Uploads (S3/Local)] --- J
+
+  %% Notes
+  classDef area fill:#111,stroke:#555,color:#fff
+  class Client Apps,Next.js App Router,Middleware,Database,Identity area
