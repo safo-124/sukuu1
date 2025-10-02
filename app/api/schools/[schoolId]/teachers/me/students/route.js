@@ -66,6 +66,19 @@ export async function GET(request, { params }) {
     });
     const timetableSectionIds = timetableSectionRows.map(r => r.sectionId).filter(Boolean);
 
+    // Subjects taught via timetable (for broader subject-teacher inference)
+    const timetableSubjectsForTeacher = await prisma.timetableEntry.findMany({
+      where: {
+        schoolId,
+        staffId,
+        ...(subjectIdFilter ? { subjectId: subjectIdFilter } : {}),
+        section: { class: { academicYearId } }
+      },
+      distinct: ['subjectId'],
+      select: { subjectId: true }
+    });
+    const subjectIdsFromTimetable = timetableSubjectsForTeacher.map(t => t.subjectId).filter(Boolean);
+
     // Sections via StaffSubjectLevel (derive sections through classes matching level or class assignment)
     // We load classes for levels the teacher teaches, then their sections.
     const ssl = await prisma.staffSubjectLevel.findMany({
@@ -100,6 +113,28 @@ export async function GET(request, { params }) {
     }
     // Ensure sections belong to current academic year (through class relation)
     const sectionsFromSSLIds = sectionsFromSSL.filter(s => s.class?.academicYearId === academicYearId).map(s => s.id);
+
+    // Classes offering subjects this teacher teaches (via ClassSubjects pivot)
+    const subjectIdsFromSSL = ssl.map(r => r.subjectId).filter(Boolean);
+    const teacherSubjectIds = Array.from(new Set([ ...subjectIdsFromSSL, ...subjectIdsFromTimetable ])).filter(Boolean);
+    let sectionsFromClassSubjectsIds = [];
+    if (teacherSubjectIds.length) {
+      const classesOfferingMySubjects = await prisma.class.findMany({
+        where: {
+          schoolId,
+          academicYearId,
+          ...(classIdFilter ? { id: classIdFilter } : {}),
+          ...(levelIdFilter ? { schoolLevelId: levelIdFilter } : {}),
+          subjects: { some: { id: { in: teacherSubjectIds } } }
+        },
+        select: { id: true }
+      });
+      const classIds = classesOfferingMySubjects.map(c => c.id);
+      if (classIds.length) {
+        const secs = await prisma.section.findMany({ where: { classId: { in: classIds } }, select: { id: true } });
+        sectionsFromClassSubjectsIds = secs.map(s => s.id);
+      }
+    }
 
     // Sections inferred via Assignments created by this teacher (acts as a proxy for teaching a subject)
     //  - Direct section assignments: include those sections if they belong to current academic year
@@ -137,6 +172,7 @@ export async function GET(request, { params }) {
       ...classTeacherSectionIds,
       ...timetableSectionIds,
       ...sectionsFromSSLIds,
+      ...sectionsFromClassSubjectsIds,
       ...assignmentSectionIdsDirect,
       ...assignmentSectionIdsViaClass
     ])).filter(Boolean);
@@ -219,7 +255,7 @@ export async function GET(request, { params }) {
         subjectsBySection[row.sectionId] = subjectsBySection[row.sectionId] || new Map();
         subjectsBySection[row.sectionId].set(row.subject.id, row.subject);
       }
-      // Subjects via StaffSubjectLevel (match classes or levels)
+  // Subjects via StaffSubjectLevel (match classes or levels)
       const classesOfEnrollments = Array.from(new Set(enrollments.map(e => e.section.classId)));
       const classMapLevel = new Map(enrollments.map(e => [e.section.classId, e.section.class.schoolLevelId]));
       const sslSubjects = await prisma.staffSubjectLevel.findMany({
@@ -241,7 +277,7 @@ export async function GET(request, { params }) {
           }
         }
       }
-      // Subjects via Assignments (section-scoped and class-scoped)
+  // Subjects via Assignments (section-scoped and class-scoped)
       const assignmentSubjectsBySection = await prisma.assignment.findMany({
         where: {
           schoolId,
@@ -284,6 +320,22 @@ export async function GET(request, { params }) {
               subjectsBySection[sid] = subjectsBySection[sid] || new Map();
               subjectsBySection[sid].set(a.subject.id, a.subject);
             }
+          }
+        }
+      }
+
+      // Subjects via ClassSubjects pivot (classes offering my subjects)
+      if (teacherSubjectIds.length) {
+        const secs = await prisma.section.findMany({
+          where: { id: { in: candidateSectionIds } },
+          select: { id: true, class: { select: { id: true, subjects: { select: { id: true, name: true } } } } }
+        });
+        for (const sec of secs) {
+          const offered = (sec.class?.subjects || []).filter(sub => teacherSubjectIds.includes(sub.id));
+          if (!offered.length) continue;
+          subjectsBySection[sec.id] = subjectsBySection[sec.id] || new Map();
+          for (const sub of offered) {
+            subjectsBySection[sec.id].set(sub.id, { id: sub.id, name: sub.name });
           }
         }
       }
