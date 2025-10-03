@@ -112,7 +112,7 @@ export default function LoginPage() {
                 {schoolLoading ? "Loading..." : school?.name || "School Admin Login"}
               </h1>
               <p className="text-gray-300">
-                {school?.name ? `${school.name} • Admin Portal` : "Access your school management portal"}
+                {school?.name ? school.name : "Access your school management portal"}
               </p>
             </div>
 
