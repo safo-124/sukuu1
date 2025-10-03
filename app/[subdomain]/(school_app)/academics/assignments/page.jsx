@@ -46,6 +46,8 @@ function StudentAssignmentsView() {
   const [content, setContent] = useState('');
   const [files, setFiles] = useState([]);
   const [activeTab, setActiveTab] = useState('pending');
+  const [subjectFilter, setSubjectFilter] = useState('__all__');
+  const [sortBy, setSortBy] = useState('dueDateAsc'); // dueDateAsc | dueDateDesc
 
   useEffect(() => {
     fetchAssignments();
@@ -68,12 +70,18 @@ function StudentAssignmentsView() {
 
   const categorizedAssignments = useMemo(() => {
     const now = new Date();
-    const pending = assignments.filter(a => new Date(a.dueDate) > now && !a.submitted);
-    const overdue = assignments.filter(a => new Date(a.dueDate) <= now && !a.submitted);
-    const completed = assignments.filter(a => a.submitted);
+    const filterBySubject = (arr) => subjectFilter === '__all__' ? arr : arr.filter(a => a.subjectId === subjectFilter);
+    const sorters = {
+      dueDateAsc: (a, b) => new Date(a.dueDate) - new Date(b.dueDate),
+      dueDateDesc: (a, b) => new Date(b.dueDate) - new Date(a.dueDate),
+    };
+    const sortFn = sorters[sortBy] || sorters.dueDateAsc;
+    const pending = filterBySubject(assignments.filter(a => new Date(a.dueDate) > now && !a.submitted)).sort(sortFn);
+    const overdue = filterBySubject(assignments.filter(a => new Date(a.dueDate) <= now && !a.submitted)).sort(sortFn);
+    const completed = filterBySubject(assignments.filter(a => a.submitted)).sort(sortFn);
     
     return { pending, overdue, completed };
-  }, [assignments]);
+  }, [assignments, subjectFilter, sortBy]);
 
   const getStatusColor = (assignment) => {
     const now = new Date();
@@ -130,6 +138,30 @@ function StudentAssignmentsView() {
           <p className="text-gray-600 dark:text-gray-400">
             {categorizedAssignments.pending.length} pending, {categorizedAssignments.overdue.length} overdue
           </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Select value={subjectFilter} onValueChange={setSubjectFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="All Subjects" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All Subjects</SelectItem>
+              {/* Subject options will be derived from assignments */}
+              {Array.from(new Map(assignments.filter(a=>a.subject).map(a => [a.subjectId, a.subject])).values())
+                .map(s => (
+                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Sort" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="dueDateAsc">Due date (soonest)</SelectItem>
+              <SelectItem value="dueDateDesc">Due date (latest)</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -478,6 +510,16 @@ function AssignmentDetailModal({ assignment, isOpen, onClose, onSubmitted }) {
                   </AlertDescription>
                 </Alert>
               )}
+
+              {submission?.feedback && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Teacher Feedback</AlertTitle>
+                  <AlertDescription className="text-sm whitespace-pre-wrap">
+                    {submission.feedback}
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
           )}
         </div>
@@ -485,7 +527,11 @@ function AssignmentDetailModal({ assignment, isOpen, onClose, onSubmitted }) {
           <DialogClose asChild>
             <Button variant="outline">Close</Button>
           </DialogClose>
-          <Button onClick={submitWork} disabled={uploading}>
+          <Button 
+            onClick={submitWork} 
+            disabled={uploading || (submission && (submission.marksObtained != null || submission.gradedAt != null))}
+            title={submission && (submission.marksObtained != null || submission.gradedAt != null) ? 'Submission already graded' : undefined}
+          >
             {uploading ? 'Submitting...' : 'Submit'}
           </Button>
         </DialogFooter>

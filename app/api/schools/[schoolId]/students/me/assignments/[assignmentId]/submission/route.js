@@ -63,7 +63,7 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json().catch(() => ({}));
+  const body = await request.json().catch(() => ({}));
     const { content, attachments, answers } = body || {};
 
     // Resolve student and current enrollment for visibility checks
@@ -73,8 +73,8 @@ export async function POST(request, { params }) {
     });
     if (!enrollment) return NextResponse.json({ error: 'No active enrollment found.' }, { status: 400 });
 
-    // Load assignment and visibility
-    const assignment = await prisma.assignment.findFirst({ where: { id: assignmentId, schoolId } });
+  // Load assignment and visibility
+  const assignment = await prisma.assignment.findFirst({ where: { id: assignmentId, schoolId } });
     if (!assignment) return NextResponse.json({ error: 'Assignment not found.' }, { status: 404 });
 
     // Visibility: assignment is for my section OR my class OR general
@@ -90,6 +90,15 @@ export async function POST(request, { params }) {
     if (assignment.dueDate && new Date(assignment.dueDate) < now) {
       // Allow but warn; you can change to hard block by returning 400
       console.warn('Submitting after due date');
+    }
+
+    // If there is an existing graded submission, block re-submission
+    const existing = await prisma.submittedAssignment.findUnique({
+      where: { assignmentId_studentId: { assignmentId, studentId: enrollment.studentId } },
+      select: { id: true, marksObtained: true, gradedAt: true },
+    });
+    if (existing && (existing.marksObtained !== null || existing.gradedAt !== null)) {
+      return NextResponse.json({ error: 'This submission has already been graded and cannot be changed.' }, { status: 400 });
     }
 
     // Build submission payload
