@@ -46,18 +46,34 @@ export async function POST(request) {
           continue; // Skip items that are not actual files (e.g., empty parts of formData)
       }
 
-      // Save to local filesystem under public/uploads/assignments
-      const rawName = path.basename(file.name);
-      const safeBase = rawName.replace(/[^a-zA-Z0-9_.-]/g, '_');
-      const uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeBase}`;
-      const filePath = path.join(uploadsDir, uniqueName);
+      try {
+        // If running on a read-only filesystem (e.g., some serverless envs), bail out with a helpful message
+        if (process.env.VERCEL) {
+          throw new Error('Local filesystem uploads are not supported on this hosting environment. Please configure cloud storage (e.g., S3).');
+        }
 
-      const buffer = Buffer.from(await file.arrayBuffer());
-      await fs.writeFile(filePath, buffer);
+        // Save to local filesystem under public/uploads/assignments
+        const rawName = path.basename(file.name);
+        const safeBase = rawName.replace(/[^a-zA-Z0-9_.-]/g, '_');
+        const uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeBase}`;
+        const filePath = path.join(uploadsDir, uniqueName);
 
-      const publicUrl = `${origin}/uploads/assignments/${uniqueName}`;
-      uploadedFileUrls.push(publicUrl);
-      console.log(`Saved upload: ${file.name} -> ${publicUrl}`);
+        const buffer = Buffer.from(await file.arrayBuffer());
+        await fs.writeFile(filePath, buffer);
+
+        const publicUrl = `${origin}/uploads/assignments/${uniqueName}`;
+        uploadedFileUrls.push(publicUrl);
+        console.log(`Saved upload: ${file.name} -> ${publicUrl}`);
+      } catch (e) {
+        // Surface a friendly error, especially for read-only FS
+        if (e && (e.code === 'EROFS' || e.code === 'EPERM')) {
+          return NextResponse.json({
+            error: 'File storage is read-only in this environment. Configure S3 (or another cloud storage) or run locally.',
+            details: String(e.message || e)
+          }, { status: 500 });
+        }
+        return NextResponse.json({ error: e?.message || 'Failed to save file.' }, { status: 500 });
+      }
     }
 
     return NextResponse.json({ message: 'Files uploaded successfully.', fileUrls: uploadedFileUrls }, { status: 200 });
