@@ -31,7 +31,28 @@ export async function GET(request, { params }) {
       orderBy: { dueDate: 'asc' }
     });
 
-    return NextResponse.json({ assignments });
+    // Look up my submissions for these assignments
+    const ids = assignments.map(a => a.id);
+    const mySubs = ids.length
+      ? await prisma.submittedAssignment.findMany({
+          where: { schoolId, studentId: enrollment.studentId, assignmentId: { in: ids } },
+          select: { assignmentId: true, id: true, submittedAt: true, marksObtained: true }
+        })
+      : [];
+    const subMap = new Map(mySubs.map(s => [s.assignmentId, s]));
+
+    const out = assignments.map(a => {
+      const sub = subMap.get(a.id);
+      return {
+        ...a,
+        submitted: !!sub,
+        mySubmission: sub
+          ? { id: sub.id, submittedAt: sub.submittedAt, marksObtained: sub.marksObtained ?? null }
+          : null,
+      };
+    });
+
+    return NextResponse.json({ assignments: out });
   } catch (e) {
     console.error('Student self assignments error', e);
     return NextResponse.json({ error: 'Failed to fetch assignments' }, { status: 500 });

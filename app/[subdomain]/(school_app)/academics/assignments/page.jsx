@@ -181,6 +181,10 @@ function StudentAssignmentsView() {
           assignment={selectedAssignment}
           isOpen={!!selectedAssignment}
           onClose={() => setSelectedAssignment(null)}
+          onSubmitted={() => {
+            // Refresh assignments after submit to update status counters
+            (async () => { try { await fetchAssignments(); } catch {} })();
+          }}
         />
       )}
     </div>
@@ -288,18 +292,203 @@ function AssignmentsList({ assignments, onSelect }) {
   );
 }
 
-function AssignmentDetailModal({ assignment, isOpen, onClose }) {
-  // Assignment detail modal implementation
+function AssignmentDetailModal({ assignment, isOpen, onClose, onSubmitted }) {
+  const { data: session } = useSession();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [submission, setSubmission] = useState(null);
+  const [answerContent, setAnswerContent] = useState('');
+  const [answers, setAnswers] = useState([]); // for OBJECTIVE
+  const [uploading, setUploading] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState([]);
+
+  useEffect(() => {
+    if (!isOpen || !session?.user?.schoolId || !assignment?.id) return;
+    (async () => {
+      try {
+        setLoading(true);
+        setError('');
+        const res = await fetch(`/api/schools/${session.user.schoolId}/students/me/assignments/${assignment.id}/submission`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to load submission');
+        setSubmission(data.submission || null);
+        if (data.contentJson?.answers) setAnswers(data.contentJson.answers);
+        // For subjective, if content is plain string, show it
+        if (data.submission?.content && assignment.type !== 'OBJECTIVE') {
+          try {
+            // If stored JSON, ignore here; else set as plain text
+            JSON.parse(data.submission.content);
+          } catch {
+            setAnswerContent(data.submission.content);
+          }
+        }
+      } catch (e) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [isOpen, session?.user?.schoolId, assignment?.id, assignment?.type]);
+
+  const dueInfo = useMemo(() => {
+    const due = new Date(assignment.dueDate);
+    const now = new Date();
+    const diffH = (due - now) / 36e5;
+    return {
+      text: diffH < 0 ? `Overdue by ${Math.ceil(-diffH)} hours` : diffH < 24 ? `Due in ${Math.ceil(diffH)} hours` : due.toLocaleString(),
+      overdue: diffH < 0,
+    };
+  }, [assignment?.dueDate]);
+
+  const handleFileInput = (e) => {
+    setPendingFiles(Array.from(e.target.files || []));
+  };
+
+  const uploadPendingFiles = async () => {
+    if (!pendingFiles.length) return [];
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      pendingFiles.forEach(f => fd.append('files', f));
+      const res = await fetch('/api/upload-files', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      return data.fileUrls || [];
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const submitWork = async () => {
+    try {
+      setUploading(true);
+      const uploaded = await uploadPendingFiles();
+      const payload = assignment.type === 'OBJECTIVE' ? {
+        answers,
+        attachments: uploaded,
+      } : {
+        content: answerContent,
+        attachments: uploaded,
+      };
+      const res = await fetch(`/api/schools/${session.user.schoolId}/students/me/assignments/${assignment.id}/submission`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Submission failed');
+      toast.success('Submission saved');
+      setSubmission(data.submission);
+      setPendingFiles([]);
+      if (onSubmitted) onSubmitted();
+    } catch (e) {
+      toast.error('Failed to submit', { description: e.message });
+      setError(e.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>{assignment.title}</DialogTitle>
+          <DialogDescription>
+            <div className={`text-sm ${dueInfo.overdue ? 'text-red-600' : 'text-gray-500'}`}>{dueInfo.text}</div>
+          </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
-          <p>{assignment.description}</p>
-          {/* Add submission interface here */}
+        <div className="space-y-6">
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="space-y-2">
+            <Label>Description</Label>
+            <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{assignment.description || 'No description'}</p>
+          </div>
+
+          {assignment.attachments?.length > 0 && (
+            <div className="space-y-2">
+              <Label>Files</Label>
+              <div className="space-y-2">
+                {assignment.attachments.map((url, i) => (
+                  <a key={i} href={url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-blue-600 hover:underline">
+                    <Paperclip className="w-4 h-4" />
+                    {url.split('/').pop()}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {loading ? (
+            <div className="text-sm text-gray-500">Loading...</div>
+          ) : (
+            <div className="space-y-4">
+              {assignment.type === 'OBJECTIVE' ? (
+                <div className="space-y-3">
+                  <Label>Your Answers</Label>
+                  {(assignment.objectives || []).map((q, idx) => {
+                    const val = answers.find(a => a.question === q.question)?.answer || '';
+                    return (
+                      <div key={idx} className="space-y-1">
+                        <div className="text-sm font-medium">Q{idx + 1}. {q.question}</div>
+                        <Input
+                          value={val}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setAnswers(prev => {
+                              const next = [...prev];
+                              const i = next.findIndex(a => a.question === q.question);
+                              if (i >= 0) next[i] = { question: q.question, answer: v }; else next.push({ question: q.question, answer: v });
+                              return next;
+                            });
+                          }}
+                          placeholder="Your answer"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Your Work</Label>
+                  <Textarea rows={6} value={answerContent} onChange={(e) => setAnswerContent(e.target.value)} placeholder="Type your answer here..." />
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label>Attach Files</Label>
+                <Input type="file" multiple onChange={handleFileInput} />
+                {pendingFiles.length > 0 && (
+                  <div className="text-xs text-gray-500">{pendingFiles.length} file(s) selected</div>
+                )}
+              </div>
+
+              {submission && (
+                <Alert>
+                  <CheckSquare className="h-4 w-4" />
+                  <AlertTitle>Last submitted</AlertTitle>
+                  <AlertDescription className="text-sm">
+                    {new Date(submission.submittedAt).toLocaleString()} {submission.marksObtained != null ? `• Score: ${submission.marksObtained}` : ''}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
         </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">Close</Button>
+          </DialogClose>
+          <Button onClick={submitWork} disabled={uploading}>
+            {uploading ? 'Submitting...' : 'Submit'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
