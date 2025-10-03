@@ -423,14 +423,14 @@ function AssignmentDetailModal({ assignment, isOpen, onClose, onSubmitted }) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
+      <DialogContent className="max-w-3xl w-full max-h-[90vh] p-0 flex flex-col">
+        <DialogHeader className="p-6 pb-4">
           <DialogTitle>{assignment.title}</DialogTitle>
           <DialogDescription>
             <div className={`text-sm ${dueInfo.overdue ? 'text-red-600' : 'text-gray-500'}`}>{dueInfo.text}</div>
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-6">
+        <div className="flex-1 overflow-y-auto px-6 space-y-6">
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -533,7 +533,7 @@ function AssignmentDetailModal({ assignment, isOpen, onClose, onSubmitted }) {
             </div>
           )}
         </div>
-        <DialogFooter>
+        <DialogFooter className="p-4 border-t bg-background">
           <DialogClose asChild>
             <Button variant="outline">Close</Button>
           </DialogClose>
