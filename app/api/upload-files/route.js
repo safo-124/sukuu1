@@ -1,6 +1,8 @@
 // app/api/upload-files/route.js
 import { NextResponse } from 'next/server';
-import { parse } from 'url';
+import path from 'path';
+import fs from 'fs/promises';
+export const runtime = 'nodejs';
 // You'll need to install formidable or another multipart/form-data parser if you don't use Next.js's native FormData handling in latest versions.
 // For Next.js 13/14 App Router, Request.formData() handles this, but for larger files or complex parsing, a library might be needed.
 // For simpler cases, directly using request.formData() is sufficient.
@@ -32,36 +34,33 @@ export async function POST(request) {
 
     const uploadedFileUrls = [];
 
+    // Ensure uploads directory exists (public/uploads/assignments)
+    const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'assignments');
+    await fs.mkdir(uploadsDir, { recursive: true });
+
+    const { origin } = new URL(request.url);
+
     for (const file of files) {
       if (!file.name) {
           console.warn("Skipping file without a name:", file);
           continue; // Skip items that are not actual files (e.g., empty parts of formData)
       }
 
-      // --- PLACEHOLDER FOR S3 UPLOAD LOGIC ---
-      // In a real application, you'd upload 'file' to S3 here.
-      // Example (conceptual):
-      // const buffer = Buffer.from(await file.arrayBuffer());
-      // const fileName = `${Date.now()}-${file.name.replace(/\s/g, '_')}`; // Unique filename
-      // const uploadParams = {
-      //   Bucket: process.env.S3_BUCKET_NAME,
-      //   Key: `assignments/${fileName}`, // Folder structure in S3
-      //   Body: buffer,
-      //   ContentType: file.type,
-      // };
+      // Save to local filesystem under public/uploads/assignments
+      const rawName = path.basename(file.name);
+      const safeBase = rawName.replace(/[^a-zA-Z0-9_.-]/g, '_');
+      const uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeBase}`;
+      const filePath = path.join(uploadsDir, uniqueName);
 
-      // await s3Client.send(new PutObjectCommand(uploadParams));
-      // const fileUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/assignments/${fileName}`;
-      // uploadedFileUrls.push(fileUrl);
-      // --- END PLACEHOLDER ---
+      const buffer = Buffer.from(await file.arrayBuffer());
+      await fs.writeFile(filePath, buffer);
 
-      // For demonstration, let's mock a URL:
-      const mockFileUrl = `https://mockstorage.com/assignments/${Date.now()}-${file.name.replace(/\s/g, '_')}`;
-      uploadedFileUrls.push(mockFileUrl);
-      console.log(`Mock uploaded: ${file.name} -> ${mockFileUrl}`);
+      const publicUrl = `${origin}/uploads/assignments/${uniqueName}`;
+      uploadedFileUrls.push(publicUrl);
+      console.log(`Saved upload: ${file.name} -> ${publicUrl}`);
     }
 
-    return NextResponse.json({ message: 'Files uploaded successfully (mock).', fileUrls: uploadedFileUrls }, { status: 200 });
+    return NextResponse.json({ message: 'Files uploaded successfully.', fileUrls: uploadedFileUrls }, { status: 200 });
 
   } catch (error) {
     console.error('File upload error:', error);

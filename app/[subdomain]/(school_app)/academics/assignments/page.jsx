@@ -447,12 +447,22 @@ function AssignmentDetailModal({ assignment, isOpen, onClose, onSubmitted }) {
             <div className="space-y-2">
               <Label>Files</Label>
               <div className="space-y-2">
-                {assignment.attachments.map((url, i) => (
-                  <a key={i} href={url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-blue-600 hover:underline">
-                    <Paperclip className="w-4 h-4" />
-                    {url.split('/').pop()}
-                  </a>
-                ))}
+                {assignment.attachments.map((url, i) => {
+                  let host = '';
+                  try { host = new URL(url, typeof window !== 'undefined' ? window.location.origin : 'http://localhost').hostname; } catch {}
+                  const isMock = host.includes('mockstorage.com');
+                  return (
+                    <div key={i} className="flex items-center gap-2 text-sm">
+                      <a href={url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline flex items-center gap-2">
+                        <Paperclip className="w-4 h-4" />
+                        {url.split('/').pop()}
+                      </a>
+                      {isMock && (
+                        <span className="text-xs text-red-500">Unavailable link (re-upload needed)</span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
